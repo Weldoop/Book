@@ -18,7 +18,6 @@ export interface CompactionResult {
   resolve_threads: string[];
 }
 
-export const COMPACT_EVERY_BEATS = 20;
 export const STORY_SO_FAR_CAP_TOKENS = 500;
 export const CHAPTER_CAP_TOKENS = 250;
 export const MAX_FACTS_PER_ENTITY = 8;

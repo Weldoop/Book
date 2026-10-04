@@ -31,6 +31,12 @@ offers a way on, the next thing you type picks the story up wherever the config 
 move, the lost time and the confiscated possessions all applied by code. An ending with no
 continuation closes the save.
 
+The GM says when a scene has closed, and the console marks it with a dim `--- the scene closes ---`.
+That is also where memory gets compacted, so a chapter summary is never cut through the middle of a
+conversation and the live scene is never trimmed out of the recent window. The GM can also keep short
+private notes for what it is setting up; they are never shown to you and expire after a few turns, so
+anything that still matters has to become a thread. See `docs/adr/0006-scenes-and-private-notes.md`.
+
 ```bash
 pnpm book inspect --save <name>            # per-turn calls, tokens, cost, latency, rolls, threads shown
 pnpm book inspect --save <name> --turn 4   # the full record for one turn
