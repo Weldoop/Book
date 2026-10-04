@@ -56,14 +56,19 @@ export async function runPlay(opts: PlayOptions): Promise<void> {
     await opts.api.newGame(rt, opts.saveId);
     io.write(dim(`New game "${opts.saveId}": ${opts.config.meta.title}. Type your first action (for example "Start the game").`) + "\n");
   }
-  io.write(dim("/quit to exit, /debug to toggle the debug dump.") + "\n");
+  io.write(dim("One line = one turn (several actions in one line are fine). End a line with \\ to continue it on the next line. /quit to exit, /debug for the debug dump.") + "\n");
 
   let debug = opts.debug ?? false;
   let last: TurnResultLike | undefined;
 
   for (;;) {
-    const line = await io.readLine("\n> ");
+    let line = await io.readLine("\n> ");
     if (line === null) break;
+    while (line.trimEnd().endsWith("\\")) {
+      const more = await io.readLine("... ");
+      if (more === null) break;
+      line = `${line.trimEnd().slice(0, -1)}\n${more}`;
+    }
     const text = line.trim();
     if (text === "/quit" || text === "/exit") break;
     if (text === "/debug") {

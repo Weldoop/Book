@@ -41,6 +41,13 @@ describe("runPlay", () => {
     expect(api.calls).toEqual(["go"]);
   });
 
+  it("joins lines ending with a backslash into one turn", async () => {
+    const io = scriptedIO(["first action \\", "second action", "/quit"]);
+    const api = fakeRuntimeApi();
+    await runPlay({ api, config: makeConfig("light"), store: new MemoryStore(), llm: new MockProvider(), saveId: "p", io });
+    expect(api.calls).toEqual(["first action\nsecond action"]);
+  });
+
   it("resumes an existing save and uses dim codes when color is on", async () => {
     const store = new MemoryStore();
     const api = fakeRuntimeApi();
