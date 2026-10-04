@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { MockProvider } from "@book/llm";
 import { MemoryStore } from "@book/store";
-import { runCli, runPlay } from "../src/index.ts";
+import { endingLines, runCli, runPlay, sceneLine } from "../src/index.ts";
 import type { PlayIO } from "../src/index.ts";
 import { fakeRuntimeApi, makeConfig } from "./helpers.ts";
 import { writeFile } from "node:fs/promises";
@@ -118,6 +118,44 @@ async function setup() {
   await writeFile(probes, JSON.stringify([{ after_turn: 3, question: "What did I do?", expect_any: ["what did i do"] }]));
   return { dir, config, fx, probes };
 }
+
+describe("sceneLine", () => {
+  const base = { turn: 4, kind: "act", narration: "n", status: null, panel: [], outcome: "ok", record: {} } as never;
+
+  it("says nothing while the scene is still running", () => {
+    expect(sceneLine(base)).toBeNull();
+  });
+
+  it("offers the way on once the GM closes the scene", () => {
+    expect(sceneLine({ ...(base as object), scene_ended: true } as never)).toContain("the scene closes");
+  });
+
+  it("stays quiet when an ending is already doing the talking", () => {
+    const ended = { ...(base as object), scene_ended: true, ending: { id: "e", title: "T", text: "x" } };
+    expect(sceneLine(ended as never)).toBeNull();
+  });
+});
+
+describe("endingLines", () => {
+  const base = { turn: 4, kind: "act", narration: "n", status: null, panel: [], outcome: "ok", record: {} } as never;
+
+  it("says nothing on an ordinary turn", () => {
+    expect(endingLines(base)).toEqual([]);
+  });
+
+  it("offers the way on when the ending has one", () => {
+    const lines = endingLines({ ...(base as object), ending: { id: "charged", title: "Charged", text: "The cell door shuts.", continuation: "Wake up in a cell" } } as never);
+    expect(lines[0]).toBe("--- Charged ---");
+    expect(lines[1]).toBe("The cell door shuts.");
+    expect(lines[2]).toContain("Wake up in a cell");
+    expect(lines[2]).toContain("/quit");
+  });
+
+  it("closes the book when the ending is final", () => {
+    const lines = endingLines({ ...(base as object), ending: { id: "charged", title: "Charged", text: "The cell door shuts." } } as never);
+    expect(lines[2]).toBe("This story is over. /quit to leave it here.");
+  });
+});
 
 describe("runCli", () => {
   it("replay writes a report, baseline writes another, report compares them", async () => {

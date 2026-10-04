@@ -59,6 +59,30 @@ export const SummariesSchema = z.object({
 });
 export type Summaries = z.infer<typeof SummariesSchema>;
 
+export const SceneSchema = z.object({
+  index: z.number().int().min(1).default(1),
+  started_turn: z.number().int().min(0).default(0),
+  /** Set when the GM declares the scene closed. The next input opens the next one. */
+  closed: z.boolean().default(false),
+});
+export type Scene = z.infer<typeof SceneSchema>;
+
+/** A private GM note. Never rendered to the player and never carried into beats or summaries. */
+export const GmNoteSchema = z.object({
+  turn: z.number().int().min(0),
+  text: z.string(),
+});
+export type GmNote = z.infer<typeof GmNoteSchema>;
+
+/** An ending that has fired and is waiting for the player to carry on or leave it here. */
+export const PendingEndingSchema = z.object({
+  id: IdSchema,
+  turn: z.number().int().min(0),
+  /** False when the ending is final, so the save is closed rather than paused. */
+  continuable: z.boolean(),
+});
+export type PendingEnding = z.infer<typeof PendingEndingSchema>;
+
 export const STATE_VERSION = 1 as const;
 
 export const StateSchema = z.object({
@@ -75,6 +99,13 @@ export const StateSchema = z.object({
   summaries: SummariesSchema,
   window: z.array(TranscriptTurnSchema),
   focus_next: z.array(IdSchema).default([]),
+  scene: SceneSchema.default({}),
+  /** Private, short-lived GM notes. Not player-facing and not part of long-term memory. */
+  notes: z.array(GmNoteSchema).default([]),
+  /** Set while an ending is waiting on the player. Cleared when the story carries on. */
+  ending: PendingEndingSchema.nullable().default(null),
+  /** Endings already fired, so one cannot fire twice after a continuation. */
+  endings_seen: z.array(IdSchema).default([]),
   modules: z.record(z.string(), z.unknown()),
 });
 export type State = z.infer<typeof StateSchema>;

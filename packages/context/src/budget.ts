@@ -6,6 +6,7 @@ export interface ContextBudget {
   state_snapshot: number;
   due_events: number;
   threads: number;
+  notes: number;
   entities_in_focus: number;
   window: number;
   beats: number;
@@ -20,6 +21,7 @@ export const DEFAULT_BUDGET: ContextBudget = {
   state_snapshot: 600,
   due_events: 100,
   threads: 300,
+  notes: 120,
   entities_in_focus: 500,
   window: 800,
   beats: 400,

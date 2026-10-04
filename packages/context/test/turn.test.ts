@@ -171,6 +171,7 @@ describe("buildTurnContext structure", () => {
       "state_snapshot",
       "due_events",
       "threads",
+      "notes",
       "entities_in_focus",
       "story_so_far",
       "beats",
@@ -179,6 +180,40 @@ describe("buildTurnContext structure", () => {
     ]);
     expect(ctx.total_tokens).toBe(ctx.parts.reduce((n, p) => n + p.tokens, 0));
     expect(ctx.focus).toContain("glenys");
+  });
+});
+
+describe("private notes and the scene header", () => {
+  const notes = [
+    { turn: 3, text: "oldest" },
+    { turn: 4, text: "middle" },
+    { turn: 5, text: "newest" },
+    { turn: 6, text: "newer still" },
+  ];
+
+  it("adds nothing when the GM has written no notes", () => {
+    expect(part(build(), "notes").tokens).toBe(0);
+  });
+
+  it("shows the newest notes only, capped by max_in_context", () => {
+    const ctx = build({}, makeState({ notes }));
+    const text = JSON.stringify(ctx.messages);
+    expect(text).toContain("YOUR PRIVATE NOTES");
+    expect(text).toContain("newer still");
+    expect(text).toContain("newest");
+    expect(text).toContain("middle");
+    expect(text).not.toContain("oldest");
+  });
+
+  it("omits the section entirely when the game has notes switched off", () => {
+    const off = makeConfig({ notes: { enabled: false } });
+    const ctx = buildTurnContext({ config: off, state: makeState({ notes }), modules, input: "hi", kind: "act", due: [] });
+    expect(JSON.stringify(ctx.messages)).not.toContain("PRIVATE NOTES");
+  });
+
+  it("tells the GM which scene it is in and how long it has run", () => {
+    const ctx = build({}, makeState({ turn: 9, scene: { index: 3, started_turn: 4, closed: false } }));
+    expect(JSON.stringify(ctx.messages)).toContain("Scene 3, running 5 turns");
   });
 });
 

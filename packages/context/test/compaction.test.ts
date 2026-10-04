@@ -28,14 +28,27 @@ const good: CompactionResult = {
 
 describe("shouldCompact", () => {
   const beats = (n: number, from = 1) => Array.from({ length: n }, (_, i) => ({ turn: from + i, text: "b" }));
-  it("is true at 20 beats since last compaction by default", () => {
-    expect(shouldCompact(makeState({ beats: beats(19) }))).toBe(false);
-    expect(shouldCompact(makeState({ beats: beats(20) }))).toBe(true);
+  const closed = { index: 1, started_turn: 0, closed: true };
+
+  it("holds off mid-scene until the backstop, so a chapter is never cut in half", () => {
+    expect(shouldCompact(makeState({ beats: beats(19) }), config)).toBe(false);
+    expect(shouldCompact(makeState({ beats: beats(20) }), config)).toBe(true);
   });
-  it("ignores beats already compacted and honours everyBeats", () => {
+
+  it("compacts as soon as the GM closes a scene, once there is enough to compact", () => {
+    expect(shouldCompact(makeState({ beats: beats(7), scene: closed }), config)).toBe(false);
+    expect(shouldCompact(makeState({ beats: beats(8), scene: closed }), config)).toBe(true);
+  });
+
+  it("takes the thresholds from the config", () => {
+    const eager = makeConfig({ scenes: { min_beats: 2, max_beats: 5, keep_scene_turns: 12 } });
+    expect(shouldCompact(makeState({ beats: beats(2), scene: closed }), eager)).toBe(true);
+    expect(shouldCompact(makeState({ beats: beats(5) }), eager)).toBe(true);
+  });
+
+  it("ignores beats already compacted", () => {
     const s = makeState({ beats: beats(30), summaries: { chapters: [], story_so_far: "", last_compacted_turn: 15 } });
-    expect(shouldCompact(s)).toBe(false);
-    expect(shouldCompact(s, { everyBeats: 15 })).toBe(true);
+    expect(shouldCompact(s, config)).toBe(false);
   });
 });
 
@@ -155,7 +168,7 @@ describe("applyCompaction", () => {
   }
 
   it("updates summaries, beats, window and last_compacted_turn without mutating input", () => {
-    const state = deepFreeze(baseState());
+    const state = deepFreeze({ ...baseState(), scene: { index: 4, started_turn: 38, closed: true } });
     const out = applyCompaction(state, good, config);
     expect(out.summaries.chapters).toEqual(["Ch1", good.chapter_summary]);
     expect(out.summaries.story_so_far).toBe(good.story_so_far);
@@ -167,6 +180,21 @@ describe("applyCompaction", () => {
     expect(state.window).toHaveLength(9);
     expect(state.beats).toHaveLength(2);
     expect(out).not.toBe(state);
+  });
+
+  it("keeps the live scene verbatim when a forced compaction lands mid-scene", () => {
+    const state = { ...baseState(), scene: { index: 4, started_turn: 32, closed: false } };
+    const out = applyCompaction(state, good, config);
+    // The scene opened after turn 32, so turns 33-40 are still live and the usual six would cut it.
+    expect(out.window).toHaveLength(8);
+    expect(out.window[0]?.turn).toBe(33);
+  });
+
+  it("never keeps more of a runaway scene than keep_scene_turns", () => {
+    const tight = makeConfig({ scenes: { min_beats: 8, max_beats: 20, keep_scene_turns: 7 } });
+    const state = { ...baseState(), scene: { index: 4, started_turn: 0, closed: false } };
+    const out = applyCompaction(state, good, tight);
+    expect(out.window).toHaveLength(7);
   });
 
   it("caps story_so_far at ~500 tokens by dropping the oldest sentences", () => {
@@ -222,7 +250,7 @@ describe("applyCompaction", () => {
       turn: 25,
       beats: Array.from({ length: 25 }, (_, i) => ({ turn: i + 1, text: "b" })),
     });
-    expect(shouldCompact(state)).toBe(true);
-    expect(shouldCompact(applyCompaction(state, good, config))).toBe(false);
+    expect(shouldCompact(state, config)).toBe(true);
+    expect(shouldCompact(applyCompaction(state, good, config), config)).toBe(false);
   });
 });

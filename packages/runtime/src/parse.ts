@@ -14,6 +14,25 @@ export function extractJson(text: string): unknown {
 
 export type ParsedDraft = { ok: true; draft: TurnDraft } | { ok: false; error: string };
 
+const HIDDEN = /\[\s*HIDDEN\s*:\s*([^\]]*)\]/gi;
+
+/**
+ * Safety net for the private-notes habit: some models write `[HIDDEN: ...]` inline because that is
+ * how other story games ask for it. Lift any of it out of the narration into `notes`, so a private
+ * thought can never reach the player through the transcript.
+ */
+export function liftHiddenNotes(draft: TurnDraft): TurnDraft {
+  const lifted: string[] = [];
+  const stripped = draft.narration.replace(HIDDEN, (_match, note: string) => {
+    const text = note.trim();
+    if (text) lifted.push(text);
+    return "";
+  });
+  if (stripped === draft.narration) return draft;
+  const narration = stripped.replace(/[ \t]{2,}/g, " ").trim();
+  return { ...draft, narration, notes: [...(draft.notes ?? []), ...lifted] };
+}
+
 export function parseDraftText(text: string): ParsedDraft {
   let value: unknown;
   try {
@@ -26,7 +45,11 @@ export function parseDraftText(text: string): ParsedDraft {
     const issue = parsed.error.issues[0];
     return { ok: false, error: `${issue?.path.join(".") || "draft"}: ${issue?.message ?? "invalid"}` };
   }
-  return { ok: true, draft: parsed.data };
+  const draft = liftHiddenNotes(parsed.data);
+  if (draft.narration.length === 0) {
+    return { ok: false, error: "narration: the reply was nothing but a hidden note" };
+  }
+  return { ok: true, draft };
 }
 
 const DeltaRepairSchema = z.object({

@@ -14,12 +14,12 @@ const RATING: Record<string, string> = {
   mature: "Content rating: mature. Mature themes are allowed within the model provider's usage policy.",
 };
 
-export function outputFormatText(order: OutputOrder): string {
+export function outputFormatText(order: OutputOrder, config?: Config): string {
   const keys =
     order === "delta_first"
       ? "Write the keys in this order: delta, beat, narration (the delta is checked first)."
       : "Write the keys in this order: narration, delta, beat.";
-  return [
+  const lines = [
     "OUTPUT",
     "Reply with a single JSON object only. No prose, no code fences, no commentary before or after it.",
     "Write the narration once, inside the JSON. Never write the story as plain text as well.",
@@ -30,7 +30,28 @@ export function outputFormatText(order: OutputOrder): string {
     '- "focus_next": optional array of entity ids likely to matter next turn.',
     '- "need": optional array of ids you lack information on.',
     '- "check": optional {"what": "what was at stake", "stat": "stat id"} - set this ONLY when you resolved the action with the fate die.',
-    keys,
+    '- "scene_ended": optional true - set this ONLY when the scene has just come to a natural close.',
+  ];
+  if (config?.notes.enabled) {
+    lines.push('- "notes": optional array of short private strings, for your eyes only (see NOTES).');
+  }
+  lines.push(keys);
+  return lines.join("\n");
+}
+
+export function sceneText(config: Config): string {
+  return [
+    "- A scene is one continuous stretch of story: a place, a conversation, a job of work. SCENE says which one you are in and how long it has run.",
+    '- Set "scene_ended": true only on the turn one genuinely closes: the player leaves, sleeps, the conversation is over, the errand is done. The engine tidies its memory at that moment, so answer honestly.',
+    `- Never set it mid-conversation or mid-task because a turn felt finished. After about ${config.scenes.max_beats} turns the engine tidies up regardless.`,
+  ].join("\n");
+}
+
+export function notesText(config: Config): string {
+  return [
+    `- You may add short private notes in "notes": a secret the player has not found, a turn you mean to take soon, a detail to pay off. The newest ${config.notes.max_in_context} come back under YOUR PRIVATE NOTES.`,
+    "- They are never shown to the player. Never mention or quote them, and never write them into the narration.",
+    `- They expire after ${config.notes.ttl_turns} turns. If one still matters, make it real: open a thread, or add an entity fact. A note is a reminder to yourself; a thread is a promise to the story.`,
   ].join("\n");
 }
 
@@ -38,6 +59,11 @@ const VIOLENCE: Record<string, string> = {
   deflect: [
     "- The player may attempt violence; you never narrate the injury. The attempt misses, is blocked, is flinched away from, or lands harmlessly, for a concrete physical reason.",
     "- Make it cost them instead: people react, leave, call someone, stop trusting them, and the trouble follows. Open a thread for the fallout and move relationships in the delta.",
+  ].join("\n"),
+  consequence: [
+    "- The player may attempt violence and it lands. Report it plainly in one or two clauses and move on: no gore, no technique, no dwelling on pain or fear.",
+    "- The world answers immediately and in proportion. Bystanders intervene, people call someone, and the authorities of this setting arrive on their own schedule.",
+    "- The cost is the story: put the injury, the money, the standing and the trouble in the delta, and open a thread for what the player now has to live with.",
   ].join("\n"),
   adventure: [
     "- This is an adventure: fights are part of the genre. Blows land, people are wounded, and characters can die. Keep it swashbuckling, not gruesome; no lingering on gore or suffering.",
@@ -124,6 +150,9 @@ export function contractText(config: Config, modules: Module[], order: OutputOrd
     "THREADS",
     threadText(config),
     "",
+    "SCENES",
+    sceneText(config),
+    "",
     "STYLE",
     `- At most ${style.max_words} words of narration, in ${PERSON[style.person] ?? style.person}.`,
   ];
@@ -131,6 +160,7 @@ export function contractText(config: Config, modules: Module[], order: OutputOrd
     lines.push("- Never decide the player's actions, words or feelings; stop where the player chooses.");
   }
   for (const rule of style.extra_rules) lines.push(`- ${rule}`);
+  if (config.notes.enabled) lines.push("", "NOTES", notesText(config));
   lines.push(
     "",
     "CONTENT",
@@ -140,7 +170,7 @@ export function contractText(config: Config, modules: Module[], order: OutputOrd
     "OPS",
     describeOps(modules),
     "",
-    outputFormatText(order),
+    outputFormatText(order, config),
   );
   return lines.join("\n");
 }

@@ -55,6 +55,10 @@ export function createInitialState(config: Config, modules: Module[], saveId: st
     summaries: { chapters: [], story_so_far: "", last_compacted_turn: 0 },
     window: [],
     focus_next: [],
+    scene: { index: 1, started_turn: 0, closed: false },
+    notes: [],
+    ending: null,
+    endings_seen: [],
     modules: moduleState,
   };
 }

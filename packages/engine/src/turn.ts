@@ -2,6 +2,7 @@ import {
   TurnDraftSchema,
   type Config,
   type DueItem,
+  type GmNote,
   type Module,
   type State,
   type TurnDraft,
@@ -124,6 +125,33 @@ export function ageThreads(state: State, config: Config, shown: string[], turn: 
   }
 }
 
+const NOTES_CAP = 12;
+
+/**
+ * Keeps the GM's private notes, drops the ones that have aged out, and truncates anything that grew
+ * into prose. Expiry is the point: a note is for the next few turns, so anything with a longer life
+ * has to be opened as a thread instead.
+ */
+export function collectNotes(state: State, config: Config, draft: TurnDraft, turn: number): GmNote[] {
+  if (!config.notes.enabled) return [];
+  const cutoff = turn - config.notes.ttl_turns;
+  const kept = state.notes.filter((n) => n.turn > cutoff);
+  const added = (draft.notes ?? [])
+    .map((text) => text.trim())
+    .filter((text) => text.length > 0)
+    .map((text) => ({ turn, text: text.slice(0, config.notes.max_chars) }));
+  return [...kept, ...added].slice(-NOTES_CAP);
+}
+
+/**
+ * Opens the next scene once the GM has closed the last one. Called before a turn is built, so the
+ * scene the player is about to act in is the new one.
+ */
+export function openScene(state: State): State {
+  if (!state.scene.closed) return state;
+  return { ...state, scene: { index: state.scene.index + 1, started_turn: state.turn, closed: false } };
+}
+
 /** Applies a draft that has already passed validation. Pure: returns the next state. */
 export function applyDraft(state: State, config: Config, modules: Module[], draft: TurnDraft, ctx: ApplyContext): State {
   const processed = processOps(state, config, modules, draft.delta);
@@ -169,6 +197,8 @@ export function applyDraft(state: State, config: Config, modules: Module[], draf
   }
 
   next.turn = turn;
+  if (draft.scene_ended) next.scene = { ...next.scene, closed: true };
+  next.notes = collectNotes(next, config, draft, turn);
   next.beats.push({ turn, text: draft.beat });
   if (next.beats.length > BEATS_CAP) next.beats = next.beats.slice(-BEATS_CAP);
   next.window.push({ turn, input: ctx.input, narration: draft.narration, clock: next.clock.now });
