@@ -5,7 +5,7 @@ import type { State } from "./state.ts";
 export type TurnKind = "act" | "continue" | "ooc";
 
 export interface Attempt {
-  kind: "draft" | "delta_repair" | "rewrite_repair";
+  kind: "draft" | "format_repair" | "delta_repair" | "rewrite_repair";
   draft?: unknown;
   violations: Violation[];
   usage?: LLMUsage;

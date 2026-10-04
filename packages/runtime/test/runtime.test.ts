@@ -87,12 +87,27 @@ describe("playTurn", () => {
     expect(JSON.stringify(records[0]?.attempts[0]?.draft)).toContain("yacht");
   });
 
-  it("treats unparseable output as game breaking and rewrites", async () => {
-    const llm = scripted({ turn: ["Sorry, I cannot do that."], rewrite_repair: [draft([])] });
+  it("reformats unparseable output on the cheap tier with no GM interlude", async () => {
+    const llm = scripted({ turn: ["<invoke>narration: Rain taps the window.</invoke>"], format_repair: [draft([])] });
     const { rt } = await setup(llm);
-    const res = await playTurn(rt, "s1", "Look around");
-    expect(res.outcome).toBe("rewritten");
+    const interludes: string[] = [];
+    const res = await playTurn(rt, "s1", "Look around", { onInterlude: (t) => interludes.push(t) });
+    expect(res.outcome).toBe("repaired");
+    expect(interludes).toEqual([]);
+    expect(res.interlude).toBeUndefined();
     expect(res.record.attempts[0]?.violations[0]?.code).toBe("unparseable");
+    expect(res.record.attempts[1]?.kind).toBe("format_repair");
+    expect(llm.calls.map((c) => [c.purpose, c.tier])).toEqual([["turn", "strong"], ["format_repair", "cheap"]]);
+  });
+
+  it("retries the original request when the model returned empty text", async () => {
+    const llm = scripted({ turn: [""], format_repair: [draft([])] });
+    const { rt } = await setup(llm);
+    const interludes: string[] = [];
+    const res = await playTurn(rt, "s1", "Look around", { onInterlude: (t) => interludes.push(t) });
+    expect(res.outcome).toBe("repaired");
+    expect(interludes).toEqual([]);
+    expect(llm.calls.map((c) => [c.purpose, c.tier])).toEqual([["turn", "strong"], ["format_repair", "strong"]]);
   });
 
   it("rolls back with the GM note after two failed repairs and does not advance the turn", async () => {

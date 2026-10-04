@@ -75,6 +75,29 @@ describe("AnthropicProvider", () => {
     expect(calls[1]!.body.model).toBe("claude-sonnet-4-5");
   });
 
+  it("disables extended thinking by default and allows opting in", async () => {
+    const a = make([OK]);
+    await a.p.complete(req());
+    expect(a.calls[0]!.body.thinking).toEqual({ type: "disabled" });
+    const b = make([OK], { BOOK_THINKING: "on" });
+    await b.p.complete(req());
+    expect(b.calls[0]!.body.thinking).toBeUndefined();
+  });
+
+  it("retries without the thinking param if the model rejects it, and remembers", async () => {
+    const { p, calls } = make([
+      { status: 400, body: { error: { message: "thinking: not supported for this model" } } },
+      OK,
+      OK,
+    ]);
+    const r = await p.complete(req());
+    expect(r.text).toBe("hello world");
+    expect(calls).toHaveLength(2);
+    expect(calls[1]!.body.thinking).toBeUndefined();
+    await p.complete(req());
+    expect(calls[2]!.body.thinking).toBeUndefined();
+  });
+
   it("parses text and usage, with total input including cache reads", async () => {
     const { p } = make([OK]);
     const r = await p.complete(req());

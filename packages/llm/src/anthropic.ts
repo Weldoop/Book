@@ -56,6 +56,7 @@ export class AnthropicProvider implements LLMProvider {
   private readonly baseUrl: string;
   private readonly maxRetries: number;
   private readonly backoffBaseMs: number;
+  private thinkingUnsupported = false;
 
   constructor(opts: AnthropicProviderOptions = {}) {
     this.env = opts.env ?? process.env;
@@ -87,7 +88,9 @@ export class AnthropicProvider implements LLMProvider {
       }));
     }
     if (req.temperature !== undefined) body.temperature = req.temperature;
-    const payload = JSON.stringify(body);
+    // Hidden reasoning tokens count against max_tokens and can leave no room for the JSON reply.
+    if (!this.thinkingUnsupported && this.env.BOOK_THINKING !== "on") body.thinking = { type: "disabled" };
+    let payload = JSON.stringify(body);
 
     const started = performance.now();
     let attempt = 0;
@@ -121,6 +124,12 @@ export class AnthropicProvider implements LLMProvider {
           Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : this.backoffBaseMs * 2 ** attempt;
         attempt++;
         await this.sleep(wait);
+        continue;
+      }
+      if (res.status === 400 && body.thinking !== undefined && /thinking/i.test(raw)) {
+        delete body.thinking;
+        this.thinkingUnsupported = true;
+        payload = JSON.stringify(body);
         continue;
       }
       if (res.status === 401 || res.status === 403) {

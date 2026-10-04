@@ -11,6 +11,7 @@ import {
   validateDraft,
 } from "@book/engine";
 import {
+  describeOps,
   applyCompaction,
   buildCompactionRequest,
   buildOocContext,
@@ -83,7 +84,7 @@ export async function newGame(rt: Runtime, saveId: string): Promise<State> {
   return state;
 }
 
-const TURN_MAX_TOKENS = 700;
+const TURN_MAX_TOKENS = 1000;
 const MAX_REPAIRS = 2;
 
 interface Evaluated {
@@ -100,7 +101,7 @@ function evaluate(state: State, rt: Runtime, text: string): Evaluated {
       text,
       violations: [
         {
-          severity: "game_breaking",
+          severity: "fixable",
           code: "unparseable",
           message: `The reply could not be read as the required JSON object (${parsed.error}). Reply with exactly one JSON object with keys narration, delta, beat.`,
         },
@@ -189,9 +190,30 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
 
   while (current.violations.length > 0 && repairs < MAX_REPAIRS) {
     const severity = severityOf(current.violations);
-    const canPatchDelta = severity === "fixable" && repairs === 0 && current.draft !== null;
+    const formatFailure = current.draft === null;
+    const canPatchDelta = severity === "fixable" && !formatFailure && repairs === 0;
 
-    if (canPatchDelta && current.draft) {
+    if (formatFailure && repairs === 0) {
+      // The reply was not valid JSON. Reformat it (or retry if empty); the story content is not in question, so no interlude.
+      const raw = current.text.trim();
+      const res = raw
+        ? await call({
+            tier: "cheap",
+            purpose: "format_repair",
+            system: [
+              {
+                text: `Convert the Game Master reply below into ONE JSON object and return only that JSON. Keys: "narration" (string, keep the story text exactly), "delta" (array of ops, may be empty), "beat" (one line under 20 words), optional "focus_next" (array of entity ids). Allowed ops:\n${describeOps(modules)}\nIf the reply already contains the JSON, extract and fix it. Do not add commentary.`,
+                cache: true,
+              },
+            ],
+            messages: [{ role: "user", content: raw }],
+            max_tokens: TURN_MAX_TOKENS,
+            json: true,
+          })
+        : await call({ tier: "strong", purpose: "format_repair", system: ctx.system, messages: ctx.messages, max_tokens: TURN_MAX_TOKENS, json: true });
+      current = evaluate(state, rt, res.text);
+      attempts.push({ kind: "format_repair", draft: current.draft ?? current.text, violations: current.violations, usage: res.usage });
+    } else if (canPatchDelta && current.draft) {
       const rc = buildRepairContext({
         kind: "delta_repair",
         config,
@@ -217,7 +239,7 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
       }
       attempts.push({ kind: "delta_repair", draft: current.draft ?? current.text, violations: current.violations, usage: res.usage });
     } else {
-      if (!rewrote) {
+      if (!rewrote && !formatFailure && severity === "game_breaking") {
         interlude = pickInterlude(state, config);
         hooks.onInterlude?.(interlude);
       }
