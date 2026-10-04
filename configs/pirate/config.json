@@ -1,0 +1,305 @@
+{
+  "id": "pirate",
+  "version": 1,
+  "meta": {
+    "title": "Black Water Reckoning",
+    "tone": "adventurous, brisk, swashbuckling, a little mechanical",
+    "premise": "The Caribbean, 1717. You command the sloop Marigold with a loyal but hungry crew, thin pockets and a Crown that would very much like you hanged. Trade, raid, scheme or run; the tide waits for no one.",
+    "content_rating": "clean"
+  },
+  "player_id": "player",
+  "modules": ["stats", "inventory", "relationships", "events", "dice"],
+  "gm_style": {
+    "max_words": 100,
+    "person": "second",
+    "never_decide_for_player": true,
+    "extra_rules": [
+      "Show the roll, its label and the threshold when the presentation profile is tabletop.",
+      "Call for a roll on any risky action: boarding, running a blockade, bluffing an officer, weathering a storm.",
+      "Voyages cost time and supplies; narrate distance in days at sea, not miles.",
+      "Keep the tone bold and nautical with period flavour, but stay readable; no more than one piece of slang per sentence.",
+      "Captains, officers and crew have their own agendas and do not obey without reason or pay.",
+      "Violence is cinematic and brief; no gore."
+    ],
+    "interludes": [
+      "The tide turns. The Game Master hauls the chart back across the table and redraws the last stretch of coast.",
+      "A sudden hush on the wind. The Game Master calls 'Belay that!' and rewinds the glass a few grains.",
+      "The sea shimmers like a mirage and the Game Master steadies the helm, then takes the moment from the top.",
+      "A gull screams, the lantern gutters, and the Game Master quietly corrects the ship's log.",
+      "The horizon folds like old parchment. The Game Master smooths the creases and tries the passage again.",
+      "Thunder somewhere far off. The Game Master rewinds the sand glass and sets the scene afresh."
+    ],
+    "rollback_note": "The Game Master shakes their head. That course won't hold. Choose another heading, Captain?"
+  },
+  "presentation": {
+    "profile": "tabletop",
+    "status_line": ["gold", "supplies", "crew_morale", "ship_hull", "reputation_crown", "reputation_pirates", "location", "time"]
+  },
+  "time": {
+    "start": "1717-05-01T06:00",
+    "min_per_action": 5,
+    "max_per_turn": 1440
+  },
+  "stats": [
+    { "key": "gold", "label": "Gold", "type": "currency", "start": 120, "display": "doubloons", "hidden": false },
+    { "key": "supplies", "label": "Supplies", "type": "bounded", "min": 0, "max": 100, "start": 60, "hidden": false },
+    { "key": "crew_morale", "label": "Crew morale", "type": "bounded", "min": 0, "max": 100, "start": 65, "hidden": false },
+    { "key": "ship_hull", "label": "Hull", "type": "bounded", "min": 0, "max": 100, "start": 85, "hidden": false },
+    { "key": "reputation_crown", "label": "Infamy with the Crown", "type": "counter", "min": 0, "start": 5, "hidden": false },
+    { "key": "reputation_pirates", "label": "Standing among pirates", "type": "counter", "min": 0, "start": 10, "hidden": false }
+  ],
+  "items": [
+    { "id": "cutlass", "name": "Cutlass", "price": 15 },
+    { "id": "flintlock-pistol", "name": "Flintlock pistol", "price": 25 },
+    { "id": "spyglass", "name": "Brass spyglass", "price": 30 },
+    { "id": "sea-chart", "name": "Sea chart of the Windward Passage", "price": 40 },
+    { "id": "ship-biscuit", "name": "Barrel of ship's biscuit", "price": 8 },
+    { "id": "rum-cask", "name": "Cask of rum", "price": 12 },
+    { "id": "salt-pork", "name": "Cask of salt pork", "price": 10 },
+    { "id": "canvas", "name": "Bolt of sailcloth", "price": 18 },
+    { "id": "pitch-and-oakum", "name": "Pitch and oakum for patching", "price": 14 },
+    { "id": "letter-of-marque", "name": "Forged letter of marque", "price": 60 },
+    { "id": "powder-keg", "name": "Keg of gunpowder", "price": 20 },
+    { "id": "sugar-crate", "name": "Crate of muscovado sugar", "price": 35 }
+  ],
+  "events": {
+    "scheduled": [
+      {
+        "id": "nassau-trade-window",
+        "at": "1717-05-03T09:00",
+        "text": "The Spanish prize auction opens at Nassau. Sugar, powder and rum change hands at good prices for anyone with gold and nerve.",
+        "entities": ["nassau"],
+        "thread": { "kind": "goal", "text": "The Nassau prize auction is open; buy cheap or sell your cargo for a premium." }
+      },
+      {
+        "id": "royal-navy-patrol",
+        "at": "1717-05-05T14:00",
+        "text": "The sails of HMS Kestrel are sighted off the headland, a patrol cutter hunting for pirates and smugglers.",
+        "entities": ["royal-navy", "port-royal"]
+      },
+      {
+        "id": "squall-line",
+        "at": "1717-05-07T17:00",
+        "text": "The glass drops fast. A black squall line is marching up from the south-east and will hit by nightfall.",
+        "entities": ["marigold"]
+      },
+      {
+        "id": "crowe-deadline",
+        "at": "1717-05-10T12:00",
+        "text": "Captain Crowe's patience runs out. He expects the payment you promised at Tortuga, or he will come to collect it.",
+        "entities": ["silas-crowe", "tortuga"],
+        "thread": { "kind": "debt", "text": "Owe Captain Crowe 80 doubloons by noon on 10 May." }
+      }
+    ],
+    "conditional": [
+      {
+        "id": "scurvy-warning",
+        "when": { "kind": "stat", "key": "supplies", "op": "<=", "value": 15 },
+        "text": "The larder is nearly bare. Hands are eyeing the last biscuits and a couple of the crew have gums that bleed.",
+        "entities": ["marigold"],
+        "once": false
+      },
+      {
+        "id": "mutinous-grumbling",
+        "when": { "kind": "stat", "key": "crew_morale", "op": "<=", "value": 20 },
+        "text": "Low talk below decks goes quiet when you pass. Bess Calloway warns that somebody has been counting the pistols.",
+        "entities": ["bess-calloway"],
+        "once": true
+      },
+      {
+        "id": "hull-taking-water",
+        "when": { "kind": "stat", "key": "ship_hull", "op": "<=", "value": 30 },
+        "text": "The pumps are going day and night. Every wave finds another seam to weep through.",
+        "entities": ["marigold"],
+        "once": false
+      },
+      {
+        "id": "crown-hunts-you",
+        "when": { "kind": "stat", "key": "reputation_crown", "op": ">=", "value": 40 },
+        "text": "A reward notice bearing your description is nailed up in every Crown port. Naval captains hunt for you in earnest.",
+        "entities": ["royal-navy"],
+        "once": true
+      },
+      {
+        "id": "crowe-grudge",
+        "when": { "kind": "relationship", "a": "player", "b": "silas-crowe", "op": "<=", "value": -30 },
+        "text": "Crowe's flag is spotted tailing the Marigold at a distance, patient as a shark.",
+        "entities": ["silas-crowe"],
+        "once": true
+      },
+      {
+        "id": "hurricane-season",
+        "when": { "kind": "after", "at": "1717-05-20T06:00" },
+        "text": "Old hands start sniffing the air. Hurricane season is not far away, and harbours will fill with nervous ships.",
+        "entities": ["player"],
+        "once": true
+      }
+    ],
+    "random": [
+      {
+        "id": "sea-weather",
+        "chance_per_hour": 0.1,
+        "entries": [
+          { "text": "A hard squall hits with little warning; sails must be reefed fast.", "weight": 2 },
+          { "text": "A dead calm settles; the sails hang slack and the heat presses down.", "weight": 3 },
+          { "text": "A fine fair wind fills the canvas and the Marigold fairly flies.", "weight": 3 },
+          { "text": "Thick fog rolls in and swallows the bowsprit.", "weight": 2 },
+          { "text": "A pod of dolphins races the bow, taken by the crew as a good omen.", "weight": 2 }
+        ]
+      },
+      {
+        "id": "naval-patrols",
+        "chance_per_hour": 0.08,
+        "entries": [
+          { "text": "A Royal Navy sloop appears on the horizon, hull-up and closing.", "weight": 2 },
+          { "text": "A lone merchantman limps along, low in the water with cargo.", "weight": 3 },
+          { "text": "A Spanish guarda costa shadows you at a careful distance.", "weight": 2 },
+          { "text": "A fishing boat offers a rumour in exchange for a bottle of rum.", "weight": 3 }
+        ]
+      },
+      {
+        "id": "port-rumours",
+        "chance_per_hour": 0.12,
+        "entries": [
+          { "text": "A drunken sailor swears a treasure galleon is anchored off a nameless cay.", "weight": 2 },
+          { "text": "A merchant is looking for armed escorts and pays well.", "weight": 3 },
+          { "text": "Press gangs are working the quayside tonight.", "weight": 2 },
+          { "text": "A fence on the waterfront is buying stolen goods at a premium.", "weight": 3 },
+          { "text": "A ragged fortune-teller offers to read your future for a coin.", "weight": 1 }
+        ]
+      }
+    ]
+  },
+  "dice": {
+    "sides": 20,
+    "thresholds": [2, 6, 11, 16, 19],
+    "labels": ["Catastrophe", "Failure", "Setback", "Success", "Strong success", "Legendary"]
+  },
+  "seed": {
+    "entities": [
+      {
+        "id": "player",
+        "type": "person",
+        "name": "The Captain",
+        "location": "marigold",
+        "facts": ["Captain of the sloop Marigold. Name and past are for the player to decide."],
+        "tags": ["player", "captain"]
+      },
+      {
+        "id": "marigold",
+        "type": "place",
+        "name": "The Marigold",
+        "aliases": ["the sloop", "the ship"],
+        "location": "nassau",
+        "facts": ["A fast single-masted sloop, eight guns, forty crew, patched in several places."],
+        "tags": ["ship"]
+      },
+      {
+        "id": "nassau",
+        "type": "place",
+        "name": "Nassau",
+        "facts": ["Free pirate haven in the Bahamas; no law but the Brethren's code; busy market and rowdy taverns."],
+        "tags": ["port", "pirate"]
+      },
+      {
+        "id": "port-royal",
+        "type": "place",
+        "name": "Port Royal",
+        "facts": ["Crown-held harbour in Jamaica with a garrison, a gallows and rich merchants."],
+        "tags": ["port", "crown"]
+      },
+      {
+        "id": "tortuga",
+        "type": "place",
+        "name": "Tortuga",
+        "facts": ["Rough French-tolerant island port where privateers refit and few questions are asked."],
+        "tags": ["port", "neutral"]
+      },
+      {
+        "id": "havana",
+        "type": "place",
+        "name": "Havana",
+        "facts": ["Heavily fortified Spanish harbour and treasure-fleet staging point."],
+        "tags": ["port", "spanish"]
+      },
+      {
+        "id": "royal-navy",
+        "type": "faction",
+        "name": "The Royal Navy",
+        "aliases": ["the Crown", "the Navy"],
+        "facts": ["Hunts pirates and smugglers in the Caribbean on behalf of the Crown."],
+        "tags": ["crown"]
+      },
+      {
+        "id": "brethren",
+        "type": "faction",
+        "name": "The Brethren of the Coast",
+        "aliases": ["the Brethren"],
+        "facts": ["Loose pirate fellowship centred on Nassau."],
+        "tags": ["pirate"]
+      },
+      {
+        "id": "bess-calloway",
+        "type": "person",
+        "name": "Bess Calloway",
+        "aliases": ["the quartermaster"],
+        "location": "marigold",
+        "facts": ["Quartermaster of the Marigold. Blunt, fair, and keeper of the ship's stores and accounts."],
+        "tags": ["crew"]
+      },
+      {
+        "id": "silas-crowe",
+        "type": "person",
+        "name": "Captain Silas Crowe",
+        "location": "tortuga",
+        "facts": ["Pirate captain of the brigantine Gallows Lark. Lent the player money and expects it back with interest."],
+        "tags": ["rival", "pirate"]
+      },
+      {
+        "id": "isabelle-moreau",
+        "type": "person",
+        "name": "Captain Isabelle Moreau",
+        "aliases": ["Madame Moreau"],
+        "location": "nassau",
+        "facts": ["French privateer captain. Charming, ruthless, and always looking for a profitable partnership."],
+        "tags": ["rival", "privateer"]
+      },
+      {
+        "id": "commander-hale",
+        "type": "person",
+        "name": "Commander Edmund Hale",
+        "location": "port-royal",
+        "facts": ["Royal Navy officer commanding HMS Kestrel. Stiff, persistent and has a personal list of pirates."],
+        "tags": ["rival", "crown"]
+      }
+    ],
+    "threads": [
+      {
+        "kind": "debt",
+        "text": "Repay Captain Crowe 80 doubloons by 10 May or face his wrath.",
+        "due": "1717-05-10T12:00",
+        "entities": ["silas-crowe", "tortuga", "player"]
+      },
+      {
+        "kind": "goal",
+        "text": "Restock supplies and repair the hull before the next long voyage; the Nassau auction opens on 3 May.",
+        "due": "1717-05-03T09:00",
+        "entities": ["marigold", "nassau", "bess-calloway"]
+      }
+    ],
+    "inventory": [
+      { "owner": "player", "item": "cutlass", "qty": 1 },
+      { "owner": "player", "item": "flintlock-pistol", "qty": 2 },
+      { "owner": "player", "item": "spyglass", "qty": 1 },
+      { "owner": "player", "item": "sea-chart", "qty": 1 },
+      { "owner": "player", "item": "ship-biscuit", "qty": 2 },
+      { "owner": "player", "item": "rum-cask", "qty": 1 }
+    ],
+    "relationships": [
+      { "a": "player", "b": "bess-calloway", "value": 55 },
+      { "a": "player", "b": "silas-crowe", "value": -5 },
+      { "a": "player", "b": "isabelle-moreau", "value": 15 },
+      { "a": "player", "b": "commander-hale", "value": -25 }
+    ]
+  }
+}

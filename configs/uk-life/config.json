@@ -1,0 +1,314 @@
+{
+  "id": "uk-life",
+  "version": 1,
+  "meta": {
+    "title": "Uplands: A Student Life",
+    "tone": "grounded, dry, British",
+    "premise": "You are a first-year student in a rented shared house in Uplands, Swansea. It is a damp Saturday in early October, you have £45 to last, the garden is a jungle, and the letting agent is due to inspect the house on Monday.",
+    "content_rating": "romance"
+  },
+  "player_id": "player",
+  "modules": ["stats", "inventory", "relationships", "events", "dice", "offscreen"],
+  "gm_style": {
+    "max_words": 90,
+    "person": "second",
+    "never_decide_for_player": true,
+    "extra_rules": [
+      "Show dice odds or thresholds only when the presentation profile is tabletop; otherwise narrate outcomes without numbers.",
+      "Never end a scene with a stage prompt such as 'What do you do?' or 'Your move'; stop on a concrete detail and let the player lead.",
+      "Keep British spelling, British idiom and dry humour; understatement beats exclamation marks.",
+      "Money is in pounds sterling. Prices are realistic for a Swansea student: a cob is a few quid, a pint is under five.",
+      "Never narrate the player's words, decisions or feelings for them; describe the world and what other people say and do.",
+      "Other characters have their own plans and moods; they do not simply agree with the player.",
+      "Romance may be warm and flirtatious; anything explicit fades to black at the door."
+    ],
+    "interludes": [
+      "The room stutters for a heartbeat. The Game Master rewinds a few seconds, tuts quietly, and tidies the moment.",
+      "Reality shifts, the way a bus shelter does when you blink too slowly. The Game Master straightens the last bit and tries again.",
+      "Something isn't quite right. The Game Master slides the scene back like a dodgy drawer and fixes the runners.",
+      "A crackle, a flicker of the strip light, and the Game Master smooths a crease out of the last minute.",
+      "The world pauses, politely, as if waiting for the kettle. The Game Master rewrites the moment before anyone notices.",
+      "Time hiccups. The Game Master rewinds to just before that went sideways and has another go."
+    ],
+    "rollback_note": "The Game Master pauses. That didn't quite work out. Try a different approach?"
+  },
+  "presentation": {
+    "profile": "light",
+    "status_line": ["money", "health", "location", "time"]
+  },
+  "time": {
+    "start": "2026-10-03T09:20",
+    "min_per_action": 1,
+    "max_per_turn": 480
+  },
+  "stats": [
+    { "key": "money", "label": "Money", "type": "currency", "start": 45, "display": "£", "hidden": false },
+    { "key": "health", "label": "Health", "type": "bounded", "min": 0, "max": 100, "start": 100, "hidden": false },
+    { "key": "energy", "label": "Energy", "type": "bounded", "min": 0, "max": 100, "start": 80, "hidden": false },
+    { "key": "stress", "label": "Stress", "type": "bounded", "min": 0, "max": 100, "start": 15, "hidden": true }
+  ],
+  "items": [
+    { "id": "phone", "name": "Phone (cracked corner)" },
+    { "id": "rucksack", "name": "Rucksack" },
+    { "id": "wallet", "name": "Wallet", "price": 12 },
+    { "id": "driving-licence", "name": "Provisional driving licence" },
+    { "id": "business-textbook", "name": "Business textbook", "price": 28 },
+    { "id": "garden-gloves", "name": "Garden gloves", "price": 4 },
+    { "id": "shears", "name": "Garden shears", "price": 9 },
+    { "id": "bin-bags", "name": "Roll of bin bags", "price": 2.5 },
+    { "id": "lager-4-pack", "name": "Lager 4-pack", "price": 5 },
+    { "id": "oat-milk", "name": "Carton of oat milk", "price": 1.75 },
+    { "id": "milk", "name": "Pint of milk", "price": 1.3 },
+    { "id": "sausage-egg-cob", "name": "Sausage and egg cob", "price": 4.2 },
+    { "id": "coffee", "name": "Takeaway coffee", "price": 2.6 },
+    { "id": "bus-ticket", "name": "Day bus ticket", "price": 5 },
+    { "id": "pint", "name": "Pint of lager", "price": 4.5 }
+  ],
+  "events": {
+    "scheduled": [
+      {
+        "id": "bins-out",
+        "at": "2026-10-04T20:00",
+        "text": "Bin night. The wheelie bins need to be at the kerb before the Monday morning collection, and the recycling is in the wrong bin again.",
+        "entities": ["shared-house", "dai"]
+      },
+      {
+        "id": "inspection-window",
+        "at": "2026-10-05T10:00",
+        "text": "The letting agent's inspection window opens. Someone from the agency will check the common rooms and the garden for cleanliness and damage.",
+        "entities": ["letting-agent", "shared-house", "back-garden"],
+        "thread": {
+          "kind": "commitment",
+          "text": "The letting agent's inspection is under way; the common rooms and garden are being judged."
+        }
+      },
+      {
+        "id": "mobile-plan-renewal",
+        "at": "2026-10-05T09:00",
+        "text": "A text arrives: the player's mobile plan renews today and the cheap introductory rate is ending. Cancelling or switching is possible, but only if done today.",
+        "entities": ["player"],
+        "thread": {
+          "kind": "debt",
+          "text": "Mobile plan renews at a higher rate unless the player switches or cancels."
+        }
+      },
+      {
+        "id": "rent-reminder",
+        "at": "2026-10-06T08:30",
+        "text": "An automated email from the letting agency reminds the house that the next rent instalment is due at the end of the week.",
+        "entities": ["letting-agent", "shared-house"]
+      }
+    ],
+    "conditional": [
+      {
+        "id": "low-funds-warning",
+        "when": { "kind": "stat", "key": "money", "op": "<", "value": 10 },
+        "text": "The banking app sends a polite notification with the word 'low' in it. Pasta week is approaching.",
+        "entities": ["player"],
+        "once": false
+      },
+      {
+        "id": "running-on-fumes",
+        "when": { "kind": "stat", "key": "energy", "op": "<=", "value": 15 },
+        "text": "Everything is slightly too bright and slightly too loud. The body is making a formal request for sleep.",
+        "entities": ["player"],
+        "once": false
+      },
+      {
+        "id": "feeling-rough",
+        "when": { "kind": "stat", "key": "health", "op": "<", "value": 40 },
+        "text": "A proper bout of feeling rotten sets in: sore head, heavy limbs, and a sudden sympathy for everyone who has ever called in sick.",
+        "entities": ["player"],
+        "once": true
+      },
+      {
+        "id": "cerys-warms-up",
+        "when": { "kind": "relationship", "a": "player", "b": "cerys", "op": ">", "value": 60 },
+        "text": "Cerys finds a reason to linger in the same room, and doesn't pretend otherwise. Something unspoken is now very nearly spoken.",
+        "entities": ["player", "cerys"],
+        "once": true
+      },
+      {
+        "id": "dai-gets-sulky",
+        "when": { "kind": "relationship", "a": "player", "b": "dai", "op": "<", "value": 20 },
+        "text": "Dai has gone quiet in the group chat, which for Dai is a statement in itself.",
+        "entities": ["player", "dai"],
+        "once": true
+      },
+      {
+        "id": "week-one-ends",
+        "when": { "kind": "after", "at": "2026-10-09T18:00" },
+        "text": "The end of the first full week of term arrives with a quiet sense of surprise that everyone is still alive.",
+        "entities": ["player"],
+        "once": true
+      }
+    ],
+    "random": [
+      {
+        "id": "street-encounters",
+        "chance_per_hour": 0.12,
+        "entries": [
+          { "text": "A seagull makes eye contact, then makes a decision about your sandwich.", "weight": 3 },
+          { "text": "A neighbour you half-recognise nods at you and says 'Alright?' without slowing down.", "weight": 4 },
+          { "text": "A friend from your course waves from across the road, shouting something the traffic swallows.", "weight": 3 },
+          { "text": "A leaflet for a club night is pressed into your hand by someone in a very large hoodie.", "weight": 3 },
+          { "text": "A fine drizzle starts, the Swansea sort that insists it isn't really rain.", "weight": 5 },
+          { "text": "A bus sails past through a puddle with real commitment.", "weight": 2 },
+          { "text": "Someone drops a fiver and hasn't noticed.", "weight": 1 }
+        ]
+      },
+      {
+        "id": "house-noise",
+        "chance_per_hour": 0.1,
+        "entries": [
+          { "text": "Someone upstairs drops something heavy and then goes very quiet about it.", "weight": 3 },
+          { "text": "The boiler clanks twice, like a ghost in a small bin.", "weight": 3 },
+          { "text": "A housemate is playing music through a speaker that is mostly bass.", "weight": 4 },
+          { "text": "The front door slams as someone comes in and shouts 'It's only me!' to nobody in particular.", "weight": 4 },
+          { "text": "The smoke alarm chirps once, in protest at the toast.", "weight": 2 },
+          { "text": "A pan lid clatters in the kitchen and a muffled apology follows.", "weight": 2 }
+        ]
+      }
+    ]
+  },
+  "dice": {
+    "sides": 100,
+    "thresholds": [10, 25, 50, 75, 90],
+    "labels": ["Disaster", "Bad luck", "Scrappy", "Fine", "Good", "Remarkably lucky"]
+  },
+  "offscreen": {
+    "enabled": true,
+    "min_skip_hours": 6,
+    "max_entities": 4,
+    "max_tokens": 600,
+    "scope": ["npc_goals", "threads"]
+  },
+  "seed": {
+    "entities": [
+      {
+        "id": "player",
+        "type": "person",
+        "name": "Nathan",
+        "aliases": ["weldo"],
+        "location": "player-room",
+        "facts": [
+          "First-year business student at a Welsh university.",
+          "Goes by Nathan with adults and 'weldo' with housemates and friends."
+        ],
+        "tags": ["player", "student"]
+      },
+      {
+        "id": "shared-house",
+        "type": "place",
+        "name": "The house on the Uplands road",
+        "aliases": ["the house", "the student house"],
+        "facts": [
+          "A rented shared student house in Uplands, Swansea, let through a letting agency.",
+          "Kitchen and shared living space are on the upper floor; the back garden is overgrown."
+        ],
+        "tags": ["home"]
+      },
+      {
+        "id": "player-room",
+        "type": "place",
+        "name": "Your room",
+        "aliases": ["my room", "bedroom"],
+        "location": "shared-house",
+        "facts": ["A small rented bedroom with a window onto the street and a calendar on the wall."],
+        "tags": ["private"]
+      },
+      {
+        "id": "kitchen",
+        "type": "place",
+        "name": "The kitchen",
+        "location": "shared-house",
+        "facts": ["Shared kitchen with a fridge everyone claims to label."],
+        "tags": ["common-room"]
+      },
+      {
+        "id": "bathroom",
+        "type": "place",
+        "name": "The bathroom",
+        "location": "shared-house",
+        "facts": ["Shared bathroom with a shower of unpredictable temperature."],
+        "tags": ["common-room"]
+      },
+      {
+        "id": "back-garden",
+        "type": "place",
+        "name": "The back garden",
+        "aliases": ["garden"],
+        "location": "shared-house",
+        "facts": ["Overgrown with brambles and a tired fence and bench; there is a shed or outhouse for storage."],
+        "tags": ["outdoors"]
+      },
+      {
+        "id": "dai",
+        "type": "person",
+        "name": "Dai",
+        "location": "shared-house",
+        "facts": ["Housemate. Easy-going, sociable, and fond of pool."],
+        "tags": ["housemate"]
+      },
+      {
+        "id": "marcus",
+        "type": "person",
+        "name": "Marcus",
+        "location": "shared-house",
+        "facts": ["Housemate. Practical and hard-working, keeps odd hours around a job."],
+        "tags": ["housemate"]
+      },
+      {
+        "id": "cerys",
+        "type": "person",
+        "name": "Cerys",
+        "location": "kitchen",
+        "facts": ["Housemate. Up early, drinks tea, studies something that involves a lot of reading."],
+        "tags": ["housemate"]
+      },
+      {
+        "id": "mrs-pugh",
+        "type": "person",
+        "name": "Mrs Pugh",
+        "aliases": ["Glenys"],
+        "facts": ["Elderly neighbour next door with a well-kept front garden and a cat."],
+        "tags": ["neighbour"]
+      },
+      {
+        "id": "letting-agent",
+        "type": "faction",
+        "name": "The letting agency",
+        "aliases": ["the agents"],
+        "facts": ["Manages the tenancy and sends a representative to inspect common rooms and the garden."],
+        "tags": ["landlord"]
+      }
+    ],
+    "threads": [
+      {
+        "kind": "commitment",
+        "text": "The letting agent inspects the house on Monday morning; the common rooms and back garden need to be tidy or the house risks a cleaning charge.",
+        "due": "2026-10-05T10:00",
+        "entities": ["letting-agent", "shared-house", "back-garden"]
+      },
+      {
+        "kind": "goal",
+        "text": "Get the overgrown back garden under control this weekend.",
+        "due": "2026-10-04T18:00",
+        "entities": ["back-garden", "player"]
+      }
+    ],
+    "inventory": [
+      { "owner": "player", "item": "phone", "qty": 1 },
+      { "owner": "player", "item": "wallet", "qty": 1 },
+      { "owner": "player", "item": "rucksack", "qty": 1 },
+      { "owner": "player", "item": "business-textbook", "qty": 1 },
+      { "owner": "player", "item": "driving-licence", "qty": 1 }
+    ],
+    "relationships": [
+      { "a": "player", "b": "dai", "value": 40 },
+      { "a": "player", "b": "marcus", "value": 35 },
+      { "a": "player", "b": "cerys", "value": 30 },
+      { "a": "player", "b": "mrs-pugh", "value": 10 }
+    ]
+  }
+}
