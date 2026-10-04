@@ -18,6 +18,8 @@ export interface PlayOptions {
   logRaw?: boolean;
   io: PlayIO;
   debug?: boolean;
+  /** Returns a reason when a spend cap is used up, so play stops between turns instead of mid-turn. */
+  stopCheck?: () => string | undefined;
 }
 
 export function rollLine(result: TurnResultLike): string | null {
@@ -101,6 +103,12 @@ export async function runPlay(opts: PlayOptions): Promise<void> {
       io.write(dim(`debug ${debug ? "on" : "off"}`) + "\n");
       if (debug && last) io.write(dim(debugDump(last)) + "\n");
       continue;
+    }
+
+    const stop = opts.stopCheck?.();
+    if (stop) {
+      io.write(dim(`Stopping: ${stop}. Your save is intact; raise the cap and resume with the same --save.`) + "\n");
+      break;
     }
 
     const t0 = performance.now();

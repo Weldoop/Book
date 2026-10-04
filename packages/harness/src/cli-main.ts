@@ -152,6 +152,7 @@ export async function runCli(argv: string[], deps: CliDeps = {}): Promise<number
             logRaw: flagBool(args, "log-raw"),
             io,
             debug: flagBool(args, "debug"),
+            stopCheck: setup.stopCheck,
           });
         } finally {
           io.close();

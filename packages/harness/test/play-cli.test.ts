@@ -29,6 +29,25 @@ describe("runPlay", () => {
     expect(text).toContain("rewritten");
   });
 
+  it("stops between turns when a spend cap is used up and says the save survived", async () => {
+    const io = scriptedIO(["one", "two", "three"]);
+    const api = fakeRuntimeApi();
+    let turns = 0;
+    await runPlay({
+      api,
+      config: makeConfig("light"),
+      store: new MemoryStore(),
+      llm: new MockProvider(),
+      saveId: "p",
+      io,
+      stopCheck: () => (turns++ >= 1 ? "max-cost-usd $2 reached ($2.0100 spent)" : undefined),
+    });
+    expect(api.calls).toEqual(["one"]);
+    const text = io.out.join("");
+    expect(text).toContain("max-cost-usd $2 reached");
+    expect(text).toContain("Your save is intact");
+  });
+
   it("shows the roll above the narration when the runtime reports one", async () => {
     const io = scriptedIO(["pick the lock"]);
     const api = fakeRuntimeApi({ roll: { value: 3, band: "Disaster", what: "picking the lock", stat: "dexterity" } });

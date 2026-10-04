@@ -34,11 +34,16 @@ pnpm book models                           # list the model ids your key can rea
 
 ## Real model runs
 
-Store `ANTHROPIC_API_KEY` as a Cursor secret (never commit it or type it into a command). If it is not set, the CLI asks for it with hidden input and does not save it. Real runs need `--provider anthropic` and at least one cap:
+Store `ANTHROPIC_API_KEY` as a Cursor secret (never commit it or type it into a command). If it is not set, the CLI asks for it with hidden input and does not save it. Real runs refuse to start without at least one of `--max-cost-usd`, `--max-total-tokens` or `--max-turns`:
 
 ```bash
+pnpm book play   --config configs/uk-life/config.json --save live-5 \
+                 --provider anthropic --max-cost-usd 2 --log-raw
 pnpm book replay ... --provider anthropic --max-cost-usd 2
 ```
+
+When a cap is used up, play stops between turns and says so; the save is intact, so raising the cap
+and reusing the same `--save` resumes where you left off.
 
 Models default to `claude-sonnet-4-5` (strong) and `claude-haiku-4-5` (cheap); override with `BOOK_MODEL_STRONG` and `BOOK_MODEL_CHEAP`. Run `pnpm book models` to see what your key can reach.
 
