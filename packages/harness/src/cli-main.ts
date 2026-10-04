@@ -7,7 +7,7 @@ import { FileStore } from "@book/store";
 import { runBaseline } from "./baseline.ts";
 import { parseFixture, parseProbes } from "./fixture.ts";
 import type { Fixture, Probe } from "./fixture.ts";
-import { flagBool, flagString, parseFlags } from "./flags.ts";
+import { flagBool, flagNumber, flagString, parseFlags } from "./flags.ts";
 import type { ParsedArgs } from "./flags.ts";
 import { runPlay } from "./play.ts";
 import type { PlayIO } from "./play.ts";
@@ -26,6 +26,7 @@ export const USAGE = `Usage: pnpm book <command> [flags]
             [--faults every=7,kind=game_breaking] [--save name] [--out <dir>]
   baseline  --config <path> --fixture <path> [same flags as replay]
   report    <report.json> [<other.json>]
+  inspect   --save <name> [--turn N]   (per-turn tokens, outcomes, repairs for a saved game)
 
 Real-model runs need --provider anthropic, ANTHROPIC_API_KEY in the environment,
 and at least one of --max-cost-usd, --max-total-tokens, --max-turns.`;
@@ -175,6 +176,31 @@ export async function runCli(argv: string[], deps: CliDeps = {}): Promise<number
         out("");
         out(formatReport(report));
         out(`report written to ${path}`);
+        return 0;
+      }
+      case "inspect": {
+        const saveId = required(args, "save");
+        const records = await new FileStore(dataRoot).readTurnRecords(saveId);
+        const only = flagNumber(args, "turn");
+        if (only !== undefined) {
+          const rec = records.find((r) => r.turn === only);
+          out(rec ? JSON.stringify(rec, null, 2) : `no record for turn ${only}`);
+          return rec ? 0 : 1;
+        }
+        let cumulative = 0;
+        for (const r of records) {
+          const input = r.usage.reduce((n, u) => n + u.input_tokens, 0);
+          const output = r.usage.reduce((n, u) => n + u.output_tokens, 0);
+          const cached = r.usage.reduce((n, u) => n + u.cached_input_tokens, 0);
+          const cost = r.usage.reduce((n, u) => n + u.cost_usd, 0);
+          const ms = r.usage.reduce((n, u) => n + u.latency_ms, 0);
+          cumulative += input;
+          const flags = [r.interlude ? "interlude" : "", r.fate !== undefined ? `fate ${r.fate}` : ""].filter(Boolean).join(" ");
+          out(
+            `turn ${String(r.turn).padStart(3)} ${r.kind.padEnd(8)} ${r.outcome.padEnd(11)} calls ${r.usage.length} in ${input} out ${output} cached ${cached} $${cost.toFixed(4)} ${Math.round(ms)}ms ${flags}`.trimEnd(),
+          );
+        }
+        out(`${records.length} turns, cumulative input tokens ${cumulative}`);
         return 0;
       }
       case "report": {
