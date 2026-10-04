@@ -12,6 +12,7 @@ import type { ParsedArgs } from "./flags.ts";
 import { runPlay } from "./play.ts";
 import type { PlayIO } from "./play.ts";
 import { setupProvider } from "./provider-setup.ts";
+import { promptSecret } from "./secret.ts";
 import { compareReports, formatComparison, formatReport, parseReport } from "./report.ts";
 import type { Report } from "./report.ts";
 import { runReplay } from "./replay.ts";
@@ -119,12 +120,20 @@ function defaultPlayIO(): PlayIO & { close(): void } {
 export async function runCli(argv: string[], deps: CliDeps = {}): Promise<number> {
   const out = deps.out ?? ((t: string) => process.stdout.write(`${t}\n`));
   const errOut = deps.err ?? ((t: string) => process.stderr.write(`${t}\n`));
-  const env = deps.env ?? process.env;
+  let env = deps.env ?? process.env;
   const now = deps.now ?? (() => new Date());
   const dataRoot = deps.dataRoot ?? join(process.cwd(), ".book-data");
   const args = parseFlags(argv);
 
   try {
+    const needsKey =
+      ["play", "replay", "baseline", "models"].includes(args.command ?? "") &&
+      (args.command === "models" || flagString(args, "provider") === "anthropic");
+    if (needsKey && !env.ANTHROPIC_API_KEY && !deps.env) {
+      const key = await promptSecret("ANTHROPIC_API_KEY not set. Paste it now (hidden, not saved): ");
+      if (!key) throw new Error("No API key entered.");
+      env = { ...env, ANTHROPIC_API_KEY: key };
+    }
     switch (args.command) {
       case "play": {
         const config = await loadConfig(required(args, "config"));

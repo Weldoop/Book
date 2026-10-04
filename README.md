@@ -24,7 +24,7 @@ Inject faults to exercise the repair flow: `--faults every=7,kind=game_breaking`
 
 ## Real model runs
 
-Set `ANTHROPIC_API_KEY` (never commit it). Real runs need `--provider anthropic` and at least one cap:
+Store `ANTHROPIC_API_KEY` as a Cursor secret (never commit it or type it into a command). If it is not set, the CLI asks for it with hidden input and does not save it. Real runs need `--provider anthropic` and at least one cap:
 
 ```bash
 pnpm book replay ... --provider anthropic --max-cost-usd 2
