@@ -22,3 +22,5 @@ Disabling thinking did not reduce output tokens (turn 2: 651 vs 657). The logs s
 
 When `LLMRequest.json` is set, the provider now appends an assistant message containing `{`, so the reply can only continue inside the JSON object, and `parse` puts the brace back. Prefill is skipped when `BOOK_THINKING=on`, since the API forbids both together, and for an empty reply so the empty-text retry path still triggers.
 
+`claude-sonnet-5-5` rejected the prefill with HTTP 400 ("This model does not support assistant message prefill"). The provider now retries without it and remembers, matching the thinking-unsupported fallback. Models that accept prefill still get it; models that do not still get a working turn.
+

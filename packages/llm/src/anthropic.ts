@@ -57,6 +57,7 @@ export class AnthropicProvider implements LLMProvider {
   private readonly maxRetries: number;
   private readonly backoffBaseMs: number;
   private thinkingUnsupported = false;
+  private prefillUnsupported = false;
 
   constructor(opts: AnthropicProviderOptions = {}) {
     this.env = opts.env ?? process.env;
@@ -91,9 +92,11 @@ export class AnthropicProvider implements LLMProvider {
     // Hidden reasoning tokens count against max_tokens and can leave no room for the JSON reply.
     const thinkingOn = this.env.BOOK_THINKING === "on";
     if (!this.thinkingUnsupported && !thinkingOn) body.thinking = { type: "disabled" };
-    // Prefill an open brace so the model cannot preface the JSON with prose. Not allowed alongside thinking.
-    const prefill = req.json === true && !thinkingOn && req.messages.at(-1)?.role === "user";
-    if (prefill) (body.messages as { role: string; content: string }[]).push({ role: "assistant", content: "{" });
+    // Prefill an open brace so the model cannot preface the JSON with prose. Not every model allows it,
+    // and it cannot be combined with thinking.
+    let prefill = req.json === true && !thinkingOn && !this.prefillUnsupported && req.messages.at(-1)?.role === "user";
+    const messages = body.messages as { role: string; content: string }[];
+    if (prefill) messages.push({ role: "assistant", content: "{" });
     let payload = JSON.stringify(body);
 
     const started = performance.now();
@@ -133,6 +136,13 @@ export class AnthropicProvider implements LLMProvider {
       if (res.status === 400 && body.thinking !== undefined && /thinking/i.test(raw)) {
         delete body.thinking;
         this.thinkingUnsupported = true;
+        payload = JSON.stringify(body);
+        continue;
+      }
+      if (res.status === 400 && prefill && /prefill|end with a user message/i.test(raw)) {
+        messages.pop();
+        prefill = false;
+        this.prefillUnsupported = true;
         payload = JSON.stringify(body);
         continue;
       }

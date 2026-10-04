@@ -97,6 +97,21 @@ describe("AnthropicProvider", () => {
     expect((await empty.p.complete(req({ json: true }))).text).toBe("");
   });
 
+  it("retries without the prefill if the model rejects it, and remembers", async () => {
+    const { p, calls } = make([
+      { status: 400, body: { error: { message: "This model does not support assistant message prefill. The conversation must end with a user message." } } },
+      { status: 200, body: { ...OK.body, content: [{ type: "text", text: '{"narration":"Rain."}' }] } },
+      OK,
+    ]);
+    const r = await p.complete(req({ json: true }));
+    expect(r.text).toBe('{"narration":"Rain."}');
+    expect(calls[0]!.body.messages.at(-1)).toEqual({ role: "assistant", content: "{" });
+    expect(calls[1]!.body.messages).toHaveLength(1);
+    // The brace is not re-added to a reply that was produced without the prefill.
+    await p.complete(req({ json: true }));
+    expect(calls[2]!.body.messages).toHaveLength(1);
+  });
+
   it("disables extended thinking by default and allows opting in", async () => {
     const a = make([OK]);
     await a.p.complete(req());
