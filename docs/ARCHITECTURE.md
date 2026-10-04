@@ -63,7 +63,7 @@ Hosted trial and billing, bring-your-own-key, publishing and discovery, stars, f
 
 1. **AI proposes, engine commits.** The model never writes state. It returns a delta; code validates and applies it.
 2. **Code owns anything countable.** Clock, money, stats, inventory, dice, schedules and the status line are deterministic.
-3. **One call per turn.** Narration and delta come from the same call so the story and the state cannot drift apart.
+3. **One call per turn where possible.** Narration and delta come from the same call so the story and the state cannot drift apart. If the delta fails validation, a short second call repairs only the delta; the story the player is reading is never rewritten or interrupted (section 5.3).
 4. **Bounded context.** Per-turn context has a hard token budget independent of game length or world size.
 5. **Structure over transcript.** Facts, threads and callbacks live in structured state; prose history is only a recent window.
 6. **Modules, not a mega-engine.** Every mechanic is an optional module with the same interface.
@@ -121,7 +121,7 @@ The game has several roles, but only some of them are model calls. A role that i
 | Storyteller | The single strong-model call per turn | main cost |
 | Archivist (summaries, fact consolidation) | Cheap-model call, batched every ~20 turns | small |
 | Out-of-character helper | Cheap-model call, read-only | small |
-| World simulator (off-screen NPC goals during long time skips) | Cheap-model call, only on large time jumps; **post-PoC experiment** | small, rare |
+| World simulator (off-screen NPC activity during long time skips) | Optional per-game module `offscreen`; cheap-model call only on large time jumps (section 9.6) | small, rare, off by default |
 
 An LLM validator is not part of the default design. It is only considered later as an occasional consistency check if code validation proves too weak, because it would add a second call to every turn.
 
@@ -147,11 +147,23 @@ Trivial deterministic actions (for example "wait until 14:00") may later be reso
 2. **Due events.** Engine checks the clock, scheduled events, conditional triggers and random tables, and lists anything that fires this turn.
 3. **Build context** (section 6).
 4. **One model call** returning strict JSON: `{ narration, delta, beat, suggestions? }`.
-5. **Validate** the delta (schema, module rules, permission, clock bounds). On failure: one repair call with the error list; on second failure: narrate only, apply no delta, log the failure.
+5. **Validate** the delta (schema, module rules, permission, clock bounds). The narration is shown to the player immediately; validation does not hold up the story. On failure, run the delta repair flow (section 5.3).
 6. **Commit** state, delta, beat and usage atomically (single transaction on database stores; single write on file store).
 7. **Render** narration plus the status line or stat panel built from config presentation settings. The model never writes the status line.
 
-### 5.3 Model output contract (draft)
+### 5.3 Delta repair flow (keeps the player in the story)
+
+The player should never see a validation error or a rewritten scene. Narration is the part the player experiences; the delta is bookkeeping.
+
+1. **Show the narration** as soon as it arrives (streamed if the provider supports it).
+2. If the delta is invalid, make a **repair call** that is small by design. Its input is only: the narration, the rejected ops with their error messages, and the relevant state slice (not the full context). Its output is a corrected delta only. It never re-writes the story.
+3. If the repaired delta passes, commit it as normal. Target: the repair finishes before the player sends the next message.
+4. If the repair also fails, commit **narration only** and record a `reconcile` thread describing the unapplied change (for example "player paid the cafe, amount unknown"). The next turn's context includes it so the storyteller can correct state naturally.
+5. Every repair and reconcile is logged. The benchmark reports the repair rate and the reconcile rate; the single-call design is judged against these.
+
+If repairs are frequent, the escalation order is: tighten the op schema and prompt, then try a stronger tier on the turn call, and only then move to a standing two-call pipeline (decide, then write).
+
+### 5.4 Model output contract (draft)
 
 ```json
 {
@@ -274,7 +286,8 @@ Notes:
   "id": "uk-life",
   "version": 1,
   "meta": { "title": "...", "tone": "grounded, dry, British", "content_rating": "romance" },
-  "modules": ["stats", "inventory", "relationships", "events", "dice"],
+  "modules": ["stats", "inventory", "relationships", "events", "dice", "offscreen"],
+  "offscreen": { "enabled": true, "min_skip_hours": 6, "max_entities": 4, "max_tokens": 600, "scope": ["npc_goals", "threads"] },
   "gm_style": { "max_words": 90, "person": "second", "never_decide_for_player": true },
   "presentation": { "profile": "light", "status_line": ["money", "health", "location", "time"] },
   "time": { "start": "2026-10-03T09:20", "min_per_action": 1, "max_per_turn": 480 },
@@ -317,8 +330,20 @@ interface Module {
 | dice | fate die and thresholds | yes |
 | factions | standing and goals | pirate config |
 | travel/map | locations and travel time | pirate config |
+| offscreen | optional world simulator for NPC activity during time skips | yes, optional per game |
 | combat | structured fights | later |
 | survival | needs and weather | later |
+
+### 9.3.1 Off-screen simulator (optional module)
+
+A game opts in with `"offscreen": { "enabled": true, ... }`. It is off by default and costs nothing when disabled.
+
+- **Trigger:** the clock advances by at least `min_skip_hours` in one turn (sleep, travel, "wait until Monday"), or a configured number of in-world days pass.
+- **Input:** up to `max_entities` NPCs chosen by code (those with open goals or threads that are due), their goals and facts, and the elapsed time. Not the full context.
+- **Output:** a small delta only (NPC moved, relationship drift, thread progress, a new message or event waiting for the player). It goes through the same validator.
+- **Surfacing:** results are not narrated immediately. They become entries the storyteller can reveal when the player next meets or contacts that NPC, so the world feels alive without spending narration tokens.
+- **Budget:** hard `max_tokens` per run, cheap tier, and a per-save daily cap. The benchmark reports its token share and a human rating of whether it improved engagement.
+- **Scope in the PoC:** build the module and interface; test it on the UK config first with it both on and off.
 
 ### 9.4 Presentation profiles
 
@@ -464,6 +489,19 @@ Proposed tooling: TypeScript, pnpm workspaces, Vitest, Zod, ESLint and Prettier.
 | D. Content and evaluation | `configs/`, `fixtures/`, recall probes, playtest notes | A schemas |
 | E. Web (later) | `apps/web` | harness results |
 
+### 16.1.1 Agent setup (decided)
+
+Four development agents run in parallel at most, one per track A to D. Track E starts after the Phase 3 gate.
+
+| Agent | Starts | Notes |
+|---|---|---|
+| A. Contracts and engine | Phase 0 | Runs first alone to draft the schemas and `AGENTS.md`; B, C and D start once the owner approves the contracts |
+| B. Context and memory | Phase 1 | Builds the context builder, attention mapping, memory layers and compaction |
+| C. LLM and harness | Phase 1 | Adapter, mock provider, metering, store, CLI and benchmark reports |
+| D. Content and evaluation | Phase 1 | UK config, golden session fixture, recall probes, adversarial inputs |
+
+Owner approval is required for: changes to `packages/schema`, changes to the module interface, changes to the token budget table, new runtime dependencies, and any use of the real model API. Everything else is merged on green CI.
+
 ### 16.2 Rules
 - Agents only edit files in their own directories. Cross-track changes go through a contract change.
 - `packages/schema` changes need an ADR and human approval before merging.
@@ -482,7 +520,7 @@ Proposed tooling: TypeScript, pnpm workspaces, Vitest, Zod, ESLint and Prettier.
 | Risk | Mitigation |
 |---|---|
 | Flat or generic stories after compression | Callbacks as first-class threads; widen window before adding calls; human engagement tests |
-| Delta rejection loops with weaker models | Closed op set, one repair retry, narrate-only fallback |
+| Delta rejection loops with weaker models | Closed op set, small repair call, reconcile thread and narrate-only fallback (section 5.3) |
 | Module interface too rigid for unusual worlds | Prove with two very different configs; add an escape-hatch "freeform note" op only if needed |
 | Over-engineering again | Every addition needs a measured failure from the benchmark |
 | Prompt fragments grow with each module | Load only relevant fragments; budget enforced per part |
@@ -503,9 +541,11 @@ Proposed tooling: TypeScript, pnpm workspaces, Vitest, Zod, ESLint and Prettier.
 6. The fate die is visible to the player.
 7. The working name is `book` and this repository is the home of the monorepo.
 
+8. One model call per turn where possible; if the delta fails validation, a small repair call fixes only the delta while the player keeps reading, with a standing two-call pipeline only as a later escalation (section 5.3).
+9. Four development agents in parallel (tracks A to D), with owner approval for schema, module interface, token budget, new dependencies and real-model API use (section 16.1.1).
+10. The off-screen simulator is included as an optional module that each game enables in its config (section 9.3.1).
+11. Attention is shown in a debug panel only, not to players.
+
 ### Still open
 
-8. One call per turn: is it acceptable to start with a single call (narration plus state change together) and only move to two calls (decide what happens, then write the prose) if the writing quality is measurably worse?
-9. Development agents: how many Cursor agents in parallel, and which changes need your approval beyond schema changes?
-10. Should the world simulator (off-screen NPC activity during time skips) be an early experiment after the benchmark, or stay on the later list?
-11. How visible should attention to the player be (a debug-only panel, or a "what the storyteller remembers" view for players)?
+None blocking Phase 0. Next step: owner approves this plan, then Track A drafts the contracts (`packages/schema`, `AGENTS.md`).
