@@ -54,6 +54,7 @@ Evidence from a real 121-turn session on a plain chat setup (figures are estimat
 - Two hand-written configs: UK life sim first, Pirate Caribbean second.
 - Presentation profiles (novel, light, tabletop) set by the config.
 - Content rating field in the config.
+- Endings that close the story, each able to offer a deterministic continuation (section 5.4).
 - Storage behind an interface; local file implementation first.
 
 ### Out of scope (designed for, not built)
@@ -189,7 +190,36 @@ Rule: nothing reaches the player until it has passed validation and been committ
 
 **Streaming note.** Because narration is held until validation, there is no word-by-word streaming of unvalidated text. Option to test: order the model output as delta first, then narration. The delta can be validated while the narration is still being generated, and the narration is released the moment the delta commits. This keeps perceived speed close to normal streaming.
 
-### 5.4 Model output contract (draft)
+### 5.4 Endings and continuations (ADR 0005)
+
+A book ends. A game should be able to end too, and should then offer to carry the story on somewhere
+else rather than resetting to turn 1.
+
+`config.endings` is an ordered list. Each entry has a `when` condition (the same shape conditional
+events use, so there is no second evaluator), a `title`, and engine-written `text` in the game's
+voice. After a turn is applied, the engine takes the first unfired ending whose condition holds;
+`state.endings_seen` stops one firing twice.
+
+An ending may carry a `continue` block, which the engine applies on the player's next input:
+
+| Field | Effect, all in code |
+|---|---|
+| `skip_minutes` | Time passing between the ending and the new scene (unconscious, remanded, recovering) |
+| `location` | Where the player is moved to; must already exist in state |
+| `set_stats` | Stats forced to a value, for example money to 0 after confiscation |
+| `clear_inventory` | Strips what the player was carrying |
+| `note` | The situation, handed to the GM as a due event so it is told where the scene opens |
+
+So a continuation costs no tokens and cannot drift. An ending with no `continue` block is final:
+further input returns the ending text with outcome `ended` and makes no model call.
+
+Endings are what make non-numeric jeopardy worth owning in code. `uk-life` carries a hidden
+`jeopardy` stat that the GM raises through a validated op when the player does something a court
+would care about, and the `charged` ending fires at the ceiling. The alternative - a model-authored
+"Legal Status" line - is what a competitor ships, and in the session reviewed for ADR 0005 it had
+already drifted to "Wanted" while the player sat in a cell.
+
+### 5.5 Model output contract (draft)
 
 ```json
 {
@@ -245,6 +275,9 @@ Rules:
 - "In focus" is decided by code: scene location, name or alias match in the input, and threads that reference the entity. No embeddings in the PoC.
 - Static parts (1-2) are placed first so provider prompt caching helps where available.
 - The debug view shows every part, its token count, and what was trimmed.
+- Parts 1-2 are the only region a creator may reorder (ADR 0005). Prompt order changes behaviour, so
+  the eventual card editor gets control of exactly the block that is static and cacheable; parts
+  3-10 stay engine-assembled in priority order so the budget cannot be reordered out of shape.
 
 ### 6.1 Attention mapping
 
@@ -301,7 +334,28 @@ pool is the long-term memory and the prompt sees only a few of them:
 - Player-created and config-seeded threads are weighted the same, one action may resolve several,
   and a resolution may open a follow-up with `parent` set so chains are traceable.
 
-**Compaction call** (cheap tier, batched, every ~20 turns or when a budget part overflows): input is the beats, current summary and entity facts; output is a new chapter summary, consolidated facts and thread clean-up as a delta. It goes through the same validator.
+### 7.2 Compaction as built
+
+Compaction is how the long-term memory in the save gets written. There is no separate memory service
+and no retrieval step: `state.summaries` and `state.entities[].facts` are ordinary fields of the save
+document, and compaction is the process that rewrites them.
+
+- **Trigger:** 20 or more beats since `summaries.last_compacted_turn` (`COMPACT_EVERY_BEATS`).
+  Checked at the end of a turn, after the draft has been applied.
+- **Call:** one cheap-tier call, in line with the turn rather than on a background worker. It is
+  best-effort: if it fails or cannot be parsed, the state is left alone and the next turn retries.
+  The player never waits on a failed compaction.
+- **Input:** the current story-so-far, the beats since the last compaction, open threads, and the
+  full fact list of every entity touched since then. Whole entities only, because a partial list
+  would silently drop facts when the reply replaces it.
+- **Output:** a dedicated `CompactionResult` (`chapter_summary`, `story_so_far`, `facts`,
+  `resolve_threads`), not a delta. It has its own parser and is applied by `applyCompaction`, so it
+  does not travel through the turn validator or the op set.
+- **Effect:** the chapter is appended, story-so-far is replaced and capped at ~500 tokens, each
+  listed entity's facts are replaced and capped at 8, finished threads are resolved, beats are
+  cleared and the verbatim window is trimmed to the last 6 turns.
+
+The caps are the whole point: this is what keeps the per-turn context flat as the save grows.
 
 ---
 
@@ -316,6 +370,8 @@ save
   entities { id: { type, name, aliases, location, facts[], tags[] } }
   threads  [ { id, kind, text, due?, status, entities[], warm, reminders, parent?, on_overdue? } ]
   beats    [ { turn, text } ]
+  ending   { id, turn, continuable } | null     // set while an ending waits on the player
+  endings_seen [ id ]                           // so one ending cannot fire twice
   summaries { chapters[], story_so_far }
   modules  { stats, inventory, relationships, factions, events, dice, ... }
   delta_log [ { turn, ops[], source } ]      // append-only, enables replay
@@ -364,17 +420,36 @@ Notes:
     "conditional": [ { "when": "relationship(player,cerys) > 60", "fire": "romance_beat" } ],
     "random": [ { "table": "street_encounters", "chance_per_hour": 0.15 } ]
   },
+  "endings": [
+    {
+      "id": "charged",
+      "when": { "kind": "stat", "key": "jeopardy", "op": ">=", "value": 100 },
+      "title": "Charged",
+      "text": "The student year ends in a custody suite off Alexandra Road...",
+      "continue": {
+        "label": "Wake up in a cell and carry on from there",
+        "location": "custody-suite",
+        "note": "Morning in the cells. Open on waking; do not recap the arrest.",
+        "skip_minutes": 600,
+        "set_stats": { "jeopardy": 45, "energy": 25 },
+        "clear_inventory": true
+      }
+    }
+  ],
   "seed": { "entities": [], "threads": [ { "kind": "goal", "text": "...", "due": "...", "on_overdue": "..." } ] }
 }
 ```
 
-`meta.violence` picks how the GM handles the player attacking someone: `deflect` means the attempt
-fails for a physical reason and the cost lands socially, which is what a grounded domestic setting
-needs; `adventure` means genre combat where blows land and characters can die, which is what a
-pirate or fantasy game needs. The model's own policy is the ceiling regardless of the setting.
-`meta.harshness` scales what a mistake costs and never touches the dice. `dice.visible` shows the
-roll to the player; when it is false, the contract instead requires every failure to carry a
-concrete in-world cause. See ADR 0004.
+`meta.violence` is a tone dial, not a capability limit. `deflect` means the attempt fails for a
+physical reason and nothing lands, which is what a cosy game needs. `consequence` means it lands,
+reported plainly in a clause or two with no gore and no dwelling, and the cost arrives as injury,
+money, standing and legal trouble; this is what a grounded setting needs, and `uk-life` uses it.
+`adventure` means genre combat where blows land and characters can die, which is what a pirate or
+fantasy game needs. The model's own policy is the ceiling regardless of the setting, and the reason
+`consequence` works is that brief, clinical, consequence-focused violence sits well inside it
+(ADR 0005). `meta.harshness` scales what a mistake costs and never touches the dice.
+`dice.visible` shows the roll to the player; when it is false, the contract instead requires every
+failure to carry a concrete in-world cause. See ADR 0004.
 
 ### 9.2 Module interface (contract)
 
@@ -505,6 +580,11 @@ The 121 player messages from the real session (about 4k tokens) become `fixtures
 | Publishing and discovery | Configs are versioned and immutable once published; fields `owner_id`, `visibility`, `forked_from` reserved |
 | Stars, favourites, tips | Config and usage records carry ids that ratings and tips can reference later |
 | Creator world wizard | Config is pure JSON validated by module schemas; the wizard only needs to emit it |
+| Game wizard as prose cards | The wizard edits the string-valued parts of the config as an ordered list of titled cards; countable parts stay structured. Cards are reorderable only inside budget parts 1-2 (ADR 0005) |
+| Shared card library | Card identity reserved as `{ id, title, body, order, source_card_id? }`, so "save to my cards" and "browse cards" are a query rather than a migration |
+| Sharing a finished playthrough | Endings mark where a story closed; the delta log and beats already hold everything a shareable write-up needs |
+| Player-facing retry and edit-last-input | The delta log replays to turn N-1, so an undo needs no inverse ops (deferred in ADR 0005) |
+| Play before signup | Usage meters against an opaque session id rather than a user id, so anonymous play needs no schema change |
 | Subscriptions and credit packs | Usage is metered per user and per config from day one |
 | Hosted trial | Provider adapter plus per-user token budget guard |
 | Bring-your-own key | Adapter takes credentials per request |
@@ -548,7 +628,7 @@ Proposed tooling: TypeScript, pnpm workspaces, Vitest, Zod, ESLint and Prettier.
 | 0. Contracts | Schemas, delta ops, module interface, budget table, ADRs, `AGENTS.md` | Human approval of contracts |
 | 1. Core build (parallel) | Engine and modules, context and memory, LLM adapter and mock, harness, UK config | All unit tests pass on the mock provider |
 | 2. Benchmark | Baseline vs engine on the golden session with a real model | Meets or explains misses against section 1.2 targets |
-| 3. Playable | Minimal Nuxt chat with debug panel; 2-3 testers | Testers continue unprompted; failure list captured |
+| 3. Playable | Minimal Nuxt chat with debug panel, mobile-first, testers only (no auth, no funnel); 2-3 testers | Testers continue unprompted; failure list captured |
 | 4. Universality | Pirate config with factions and travel modules | Second config runs without engine changes |
 | 5. Next decisions | Supabase, hosted trial, wizard, publishing | Chosen from measured data |
 
@@ -650,10 +730,38 @@ Owner approval is required for: changes to `packages/schema`, changes to the mod
 24. The status line may show the turn number, the console names what the engine did when a turn did
     not come back clean, and `--log-raw` keeps raw replies for diagnosis.
 
+### Decided after reviewing a competitor (4 Oct 2026)
+
+A saved session of Questner's "London Life: Realism" was analysed in full. Its whole architecture is
+an ordered list of editable prompt cards plus one engine-written rolling summary; there is no state
+engine, and its model-authored status line had already drifted within a single scene. See ADR 0005.
+
+25. Violence is a tone dial with three modes: `deflect` (cosy, nothing lands), `consequence` (it
+    lands, told plainly and briefly, and the cost is social, legal and medical) and `adventure`
+    (genre combat). `uk-life` moves to `consequence`, because a grounded sim where the player cannot
+    be hit is less realistic, not more.
+26. A story may end. `config.endings` fires on the same condition shape as conditional events, and
+    an ending may offer a continuation that code applies: time passes, the player is moved, stats
+    are forced, possessions are stripped, and the GM is handed the opening situation as a due event.
+    An ending with no continuation closes the save and costs no model call (section 5.4).
+27. The creator surface is prose cards over the string-valued parts of the config, with countable
+    parts staying structured. Adopted in principle, built with the wizard, not in the PoC.
+28. "Assume the player is right about anything you do not remember" is rejected as an engine rule:
+    it would license the model to author state the engine owns and would manufacture the repairs it
+    was meant to avoid. It may return as an optional creator card.
+29. Player-facing retry and edit-last-input are deferred until after the Phase 2 benchmark.
+30. Stages as a first-class concept (compaction boundaries aligned to scene transitions, plus a
+    "continue" button) remain open, pending evidence that the fixed 20-beat trigger cuts summaries
+    mid-scene.
+31. The Phase 3 UI is for the owner and testers only: no auth, no funnel, no anonymous play. Usage
+    meters against an opaque session id so play-before-signup is possible later.
+32. When the UI is built it is mobile-first from the first commit, with serif body text and
+    persisted size and theme applied before first paint. A PWA stays out of scope.
+
 ### Build status (4 Oct 2026)
 
 Phase 0 (contracts) and Phase 1 (core build) are implemented, plus the fixes from the first two live
-sessions; 299 tests pass.
+sessions and the ADR 0005 changes; 314 tests pass.
 
 | Area | State |
 |---|---|
@@ -663,6 +771,7 @@ sessions; 299 tests pass.
 | Mock and Anthropic providers, file store, harness CLI (play, replay, baseline, report, inspect, models) | done; Anthropic adapter tested only with injected fetch |
 | UK and pirate configs, golden session, recall probes | done |
 | Thread lifecycle and overdue consequences, per-config violence and harshness, `clock.skip`, visible dice | done; not yet exercised against a real model |
+| Endings with deterministic continuations, `violence: consequence`, `jeopardy` stat on `uk-life` | done; not yet exercised against a real model |
 | Real-model benchmark (Phase 2) | two short live sessions played; full golden-session benchmark not yet run |
 | `need` / attention-miss handling, delta-first experiment results | not yet implemented / not yet measured |
 | Nuxt UI, Supabase, hosted trial, wizard | later phases |

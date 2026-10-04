@@ -26,6 +26,11 @@ While playing: one line is one turn, end a line with `\` to continue it, `/debug
 and repair dump, `/quit` exits. Add `--log-raw` to keep every model reply verbatim in the turn log,
 which is what makes format problems diagnosable afterwards.
 
+A story can end. When a configured ending fires, the console prints its closing card; if the ending
+offers a way on, the next thing you type picks the story up wherever the config puts you, with the
+move, the lost time and the confiscated possessions all applied by code. An ending with no
+continuation closes the save.
+
 ```bash
 pnpm book inspect --save <name>            # per-turn calls, tokens, cost, latency, rolls, threads shown
 pnpm book inspect --save <name> --turn 4   # the full record for one turn
