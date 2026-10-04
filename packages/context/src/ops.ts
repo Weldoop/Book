@@ -20,6 +20,7 @@ export const OP_FIELDS: Record<OpName, readonly Field[]> = {
     ["aliases", "[str]", true],
     ["location", "id", true],
     ["facts", "[str]", true],
+    ["tags", "[str]", true],
   ],
   "entity.move": [
     ["id", "id"],

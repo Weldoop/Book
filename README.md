@@ -56,7 +56,7 @@ pnpm book replay ... --provider anthropic --max-cost-usd 2
 When a cap is used up, play stops between turns and says so; the save is intact, so raising the cap
 and reusing the same `--save` resumes where you left off.
 
-Models default to `claude-sonnet-4-5` (strong) and `claude-haiku-4-5` (cheap); override with `BOOK_MODEL_STRONG` and `BOOK_MODEL_CHEAP`. Run `pnpm book models` to see what your key can reach.
+Models default to `claude-sonnet-4-6` (strong) and `claude-haiku-4-5-20251001` (cheap); override with `BOOK_MODEL_STRONG` and `BOOK_MODEL_CHEAP`. Run `pnpm book models` to see what your key can reach.
 
 Extended thinking is disabled by default: its hidden tokens are billed at the output rate and were
 eating the output cap (ADR 0003). Set `BOOK_THINKING=on` to turn it back on and measure the

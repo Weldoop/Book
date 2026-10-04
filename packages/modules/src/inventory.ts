@@ -37,6 +37,16 @@ export const inventoryModule: Module = {
         },
       ];
     }
+    if (config.items.length > 0 && !config.items.some((item) => item.id === op.item)) {
+      return [
+        {
+          severity: "fixable",
+          code: "unknown_item",
+          op_index: index,
+          message: `Op ${index}: item '${op.item}' is not in the catalog. Use an item id from the world sheet.`,
+        },
+      ];
+    }
     if (op.op === "inventory.remove") {
       const have = inventoryOf(state).owners[op.owner]?.[op.item] ?? 0;
       if (have < op.qty) {
@@ -67,7 +77,7 @@ export const inventoryModule: Module = {
   },
 
   promptFragment: () =>
-    "INVENTORY: Items change hands only through inventory.add / inventory.remove. The player can only use or give away items listed in STATE. Buying an item needs both a stat.add (payment) and an inventory.add.",
+    "INVENTORY: Items change hands only through inventory.add / inventory.remove, and the item id must be one from the world sheet. Never entity.move an item onto a person. Buying needs both a stat.add for the price and an inventory.add. The player can only use or give away items listed in STATE.",
 
   focus: () => [],
   due: () => [],

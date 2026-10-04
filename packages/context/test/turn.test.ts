@@ -172,6 +172,7 @@ describe("buildTurnContext structure", () => {
       "due_events",
       "threads",
       "notes",
+      "world_sheet",
       "entities_in_focus",
       "story_so_far",
       "beats",

@@ -95,6 +95,7 @@ export function mapAttention(args: AttentionArgs): string[] {
   const eligible = (id: string): boolean => {
     const e = state.entities[id];
     if (!e || id === config.player_id) return false;
+    if (e.tags.includes("unmet") && !mentioned(e, input)) return false;
     return !(e.type === "place" && e.facts.length === 0);
   };
   const add = (ids: Iterable<string>): void => {

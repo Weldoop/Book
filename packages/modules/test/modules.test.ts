@@ -41,8 +41,14 @@ describe("op validation", () => {
 
   it("flags removing an unowned item as game breaking", () => {
     const { config, modules, state } = testSetup();
-    const res = validateDraft(state, config, modules, draft([{ op: "inventory.remove", owner: "player", item: "sword" }]) as never);
+    const res = validateDraft(state, config, modules, draft([{ op: "inventory.remove", owner: "player", item: "spare" }]) as never);
     expect(res.violations[0]).toMatchObject({ severity: "game_breaking", code: "item_not_owned" });
+  });
+
+  it("rejects an item id that is not in the catalog", () => {
+    const { config, modules, state } = testSetup();
+    const res = validateDraft(state, config, modules, draft([{ op: "inventory.add", owner: "player", item: "sword" }]) as never);
+    expect(res.violations[0]).toMatchObject({ severity: "fixable", code: "unknown_item" });
   });
 
   it("treats malformed ops and unknown ids as fixable", () => {
@@ -182,6 +188,19 @@ describe("renderView", () => {
     const view = renderView(config, state, modules);
     expect(view.status).toBe("money: £45.00 | health: 100/100 | Box room | Sat 3 Oct 2026, 09:20");
     expect(view.panel).toEqual([]);
+  });
+
+  it("shows energy when the status line asks for it and keeps relationship scores off the panel", () => {
+    const { config, modules, state } = testSetup({
+      presentation: { profile: "tabletop", status_line: ["money", "energy"] },
+      stats: [
+        { key: "money", type: "currency", start: 45, display: "GBP" },
+        { key: "energy", label: "Energy", type: "bounded", min: 0, max: 100, start: 80 },
+      ],
+    });
+    const view = renderView(config, state, modules);
+    expect(view.status).toBe("money: £45.00 | Energy: 80/100");
+    expect(view.panel.join("\n")).not.toContain("Relationships");
   });
 
   it("puts the turn number on the status line when the config asks for it", () => {

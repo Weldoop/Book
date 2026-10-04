@@ -266,11 +266,12 @@ The context builder fills a fixed budget in priority order and trims from the bo
 | 5 | Due events and fate die | ~100 | no |
 | 6 | Open threads (due soonest first, capped) | ~300 | no |
 | 6a | The GM's private notes from the last few turns (ADR 0006) | ~120 | no |
+| 6b | World sheet: catalog ids and prices, place ids, unmet people (ADR 0007) | ~350 | no |
 | 7 | Entities in focus (present, named in input, or linked to a hot thread) with top facts | ~500 | no |
 | 8 | Last 6 turns verbatim (more while a scene is still running, trimmed to the budget) | ~800 | no |
 | 9 | Beats since last compaction (max ~20) | ~400 | no |
 | 10 | Story-so-far summary (capped) | ~500 | no |
-| | **Total** | **~4.5k** | |
+| | **Total** | **~4.9k** | |
 
 Rules:
 - Hard cap per part; over-budget parts are trimmed by importance, then recency.
@@ -364,6 +365,13 @@ document, and compaction is the process that rewrites them.
   scene when a forced compaction lands mid-scene).
 
 The caps are the whole point: this is what keeps the per-turn context flat as the save grows.
+
+A chapter write that cannot be parsed does not retry on every following turn. The engine sets
+`summaries.compaction_hold_until` and skips the beat-ceiling backstop until that turn. A scene the
+GM actually closed still compacts. The validated narration is shown before that write runs, so the
+player is not waiting on it; the turn is committed once the write has succeeded or been held
+(ADR 0007). The archivist still does not move the player. A change of room is an `entity.move`,
+checked like any other op.
 
 The GM's private notes (section 7.3) are deliberately not part of any of this. Compaction never sees
 them, so nothing the GM told only itself can be laundered into long-term memory.
@@ -823,10 +831,29 @@ engine, and its model-authored status line had already drifted within a single s
     note that still matters into a thread or an entity fact, so the cheap register has an explicit
     upgrade path to the expensive one.
 
+### Decided after the Uplands playtest (4 Oct 2026)
+
+37. Each new save deals its own first chapter when `config.opening` is set. The GM deals the cast
+    (`dealt_by` stays unset until a future card). Generated people and threads live only in the
+    save. Unmet people stay out of the narration until they share the player's location. `openBook`
+    runs on the play path only; a failed opening leaves the seed. See ADR 0007.
+38. A world sheet of catalog ids, prices, places and unmet people is in every turn prompt and in
+    delta repair. Places cap at 24. The sheet's budget is 350 tokens.
+39. The validator checks and applies legal ops. It does not infer a move from prose. A mentioned
+    place is created immediately with `unvisited`. Travel the GM allows is an `entity.create` or a
+    cleared tag plus `entity.move` in that same delta.
+40. `scene_ended` stays the GM's call. The beat ceiling still compacts, without pretending the
+    scene ended. A failed chapter write is held for five turns. Validated narration is released
+    before the archivist runs.
+41. Warnings the player must not miss (conditional events, overdue promises) are printed by the
+    engine under the narration. Energy joins the Uplands status line. Relationship scores stay off
+    the player UI and are felt only in the writing.
+42. Other people know only what they have seen, heard, or been told. There is no knowledge store.
+
 ### Build status (4 Oct 2026)
 
 Phase 0 (contracts) and Phase 1 (core build) are implemented, plus the fixes from the first two live
-sessions and the ADR 0005 and 0006 changes; 342 tests pass.
+sessions and the ADR 0005, 0006 and 0007 changes; 356 tests pass.
 
 | Area | State |
 |---|---|
@@ -838,6 +865,7 @@ sessions and the ADR 0005 and 0006 changes; 342 tests pass.
 | Thread lifecycle and overdue consequences, per-config violence and harshness, `clock.skip`, visible dice | done; not yet exercised against a real model |
 | Endings with deterministic continuations, `violence: consequence`, `jeopardy` stat on `uk-life` | done; not yet exercised against a real model |
 | Scene-aware compaction and the GM's private notes | done; the mock never closes a scene or writes a note, so both need a real model |
+| World sheet, dealt opening, catalog item ids, release-before-archivist (ADR 0007) | done; opening is exercised with the mock, not yet against a real model |
 | Real-model benchmark (Phase 2) | two short live sessions played; full golden-session benchmark not yet run |
 | `need` / attention-miss handling, delta-first experiment results | not yet implemented / not yet measured |
 | Nuxt UI, Supabase, hosted trial, wizard | later phases |

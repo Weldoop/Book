@@ -155,7 +155,11 @@ describe("uk-life specifics", () => {
     expect(config.modules).toEqual(["stats", "inventory", "relationships", "events", "dice", "offscreen"]);
     expect(config.time.start).toBe("2026-10-03T09:20");
     expect(config.meta.content_rating).toBe("romance");
-    expect(config.presentation).toEqual({ profile: "light", status_line: ["turn", "money", "health", "location", "time"] });
+    expect(config.presentation).toEqual({
+      profile: "light",
+      status_line: ["turn", "money", "health", "energy", "location", "time"],
+    });
+    expect(config.opening).toEqual({});
     expect(config.stats.find((s) => s.key === "money")?.start).toBe(45);
     expect(config.dice).toMatchObject({ sides: 100, thresholds: [10, 25, 50, 75, 90] });
     expect(config.offscreen).toMatchObject({ enabled: true, min_skip_hours: 6, max_entities: 4, max_tokens: 600 });
@@ -179,6 +183,7 @@ describe("pirate specifics", () => {
     expect(config.meta.content_rating).toBe("clean");
     expect(config.dice?.sides).toBe(20);
     expect(config.offscreen?.enabled ?? false).toBe(false);
+    expect(config.opening).toEqual({});
     const keys = config.stats.map((s) => s.key);
     expect(keys).toEqual(
       expect.arrayContaining(["gold", "supplies", "crew_morale", "ship_hull", "reputation_crown", "reputation_pirates"]),

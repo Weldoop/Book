@@ -42,8 +42,8 @@ export function outputFormatText(order: OutputOrder, config?: Config): string {
 export function sceneText(config: Config): string {
   return [
     "- A scene is one continuous stretch of story: a place, a conversation, a job of work. SCENE says which one you are in and how long it has run.",
-    '- Set "scene_ended": true only on the turn one genuinely closes: the player leaves, sleeps, the conversation is over, the errand is done. The engine tidies its memory at that moment, so answer honestly.',
-    `- Never set it mid-conversation or mid-task because a turn felt finished. After about ${config.scenes.max_beats} turns the engine tidies up regardless.`,
+    "- You alone decide when a scene ends. Set \"scene_ended\": true on the turn it closes: the player leaves, sleeps, the conversation is over, or the errand is done. The engine will not infer this from travel or sleep.",
+    `- Never set it mid-conversation or mid-task because a turn felt finished. After about ${config.scenes.max_beats} turns the engine tidies memory anyway, without pretending the scene ended.`,
   ].join("\n");
 }
 
@@ -120,6 +120,23 @@ export function threadText(config: Config): string {
   ].join("\n");
 }
 
+function workedExamples(config: Config, modules: Module[]): string {
+  const lines = [
+    "EXAMPLES",
+    `{"op":"entity.move","id":"${config.player_id}","location":"<place id from the world sheet>"}`,
+    '{"op":"entity.create","id":"new-place","type":"place","name":"A place someone mentioned","tags":["unvisited"]}',
+  ];
+  if (modules.some((m) => m.ops.includes("inventory.add"))) {
+    const item = config.items.find((i) => i.price !== undefined) ?? config.items[0];
+    lines.push(
+      item
+        ? `{"op":"inventory.add","owner":"${config.player_id}","item":"${item.id}","qty":1}`
+        : `{"op":"inventory.add","owner":"${config.player_id}","item":"<catalog item id>","qty":1}`,
+    );
+  }
+  return lines.join("\n");
+}
+
 export function contractText(config: Config, modules: Module[], order: OutputOrder): string {
   const style = config.gm_style;
   const tabletop = config.presentation.profile === "tabletop";
@@ -132,7 +149,10 @@ export function contractText(config: Config, modules: Module[], order: OutputOrd
     "- You never write state. You propose `delta` ops.",
     "- Every change to money, stats, items, time, relationships, threads or new named characters MUST appear in delta. If it is not in delta, it did not happen.",
     "- Declare every new named person or place with entity.create before any op or focus_next refers to it.",
-    "- Use only ids shown in the context. Never invent ops or fields.",
+    "- Use only ids shown in the context. Never invent ops or fields. Item ids come from the world sheet.",
+    "- Other people know only what they have seen, heard, or been told. An intention written only in the player's command is invisible to them until the player acts on it or says it.",
+    "- If the player goes somewhere, entity.move the player in that same delta. Create a new place with entity.create before the move. A place someone mentions before the player enters it is created in that turn with the tag \"unvisited\".",
+    "- Do not name a person tagged unmet, and do not treat them as present, until they share the player's location.",
     tabletop
       ? "- Stat numbers and rolls may appear in narration (tabletop profile)."
       : "- Never write the status line or stat numbers in narration; the engine renders them.",
@@ -161,9 +181,7 @@ export function contractText(config: Config, modules: Module[], order: OutputOrd
   }
   for (const rule of style.extra_rules) lines.push(`- ${rule}`);
   if (config.notes.enabled) lines.push("", "NOTES", notesText(config));
-  lines.push(
-    "",
-    "CONTENT",
+  lines.push("", workedExamples(config, modules), "", "CONTENT",
     RATING[config.meta.content_rating] ?? RATING.clean ?? "",
     "Never write any sexual content involving minors.",
     "",

@@ -34,8 +34,11 @@ const REQUEST_STORY_CAP = 700;
  */
 export function shouldCompact(state: State, config: Config): boolean {
   const beats = recentBeats(state).length;
-  if (beats >= config.scenes.max_beats) return true;
-  return state.scene.closed && beats >= config.scenes.min_beats;
+  const sceneClose = state.scene.closed && beats >= config.scenes.min_beats;
+  if (sceneClose) return true;
+  const hold = state.summaries.compaction_hold_until;
+  if (hold !== undefined && state.turn < hold) return false;
+  return beats >= config.scenes.max_beats;
 }
 
 /**
@@ -52,8 +55,8 @@ export function windowKeep(state: State, config: Config): number {
 export const COMPACTION_SYSTEM = [
   "You are the archivist of an interactive story. Compress old events into durable memory. Reply with a single JSON object only, no prose, no code fences.",
   "Keys:",
-  '- "chapter_summary": string, at most 150 words, covering the beats shown.',
-  '- "story_so_far": string, at most 350 words, merging the current story so far with the new chapter. You MUST keep running jokes, favours owed, promises, nicknames and recurring characters.',
+  '- "chapter_summary": string, at most 80 words, covering the beats shown.',
+  '- "story_so_far": string, at most 160 words, merging the current story so far with the new chapter. You MUST keep running jokes, favours owed, promises, nicknames and recurring characters.',
   '- "facts": array of {"id": string, "fact": string, "importance": 1|2|3}. For each entity you want to tidy, list ALL the facts it should keep (consolidated: merge duplicates, drop outdated or trivial ones, at most 8 per entity). Your list replaces its old facts. Only use entity ids shown below; omit entities that need no change.',
   '- "resolve_threads": array of thread ids that are clearly finished. Only use ids shown below.',
   "Never invent events. Use only what is shown.",

@@ -56,6 +56,11 @@ export const SummariesSchema = z.object({
   chapters: z.array(z.string()).default([]),
   story_so_far: z.string().default(""),
   last_compacted_turn: z.number().int().min(0).default(0),
+  /**
+   * After a failed chapter write, skip the beat-ceiling retry until this turn.
+   * A scene the GM actually closed still compacts.
+   */
+  compaction_hold_until: z.number().int().min(0).optional(),
 });
 export type Summaries = z.infer<typeof SummariesSchema>;
 

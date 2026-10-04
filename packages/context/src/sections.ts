@@ -31,7 +31,7 @@ export function sceneSection(config: Config, state: State): Section {
   if (locId) {
     lines.push(`Location: ${nameOf(state, locId)} [${locId}]`);
     const present = Object.values(state.entities)
-      .filter((e) => e.location === locId && e.id !== config.player_id)
+      .filter((e) => e.location === locId && e.id !== config.player_id && !e.tags.includes("unmet"))
       .sort((a, b) => (TYPE_RANK[a.type] ?? 9) - (TYPE_RANK[b.type] ?? 9) || a.id.localeCompare(b.id));
     if (present.length > 0) lines.push(`Present: ${present.map((e) => `${e.name} [${e.id}]`).join(", ")}`);
   } else {

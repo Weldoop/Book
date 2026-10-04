@@ -16,6 +16,7 @@ import {
   type Section,
 } from "./sections.ts";
 import { tokensOf } from "./text.ts";
+import { worldSheetSection } from "./world.ts";
 import type { BuiltContext, ContextPart, OutputOrder } from "./types.ts";
 
 export interface BuildContextInput {
@@ -60,6 +61,7 @@ export function assembleTurn(i: BuildContextInput): TurnAssembly {
     { part: "due_events", section: dueSection(i.config, i.due, i.fate, budget.due_events) },
     { part: "threads", section: threads },
     { part: "notes", section: notesSection(i.state, i.config, budget.notes) },
+    { part: "world_sheet", section: worldSheetSection(i.config, i.state, budget.world_sheet) },
     { part: "entities_in_focus", section: focus.section },
     { part: "story_so_far", section: storySection(i.state, budget.story_so_far) },
     { part: "beats", section: beatsSection(i.state, budget.beats) },

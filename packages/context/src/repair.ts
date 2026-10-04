@@ -3,6 +3,7 @@ import { mapAttention } from "./attention.ts";
 import { resolveBudget } from "./budget.ts";
 import { describeOps } from "./ops.ts";
 import { focusSection, sceneSection, stateSection } from "./sections.ts";
+import { worldSheetSection } from "./world.ts";
 import { extractJsonObject, tokensOf } from "./text.ts";
 import { assembleTurn, joinSections, sumTokens } from "./turn.ts";
 import type { BuiltContext, ContextPart, OutputOrder } from "./types.ts";
@@ -38,7 +39,8 @@ function deltaRepairSystem(modules: Module[]): string {
     "- Every change to money, stats, items, time, relationships, threads or new named characters must appear in delta.",
     "- Elapsed time goes in delta as clock.advance (minutes).",
     "- Declare every new named person or place with entity.create before any op refers to it.",
-    "- Use only ids shown in the context. Never invent ops or fields.",
+    "- Use only ids shown in the context. Item ids must be copied from the world sheet. Move the player with entity.move to a place id.",
+    "- Never invent ops or fields.",
     "OPS",
     describeOps(modules),
     'Return ONLY a JSON object {"delta":[...],"beat":"..."} that corrects the rejected ops. Do not change the narration.',
@@ -110,6 +112,7 @@ function buildDeltaRepair(i: RepairInput): BuiltContext {
 
   const sections = [
     { part: "scene", section: sceneSection(i.config, i.state) },
+    { part: "world_sheet", section: worldSheetSection(i.config, i.state, budget.state_snapshot) },
     { part: "state_snapshot", section: stateSection(i.config, i.state, i.modules, budget.state_snapshot) },
     { part: "entities_in_focus", section: focus.section },
     {

@@ -59,7 +59,7 @@ describe("AnthropicProvider", () => {
     expect(c.headers["x-api-key"]).toBe("sk-test-secret");
     expect(c.headers["anthropic-version"]).toBe("2023-06-01");
     expect(c.headers["content-type"]).toBe("application/json");
-    expect(c.body.model).toBe("claude-sonnet-4-5");
+    expect(c.body.model).toBe("claude-sonnet-4-6");
     expect(c.body.max_tokens).toBe(300);
     expect(c.body.temperature).toBe(0.7);
     expect(c.body.system[0].cache_control).toEqual({ type: "ephemeral" });
@@ -72,7 +72,7 @@ describe("AnthropicProvider", () => {
     await p.complete(req({ tier: "cheap" }));
     await p.complete(req({ tier: "strong" }));
     expect(calls[0]!.body.model).toBe("my-cheap");
-    expect(calls[1]!.body.model).toBe("claude-sonnet-4-5");
+    expect(calls[1]!.body.model).toBe("claude-sonnet-4-6");
   });
 
   it("prefills an open brace for json requests and restores it in the reply", async () => {

@@ -17,6 +17,8 @@ export const OpSchema = z.discriminatedUnion("op", [
     aliases: z.array(z.string()).optional(),
     location: IdSchema.optional(),
     facts: z.array(z.string()).optional(),
+    /** `unmet` hides a person until they share the player's location. `unvisited` marks a place not yet entered. */
+    tags: z.array(z.string().min(1)).max(8).optional(),
   }),
   z.object({ op: z.literal("entity.move"), id: IdSchema, location: IdSchema }),
   z.object({

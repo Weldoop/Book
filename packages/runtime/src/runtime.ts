@@ -9,6 +9,7 @@ import {
   severityOf,
   openScene,
   stripOocPrefix,
+  playerNotices,
   validateDraft,
 } from "@book/engine";
 import {
@@ -74,11 +75,25 @@ export interface TurnResult {
   scene_ended?: boolean;
   /** Set when the GM resolved the action with the die and the config shows rolls to the player. */
   roll?: { value: number; band: string; what: string; stat?: string };
+  /** Engine-printed warnings (low money, a broken promise). The narration may also mention them. */
+  notices: string[];
   record: TurnRecord;
 }
 
 export interface TurnHooks {
   onInterlude?(text: string): void;
+  /** Fired with the validated turn before the archivist runs, so the player can read while memory is written. */
+  onReleased?(result: TurnResult): void;
+}
+
+const COMPACTION_HOLD_TURNS = 5;
+const COMPACTION_MAX_TOKENS = 1600;
+
+function holdCompaction(state: State): State {
+  return {
+    ...state,
+    summaries: { ...state.summaries, compaction_hold_until: state.turn + COMPACTION_HOLD_TURNS },
+  };
 }
 
 export function createRuntime(opts: {
@@ -164,7 +179,7 @@ async function playOoc(rt: Runtime, state: State, rawInput: string): Promise<Tur
     at: new Date().toISOString(),
   };
   await rt.store.appendLog(state.save_id, { type: "ooc", record });
-  return { turn: state.turn, kind: "ooc", narration: record.narration ?? "", ...view(rt, state), outcome: "ok", record };
+  return { turn: state.turn, kind: "ooc", narration: record.narration ?? "", ...view(rt, state), outcome: "ok", notices: [], record };
 }
 
 /** Any input after a final ending. No model call: the story is over and the save stays closed. */
@@ -191,6 +206,7 @@ async function replayEnding(rt: Runtime, state: State, rawInput: string, ending:
     ...view(rt, state),
     outcome: "ended",
     ending: { id: ending.id, title: ending.title, text: ending.text },
+    notices: [],
     record,
   };
 }
@@ -371,6 +387,7 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
       ...view(rt, state),
       outcome: "rolled_back",
       ...(interlude ? { interlude } : {}),
+      notices: [],
       record,
     };
   }
@@ -380,17 +397,6 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
     due,
     shown_threads: ctx.threads_shown ?? [],
   });
-
-  if (shouldCompact(next, config)) {
-    try {
-      const req = buildCompactionRequest({ config, state: next, modules });
-      const res = await call({ tier: "cheap", purpose: "compaction", system: req.system, messages: req.messages, max_tokens: 900, json: true });
-      const parsed = parseCompactionResult(res.text);
-      if (parsed.ok) next = applyCompaction(next, parsed.value, config);
-    } catch {
-      // Compaction is best-effort; the next turn retries.
-    }
-  }
 
   const elapsed = diffMinutes(next.clock.now, state.clock.now);
   if (config.offscreen?.enabled && elapsed >= config.offscreen.min_skip_hours * 60) {
@@ -406,24 +412,24 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
   const fired = pickEnding(next, config);
   if (fired) next = markEnding(next, fired);
 
-  const record: TurnRecord = {
+  const outcome = rewrote ? "rewritten" : repairs > 0 ? "repaired" : "ok";
+  const check = current.draft.check;
+  const partial: TurnRecord = {
     ...baseRecord,
     narration: current.draft.narration,
     beat: current.draft.beat,
     delta: current.draft.delta,
-    ...(current.draft.check ? { check: current.draft.check } : {}),
-    outcome: rewrote ? "rewritten" : repairs > 0 ? "repaired" : "ok",
-    usage: usages,
+    ...(check ? { check } : {}),
+    outcome,
+    usage: [...usages],
   };
-  await rt.store.commitTurn({ save_id: saveId, expected_turn: state.turn, state: next, record });
-
-  const check = current.draft.check;
-  return {
+  const visible: TurnResult = {
     turn: next.turn,
     kind,
     narration: current.draft.narration,
     ...view(rt, next),
-    outcome: record.outcome,
+    outcome,
+    notices: playerNotices(due),
     ...(interlude ? { interlude } : {}),
     ...(next.scene.closed ? { scene_ended: true } : {}),
     ...(fired
@@ -446,6 +452,38 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
           },
         }
       : {}),
-    record,
+    record: partial,
   };
+
+  let hookError: unknown;
+  try {
+    hooks.onReleased?.(visible);
+  } catch (err) {
+    hookError = err;
+  }
+
+  if (shouldCompact(next, config)) {
+    try {
+      const req = buildCompactionRequest({ config, state: next, modules });
+      const res = await call({
+        tier: "cheap",
+        purpose: "compaction",
+        system: req.system,
+        messages: req.messages,
+        max_tokens: COMPACTION_MAX_TOKENS,
+        json: true,
+      });
+      const parsed = parseCompactionResult(res.text);
+      if (parsed.ok) next = applyCompaction(next, parsed.value, config);
+      else next = holdCompaction(next);
+    } catch {
+      next = holdCompaction(next);
+    }
+  }
+
+  const record: TurnRecord = { ...partial, usage: usages };
+  await rt.store.commitTurn({ save_id: saveId, expected_turn: state.turn, state: next, record });
+  const result: TurnResult = { ...visible, record };
+  if (hookError) throw hookError;
+  return result;
 }

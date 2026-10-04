@@ -4,7 +4,7 @@
   "meta": {
     "title": "Black Water Reckoning",
     "tone": "adventurous, brisk, swashbuckling, a little mechanical",
-    "premise": "The Caribbean, 1717. You command the sloop Marigold with a loyal but hungry crew, thin pockets and a Crown that would very much like you hanged. Trade, raid, scheme or run; the tide waits for no one.",
+    "premise": "The Caribbean, 1717. You command the sloop Marigold with a hungry crew, thin pockets and a Crown that would very much like you hanged. Trade, raid, scheme or run. The first trouble of this voyage is dealt when the book opens; the tide waits for no one.",
     "content_rating": "clean",
     "violence": "adventure",
     "harshness": "unforgiving"
@@ -402,6 +402,7 @@
     "visible": true,
     "stat_modifier": true
   },
+  "opening": {},
   "seed": {
     "entities": [
       {

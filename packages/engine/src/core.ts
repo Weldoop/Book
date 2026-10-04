@@ -4,6 +4,15 @@ import { addMinutes, diffMinutes } from "./time.ts";
 const MAX_FACT_CHARS = 220;
 const MAX_FACTS_PER_ENTITY = 12;
 
+/** A person the player has not met. Cleared when they share the player's location. */
+export const UNMET = "unmet";
+/** A place that has been mentioned and not yet entered. */
+export const UNVISITED = "unvisited";
+
+function withoutTag(tags: string[], tag: string): string[] {
+  return tags.filter((t) => t !== tag);
+}
+
 function bad(code: string, message: string, index: number, severity: Violation["severity"] = "fixable"): Violation {
   return { severity, code, message, op_index: index };
 }
@@ -130,7 +139,7 @@ export const coreModule: Module = {
           aliases: op.aliases ?? [],
           location: op.location ?? null,
           facts: (op.facts ?? []).map((text) => ({ text, importance: 2 as const, turn })),
-          tags: [],
+          tags: op.tags ?? [],
           last_touched: turn,
         };
         break;
@@ -198,4 +207,21 @@ export const coreModule: Module = {
 
 export function playerLocation(state: State, config: Config): string | null {
   return state.entities[config.player_id]?.location ?? null;
+}
+
+/**
+ * Arriving clears `unvisited` on that place. Sharing the player's location clears `unmet`.
+ * The status line and the cast the player has met are then the same facts.
+ */
+export function syncPresence(state: State, config: Config): State {
+  const here = playerLocation(state, config);
+  if (!here) return state;
+  const next = clone(state);
+  const place = next.entities[here];
+  if (place?.tags.includes(UNVISITED)) place.tags = withoutTag(place.tags, UNVISITED);
+  for (const entity of Object.values(next.entities)) {
+    if (entity.type !== "person" || entity.id === config.player_id) continue;
+    if (entity.location === here && entity.tags.includes(UNMET)) entity.tags = withoutTag(entity.tags, UNMET);
+  }
+  return next;
 }

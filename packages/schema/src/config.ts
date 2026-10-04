@@ -191,6 +191,15 @@ export const NotesConfigSchema = z.object({
 });
 export type NotesConfig = z.infer<typeof NotesConfigSchema>;
 
+/**
+ * Each new save deals its own first chapter. `dealt_by` is reserved for a future card.
+ * While it is absent, the Game Master deals the cast and the opening threads.
+ */
+export const OpeningConfigSchema = z.object({
+  dealt_by: z.enum(["gm"]).optional(),
+});
+export type OpeningConfig = z.infer<typeof OpeningConfigSchema>;
+
 export const GmStyleSchema = z.object({
   max_words: z.number().int().positive().default(90),
   person: z.enum(["first", "second", "third"]).default("second"),
@@ -253,6 +262,8 @@ export const ConfigSchema = z
     endings: z.array(EndingSchema).default([]),
     dice: DiceConfigSchema.optional(),
     offscreen: OffscreenConfigSchema.optional(),
+    /** When set, a new save deals a fresh cast and opening threads before the player types. */
+    opening: OpeningConfigSchema.optional(),
     seed: z
       .object({
         entities: z.array(EntitySeedSchema).default([]),

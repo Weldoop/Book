@@ -4,7 +4,7 @@
   "meta": {
     "title": "Uplands: A Student Life",
     "tone": "grounded, dry, British",
-    "premise": "You are a first-year student in a rented shared house in Uplands, Swansea. It is a damp Saturday in early October, you have £45 to last, the garden is a jungle, and the letting agent is due to inspect the house on Monday.",
+    "premise": "You are a first-year student in a shared house in Uplands, Swansea. Money is tight, and the people you live with have their own lives. These first days are one chapter of a longer student life.",
     "content_rating": "romance",
     "violence": "consequence",
     "harshness": "normal"
@@ -48,6 +48,7 @@
       "turn",
       "money",
       "health",
+      "energy",
       "location",
       "time"
     ]
@@ -270,38 +271,6 @@
         "once": true
       },
       {
-        "id": "cerys-warms-up",
-        "when": {
-          "kind": "relationship",
-          "a": "player",
-          "b": "cerys",
-          "op": ">",
-          "value": 60
-        },
-        "text": "Cerys finds a reason to linger in the same room, and doesn't pretend otherwise. Something unspoken is now very nearly spoken.",
-        "entities": [
-          "player",
-          "cerys"
-        ],
-        "once": true
-      },
-      {
-        "id": "dai-gets-sulky",
-        "when": {
-          "kind": "relationship",
-          "a": "player",
-          "b": "dai",
-          "op": "<",
-          "value": 20
-        },
-        "text": "Dai has gone quiet in the group chat, which for Dai is a statement in itself.",
-        "entities": [
-          "player",
-          "dai"
-        ],
-        "once": true
-      },
-      {
         "id": "week-one-ends",
         "when": {
           "kind": "after",
@@ -460,6 +429,7 @@
     "visible": false,
     "stat_modifier": false
   },
+  "opening": {},
   "offscreen": {
     "enabled": true,
     "min_skip_hours": 6,

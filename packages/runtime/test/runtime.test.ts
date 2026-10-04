@@ -4,7 +4,7 @@ import { getActiveModules, statsOf } from "@book/modules";
 import { ConfigSchema, type Config, type LLMProvider, type LLMRequest } from "@book/schema";
 import { MemoryStore } from "@book/store";
 import { describe, expect, it } from "vitest";
-import { createRuntime, newGame, playTurn } from "../src/index.ts";
+import { createRuntime, newGame, openBook, playTurn } from "../src/index.ts";
 
 const config: Config = ConfigSchema.parse(JSON.parse(readFileSync(new URL("../../../configs/uk-life/config.json", import.meta.url), "utf8")));
 
@@ -267,5 +267,76 @@ describe("playTurn", () => {
     const res = await playTurn(rt, "s1", "Check the rigging");
     expect(res.outcome).toBe("ok");
     expect(res.panel.length).toBeGreaterThan(0);
+  });
+
+  it("releases the validated turn before the archivist, and holds a failed chapter write", async () => {
+    const llm = scripted({ compaction: ["not json at all"] });
+    const { rt, store } = await setup(llm);
+    let releasedBeforeCompaction = 0;
+    for (let i = 0; i < 20; i++) {
+      const res = await playTurn(rt, "s1", `Do thing ${i}`, {
+        onReleased(r) {
+          if (!r.record.usage.some((u) => u.purpose === "compaction")) releasedBeforeCompaction++;
+        },
+      });
+      expect(res.notices).toEqual([]);
+      if (i === 19) expect(res.record.usage.some((u) => u.purpose === "compaction")).toBe(true);
+    }
+    expect(releasedBeforeCompaction).toBe(20);
+    const state = await store.loadSave("s1");
+    expect(state.turn).toBe(20);
+    expect(state.summaries.story_so_far).toBe("");
+    expect(state.summaries.compaction_hold_until).toBe(25);
+  });
+});
+
+describe("openBook", () => {
+  it("deals a cast and a thread into the save and does not name unmet people", async () => {
+    const { rt, store } = await setup(new MockProvider());
+    const opened = await openBook(rt, "s1");
+    expect(opened?.narration).not.toMatch(/Rowan|Okonkwo|Priya/);
+    const state = await store.loadSave("s1");
+    expect(state.turn).toBe(1);
+    expect(state.entities.cerys).toBeUndefined();
+    expect(state.entities["rowan-hale"]?.tags).toContain("unmet");
+    expect(state.entities["sam-okonkwo"]).toBeTruthy();
+    expect(state.entities["priya-shah"]).toBeTruthy();
+    expect(state.threads.some((t) => t.text.includes("Rowan Hale") && t.due)).toBe(true);
+    expect(state.window[0]?.narration).not.toMatch(/Rowan/);
+    expect(state.entities.kitchen?.type).toBe("place");
+    expect(state.entities.player?.type).toBe("person");
+  });
+
+  it("leaves the seed in place when the chapter cannot be read", async () => {
+    const llm = scripted({ opening: ["nope"], rewrite_repair: ["still nope"] });
+    const { rt, store } = await setup(llm);
+    expect(await openBook(rt, "s1")).toBeNull();
+    const state = await store.loadSave("s1");
+    expect(state.turn).toBe(0);
+    expect(state.entities.cerys?.name).toBe("Cerys");
+    expect(state.threads.length).toBeGreaterThan(0);
+  });
+
+  it("refuses an opening that names someone the player has not met", async () => {
+    const leaked = JSON.stringify({
+      narration: "Rowan Hale is already in the doorway.",
+      delta: [
+        { op: "entity.create", id: "rowan-hale", type: "person", name: "Rowan Hale", tags: ["unmet"] },
+        { op: "clock.advance", minutes: 1 },
+      ],
+      beat: "Someone is named too soon.",
+    });
+    const llm = scripted({ opening: [leaked], rewrite_repair: [leaked] });
+    const { rt, store } = await setup(llm);
+    expect(await openBook(rt, "s1")).toBeNull();
+    expect((await store.loadSave("s1")).entities.cerys).toBeTruthy();
+  });
+
+  it("does nothing when the book does not deal an opening", async () => {
+    const { opening: _opening, ...rest } = config;
+    const { rt, store } = await setup(new MockProvider(), { config: rest });
+    expect(await openBook(rt, "s1")).toBeNull();
+    expect((await store.loadSave("s1")).turn).toBe(0);
+    expect((await store.loadSave("s1")).entities.cerys).toBeTruthy();
   });
 });

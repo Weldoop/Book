@@ -118,6 +118,45 @@ export class MockProvider implements LLMProvider {
         return this.turnJson(req, undefined);
       case "turn":
         return this.turnJson(req, fault);
+      case "opening":
+        return JSON.stringify({
+          narration: "The day starts quietly, before anyone has decided what it is for.",
+          delta: [
+            {
+              op: "entity.create",
+              id: "rowan-hale",
+              type: "person",
+              name: "Rowan Hale",
+              tags: ["unmet"],
+              facts: ["Keeps odd hours and is not in the room."],
+            },
+            {
+              op: "entity.create",
+              id: "sam-okonkwo",
+              type: "person",
+              name: "Sam Okonkwo",
+              tags: ["unmet"],
+              facts: ["Works a late shift."],
+            },
+            {
+              op: "entity.create",
+              id: "priya-shah",
+              type: "person",
+              name: "Priya Shah",
+              tags: ["unmet"],
+              facts: ["Leaves the house early."],
+            },
+            {
+              op: "thread.open",
+              kind: "commitment",
+              text: "Rowan Hale left a note asking you to cover something before the week turns.",
+              due: "2099-06-01T18:00",
+              entities: ["rowan-hale"],
+            },
+            { op: "clock.advance", minutes: 1 },
+          ],
+          beat: "A new chapter of the life begins.",
+        });
       default:
         return this.turnJson(req, undefined);
     }

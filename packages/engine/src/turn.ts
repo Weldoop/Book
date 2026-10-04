@@ -9,6 +9,7 @@ import {
   type TurnKind,
   type Violation,
 } from "@book/schema";
+import { syncPresence } from "./core.ts";
 import { processOps } from "./ops.ts";
 import { rngFor } from "./rng.ts";
 import { addMinutes, diffMinutes } from "./time.ts";
@@ -204,7 +205,12 @@ export function applyDraft(state: State, config: Config, modules: Module[], draf
   next.window.push({ turn, input: ctx.input, narration: draft.narration, clock: next.clock.now });
   if (next.window.length > WINDOW_CAP) next.window = next.window.slice(-WINDOW_CAP);
   next.focus_next = (draft.focus_next ?? []).filter((id) => next.entities[id]).slice(0, 8);
-  return next;
+  return syncPresence(next, config);
+}
+
+/** Warnings the engine prints itself, so a missed narration cannot hide them. */
+export function playerNotices(due: DueItem[]): string[] {
+  return due.filter((d) => d.kind === "conditional" || d.id.startsWith(OVERDUE_PREFIX)).map((d) => d.text);
 }
 
 export function pickInterlude(state: State, config: Config): string {

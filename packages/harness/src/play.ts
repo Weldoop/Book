@@ -97,18 +97,46 @@ export async function runPlay(opts: PlayOptions): Promise<void> {
     ...(opts.logRaw ? { logRaw: true } : {}),
   });
 
+  const present = (result: TurnResultLike): void => {
+    const roll = rollLine(result);
+    if (roll) io.write(`\n${roll}\n`);
+    io.write(`\n${result.narration}\n`);
+    for (const notice of result.notices ?? []) {
+      if (notice.trim()) io.write(`${notice}\n`);
+    }
+    if (result.status) io.write(`\n${result.status}\n`);
+    if (opts.config.presentation.profile === "tabletop" && result.panel.length > 0) {
+      io.write(result.panel.map((p) => `  ${p}`).join("\n") + "\n");
+    }
+    const scene = sceneLine(result);
+    if (scene) io.write(`\n${dim(scene)}\n`);
+    const ending = endingLines(result);
+    if (ending.length > 0) io.write(`\n${ending.join("\n\n")}\n`);
+  };
+
+  let debug = opts.debug ?? false;
+  let last: TurnResultLike | undefined;
+
   const existing = (await opts.store.listSaves()).some((s) => s.save_id === opts.saveId);
   if (existing) {
     const state = await opts.store.loadSave(opts.saveId);
     io.write(dim(`Resumed "${opts.saveId}" at turn ${state.turn}.`) + "\n");
   } else {
     await opts.api.newGame(rt, opts.saveId);
-    io.write(dim(`New game "${opts.saveId}": ${opts.config.meta.title}. Type your first action (for example "Start the game").`) + "\n");
+    const tOpen = performance.now();
+    const opened = opts.api.openBook ? await opts.api.openBook(rt, opts.saveId) : null;
+    if (opened) {
+      io.write(dim(`New game "${opts.saveId}": ${opts.config.meta.title}.`) + "\n");
+      last = opened;
+      present(opened);
+      const stutter = stutterLine(opened);
+      if (stutter) io.write(dim(stutter) + "\n");
+      io.write(dim(`[${usageLine(opened, performance.now() - tOpen)}]`) + "\n");
+    } else {
+      io.write(dim(`New game "${opts.saveId}": ${opts.config.meta.title}. Type your first action (for example "Start the game").`) + "\n");
+    }
   }
   io.write(dim("One line = one turn (several actions in one line are fine). End a line with \\ to continue it on the next line. /quit to exit, /debug for the debug dump.") + "\n");
-
-  let debug = opts.debug ?? false;
-  let last: TurnResultLike | undefined;
 
   for (;;) {
     let line = await io.readLine("\n> ");
@@ -135,28 +163,27 @@ export async function runPlay(opts: PlayOptions): Promise<void> {
 
     const t0 = performance.now();
     let result: TurnResultLike;
+    let released = false;
     try {
       result = await opts.api.playTurn(rt, opts.saveId, text, {
         onInterlude: (t) => io.write(`\n${dim(t)}\n`),
+        onReleased: (r) => {
+          released = true;
+          present(r);
+          const early = stutterLine(r);
+          if (early) io.write(dim(early) + "\n");
+        },
       });
     } catch (err) {
       io.write(`\nError: ${err instanceof Error ? err.message : String(err)}\n`);
       break;
     }
     last = result;
-    const roll = rollLine(result);
-    if (roll) io.write(`\n${roll}\n`);
-    io.write(`\n${result.narration}\n`);
-    if (result.status) io.write(`\n${result.status}\n`);
-    if (opts.config.presentation.profile === "tabletop" && result.panel.length > 0) {
-      io.write(result.panel.map((p) => `  ${p}`).join("\n") + "\n");
+    if (!released) {
+      present(result);
+      const stutter = stutterLine(result);
+      if (stutter) io.write(dim(stutter) + "\n");
     }
-    const scene = sceneLine(result);
-    if (scene) io.write(`\n${dim(scene)}\n`);
-    const ending = endingLines(result);
-    if (ending.length > 0) io.write(`\n${ending.join("\n\n")}\n`);
-    const stutter = stutterLine(result);
-    if (stutter) io.write(dim(stutter) + "\n");
     io.write(dim(`[${usageLine(result, performance.now() - t0)}]`) + "\n");
     if (debug) io.write(dim(debugDump(result)) + "\n");
   }

@@ -13,8 +13,8 @@ export const DEFAULT_PRICES: Record<LLMTier, Price> = {
 };
 
 export const DEFAULT_MODELS: Record<LLMTier, string> = {
-  strong: "claude-sonnet-4-5",
-  cheap: "claude-haiku-4-5",
+  strong: "claude-sonnet-4-6",
+  cheap: "claude-haiku-4-5-20251001",
 };
 
 type Env = Record<string, string | undefined>;
