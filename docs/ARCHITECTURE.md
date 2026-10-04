@@ -590,6 +590,19 @@ Owner approval is required for: changes to `packages/schema`, changes to the mod
 16. The "delta first, then narration" output order is tested as an early experiment.
 17. Interlude and repair history is visible in the debug panel only.
 
-### Build status
+### Build status (4 Oct 2026)
 
-Owner approved the plan on 4 Oct 2026 and asked to start the build. See `AGENTS.md` and section 15 for phase gates. The Phase 0 contracts in `packages/schema` are the reference for all other packages.
+Phase 0 (contracts) and Phase 1 (core build) are implemented on the mock provider; 250 tests pass.
+
+| Area | State |
+|---|---|
+| Contracts, engine, modules (stats, inventory, relationships, events, dice, offscreen) | done |
+| Turn runtime: validate-then-release, delta repair, GM interlude rewrite, rollback, compaction, off-screen simulator | done |
+| Context builder, attention mapping, memory compaction | done |
+| Mock and Anthropic providers, file store, harness CLI (play, replay, baseline, report) | done; Anthropic adapter tested only with injected fetch |
+| UK and pirate configs, golden session, recall probes | done |
+| Real-model benchmark (Phase 2) | blocked on `ANTHROPIC_API_KEY` |
+| `need` / attention-miss handling, delta-first experiment results | not yet implemented / not yet measured |
+| Nuxt UI, Supabase, hosted trial, wizard | later phases |
+
+First mock benchmark (125 turns, estimates only, mock replies are short so baseline growth is understated): engine input stays flat at about 2.4k tokens per turn from turn 25; baseline grows to about 7.7k by turn 125.
