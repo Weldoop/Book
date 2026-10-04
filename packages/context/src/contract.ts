@@ -21,13 +21,76 @@ export function outputFormatText(order: OutputOrder): string {
       : "Write the keys in this order: narration, delta, beat.";
   return [
     "OUTPUT",
-    "Reply with a single JSON object only. No prose, no code fences. Keys:",
+    "Reply with a single JSON object only. No prose, no code fences, no commentary before or after it.",
+    "Write the narration once, inside the JSON. Never write the story as plain text as well.",
+    "Keys:",
     '- "narration": string, the story text for the player.',
     '- "delta": array of ops (use [] if nothing changed).',
     '- "beat": one line, at most 20 words, summarising what happened.',
     '- "focus_next": optional array of entity ids likely to matter next turn.',
     '- "need": optional array of ids you lack information on.',
+    '- "check": optional {"what": "what was at stake", "stat": "stat id"} - set this ONLY when you resolved the action with the fate die.',
     keys,
+  ].join("\n");
+}
+
+const VIOLENCE: Record<string, string> = {
+  deflect: [
+    "- The player may attempt violence; you never narrate the injury. The attempt misses, is blocked, is flinched away from, or lands harmlessly, for a concrete physical reason.",
+    "- Make it cost them instead: people react, leave, call someone, stop trusting them, and the trouble follows. Open a thread for the fallout and move relationships in the delta.",
+  ].join("\n"),
+  adventure: [
+    "- This is an adventure: fights are part of the genre. Blows land, people are wounded, and characters can die. Keep it swashbuckling, not gruesome; no lingering on gore or suffering.",
+    "- Put every injury in the delta. Tag a killed character with entity.fact.add and stop referring to them as present.",
+  ].join("\n"),
+};
+
+const HARSHNESS: Record<string, string> = {
+  forgiving: "- Consequences are gentle. Mistakes cost a little and can be walked back.",
+  normal: "- Consequences are realistic. Mistakes cost something that has to be dealt with.",
+  unforgiving:
+    "- Consequences are heavy. Mistakes cost money, standing, health or a relationship outright, and they stick.",
+};
+
+export function fateText(config: Config): string {
+  const lines = [
+    "- When a risky or uncertain action needs a result, use the supplied FATE DIE value instead of inventing the outcome. You decide whether an action is risky enough to need it; routine actions just succeed.",
+    '- When you do use it, set "check" in the output so the engine can show the player what was rolled.',
+  ];
+  if (config.dice?.visible) {
+    lines.push(
+      "- The player sees the roll, so the narration must match it: a low roll must visibly go wrong and a high roll must visibly go well.",
+    );
+    if (config.dice.stat_modifier) {
+      lines.push(
+        '- Name the stat the check leans on in "check".stat. A strong stat should carry a middling roll; a weak one should not.',
+      );
+    }
+  } else {
+    lines.push(
+      "- The player does NOT see the roll. Never mention dice, odds or luck. When an action fails or half-works, the narration must give a concrete in-world reason the player can see - someone saw it coming, a hand was wet, a drawer stuck. Never let an attempt simply fizzle with no stated cause.",
+    );
+  }
+  return lines.join("\n");
+}
+
+export function timeText(config: Config): string {
+  const lines = [
+    "- Elapsed time goes in delta as clock.advance (minutes).",
+    `- For a deliberate stretch of sleeping, travelling or waiting, use clock.skip with a reason, up to ${config.time.max_skip_minutes} minutes in one turn.`,
+  ];
+  if (config.time.max_skip_minutes === 0) lines.push("- This character does not skip time. Play the hours through.");
+  if (config.time.rest_note) lines.push(`- Rest in this world: ${config.time.rest_note}`);
+  lines.push("- A skip must be plausible for this character and this world. Do not skip past something urgent.");
+  return lines.join("\n");
+}
+
+export function threadText(config: Config): string {
+  return [
+    `- OPEN THREADS shows at most ${config.threads.max_in_context} of the live threads, not all of them. Threads the player ignores drop off this list and come back as consequences when their deadline passes.`,
+    "- Thread the player caused and threads the world set matter equally. One action may resolve more than one: list every thread.resolve it earns.",
+    "- When resolving a thread opens a new question, open the follow-up with thread.open and set parent to the thread it came from.",
+    "- Do not nag. Mention a thread only when the scene gives it a reason to come up.",
   ].join("\n");
 }
 
@@ -42,15 +105,24 @@ export function contractText(config: Config, modules: Module[], order: OutputOrd
     "RULES",
     "- You never write state. You propose `delta` ops.",
     "- Every change to money, stats, items, time, relationships, threads or new named characters MUST appear in delta. If it is not in delta, it did not happen.",
-    "- Elapsed time goes in delta as clock.advance (minutes).",
     "- Declare every new named person or place with entity.create before any op or focus_next refers to it.",
     "- Use only ids shown in the context. Never invent ops or fields.",
     tabletop
       ? "- Stat numbers and rolls may appear in narration (tabletop profile)."
       : "- Never write the status line or stat numbers in narration; the engine renders them.",
     "- The player's message may contain several actions: handle them in order in one narration.",
-    "- When a risky action needs a result, use the supplied FATE DIE value instead of inventing the outcome.",
     '- If the input is "..." (kind continue), advance the scene using DUE EVENTS or natural progression.',
+    "",
+    "TIME",
+    timeText(config),
+    "",
+    "OUTCOMES",
+    fateText(config),
+    VIOLENCE[config.meta.violence] ?? VIOLENCE.deflect ?? "",
+    HARSHNESS[config.meta.harshness] ?? HARSHNESS.normal ?? "",
+    "",
+    "THREADS",
+    threadText(config),
     "",
     "STYLE",
     `- At most ${style.max_words} words of narration, in ${PERSON[style.person] ?? style.person}.`,

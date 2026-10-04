@@ -35,6 +35,7 @@ export interface TurnAssembly {
   sections: { part: string; section: Section }[];
   parts: ContextPart[];
   focus: string[];
+  threads_shown: string[];
 }
 
 export function assembleTurn(i: BuildContextInput): TurnAssembly {
@@ -51,11 +52,12 @@ export function assembleTurn(i: BuildContextInput): TurnAssembly {
   });
   const focus = focusSection(i.state, focusIds, budget.entities_in_focus);
 
+  const threads = threadsSection(i.state, i.config, focusIds, budget.threads);
   const sections: { part: string; section: Section }[] = [
     { part: "scene", section: sceneSection(i.config, i.state) },
     { part: "state_snapshot", section: stateSection(i.config, i.state, i.modules, budget.state_snapshot) },
     { part: "due_events", section: dueSection(i.config, i.due, i.fate, budget.due_events) },
-    { part: "threads", section: threadsSection(i.state, budget.threads) },
+    { part: "threads", section: threads },
     { part: "entities_in_focus", section: focus.section },
     { part: "story_so_far", section: storySection(i.state, budget.story_so_far) },
     { part: "beats", section: beatsSection(i.state, budget.beats) },
@@ -72,7 +74,7 @@ export function assembleTurn(i: BuildContextInput): TurnAssembly {
       trimmed: section.trimmed,
     })),
   ];
-  return { system: stat.system, sections, parts, focus: focus.shown };
+  return { system: stat.system, sections, parts, focus: focus.shown, threads_shown: threads.shown };
 }
 
 export function joinSections(sections: { section: Section }[]): string {
@@ -94,5 +96,6 @@ export function buildTurnContext(input: BuildContextInput): BuiltContext {
     parts: a.parts,
     total_tokens: sumTokens(a.parts),
     focus: a.focus,
+    threads_shown: a.threads_shown,
   };
 }

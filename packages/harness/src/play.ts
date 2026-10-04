@@ -15,8 +15,34 @@ export interface PlayOptions {
   llm: LLMProvider;
   saveId: string;
   deltaFirst?: boolean;
+  logRaw?: boolean;
   io: PlayIO;
   debug?: boolean;
+}
+
+export function rollLine(result: TurnResultLike): string | null {
+  const r = result.roll;
+  if (!r) return null;
+  const stat = r.stat ? `, ${r.stat}` : "";
+  return `Fate ${r.value} - ${r.band} (${r.what}${stat})`;
+}
+
+/** One quiet line when the turn did not come back clean, so a stutter can be reported without running inspect. */
+export function stutterLine(result: TurnResultLike): string | null {
+  const kinds = result.record.attempts
+    .slice(1)
+    .map((a) => a.kind)
+    .join(", ");
+  switch (result.outcome) {
+    case "ok":
+      return null;
+    case "repaired":
+      return `[turn ${result.turn} needed a repair: ${kinds}]`;
+    case "rewritten":
+      return `[turn ${result.turn} was rewritten: ${kinds}]`;
+    default:
+      return `[turn did not commit and was rolled back: ${kinds}]`;
+  }
 }
 
 export function usageLine(result: TurnResultLike, wallMs: number): string {
@@ -46,6 +72,7 @@ export async function runPlay(opts: PlayOptions): Promise<void> {
     store: opts.store,
     llm: opts.llm,
     ...(opts.deltaFirst ? { deltaFirst: true } : {}),
+    ...(opts.logRaw ? { logRaw: true } : {}),
   });
 
   const existing = (await opts.store.listSaves()).some((s) => s.save_id === opts.saveId);
@@ -89,11 +116,15 @@ export async function runPlay(opts: PlayOptions): Promise<void> {
       break;
     }
     last = result;
+    const roll = rollLine(result);
+    if (roll) io.write(`\n${roll}\n`);
     io.write(`\n${result.narration}\n`);
     if (result.status) io.write(`\n${result.status}\n`);
     if (opts.config.presentation.profile === "tabletop" && result.panel.length > 0) {
       io.write(result.panel.map((p) => `  ${p}`).join("\n") + "\n");
     }
+    const stutter = stutterLine(result);
+    if (stutter) io.write(dim(stutter) + "\n");
     io.write(dim(`[${usageLine(result, performance.now() - t0)}]`) + "\n");
     if (debug) io.write(dim(debugDump(result)) + "\n");
   }

@@ -105,6 +105,8 @@ export function makeThread(over: Partial<Thread> & { id: string }): Thread {
     status: "open",
     entities: [],
     warm: true,
+    reminders: 0,
+    last_shown_turn: 1,
     opened_turn: 1,
     ...over,
   };

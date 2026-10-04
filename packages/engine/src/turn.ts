@@ -10,7 +10,7 @@ import {
 } from "@book/schema";
 import { processOps } from "./ops.ts";
 import { rngFor } from "./rng.ts";
-import { addMinutes } from "./time.ts";
+import { addMinutes, diffMinutes } from "./time.ts";
 
 const WINDOW_CAP = 12;
 const BEATS_CAP = 60;
@@ -32,10 +32,29 @@ export function stripOocPrefix(input: string): string {
     .trim();
 }
 
+export const OVERDUE_PREFIX = "overdue:";
+
+/**
+ * Threads whose deadline has passed unresolved. This is what lets a thread leave the prompt
+ * and still bite: the garden is forgotten for a hundred turns, then the inspection finds it.
+ */
+export function overdueThreads(state: State, config: Config): DueItem[] {
+  return state.threads
+    .filter((t) => t.status === "open" && t.due !== undefined && diffMinutes(state.clock.now, t.due) >= 0)
+    .map((t) => ({
+      id: `${OVERDUE_PREFIX}${t.id}`,
+      kind: "scheduled" as const,
+      text:
+        t.on_overdue ??
+        `The deadline has passed on "${t.text}" and it was never dealt with. Play the consequences now.`,
+      entities: t.entities.filter((id) => state.entities[id]),
+    }));
+}
+
 export function collectDue(state: State, config: Config, modules: Module[]): DueItem[] {
   const rng = rngFor(state.rng_seed, state.turn + 1, "due");
   const now = state.clock.now;
-  return modules.flatMap((m) => m.due(state, config, now, now, rng));
+  return [...modules.flatMap((m) => m.due(state, config, now, now, rng)), ...overdueThreads(state, config)];
 }
 
 /** Draws the single fate die for this turn. Deterministic per save and turn. */
@@ -78,6 +97,31 @@ export function parseDraft(value: unknown): { ok: true; draft: TurnDraft } | { o
 export interface ApplyContext {
   input: string;
   due: DueItem[];
+  /** Threads the prompt actually showed this turn, so reminders can be counted. */
+  shown_threads?: string[];
+}
+
+/**
+ * Counts the reminders a thread has spent and cools it once it runs out, so an ignored thread
+ * stops crowding the prompt. A thread the player touched, or one whose deadline is close,
+ * is warm again.
+ */
+export function ageThreads(state: State, config: Config, shown: string[], turn: number): void {
+  const { max_reminders, rewarm_hours } = config.threads;
+  const shownSet = new Set(shown);
+  for (const t of state.threads) {
+    if (t.status !== "open") continue;
+    const nearDeadline = t.due !== undefined && diffMinutes(t.due, state.clock.now) <= rewarm_hours * 60;
+    if (nearDeadline) {
+      t.warm = true;
+      t.reminders = 0;
+      continue;
+    }
+    if (!shownSet.has(t.id)) continue;
+    t.last_shown_turn = turn;
+    t.reminders += 1;
+    if (t.reminders > max_reminders) t.warm = false;
+  }
 }
 
 /** Applies a draft that has already passed validation. Pure: returns the next state. */
@@ -89,7 +133,7 @@ export function applyDraft(state: State, config: Config, modules: Module[], draf
   let next = processed.state;
   const turn = state.turn + 1;
 
-  if (processed.minutes < config.time.min_per_action) {
+  if (processed.skipped === 0 && processed.minutes < config.time.min_per_action) {
     next = { ...next, clock: { now: addMinutes(next.clock.now, config.time.min_per_action - processed.minutes) } };
   }
 
@@ -103,10 +147,21 @@ export function applyDraft(state: State, config: Config, modules: Module[], draf
         status: "open",
         entities: item.entities.filter((id) => next.entities[id]),
         warm: true,
+        reminders: 0,
+        last_shown_turn: turn,
         opened_turn: turn,
       });
     }
+    // An overdue thread has now had its consequence narrated, so it stops asking for one.
+    if (item.id.startsWith(OVERDUE_PREFIX)) {
+      const t = next.threads.find((x) => x.id === item.id.slice(OVERDUE_PREFIX.length));
+      if (t && t.status === "open") {
+        t.status = "failed";
+        t.resolved_turn = turn;
+      }
+    }
   }
+  ageThreads(next, config, ctx.shown_threads ?? [], turn);
 
   const clockBefore = state.clock.now;
   for (const m of modules) {

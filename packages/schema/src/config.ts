@@ -83,6 +83,10 @@ export const DiceConfigSchema = z.object({
   sides: z.number().int().min(2).default(100),
   thresholds: z.array(z.number()).default([10, 25, 50, 75, 90]),
   labels: z.array(z.string()).optional(),
+  /** Tabletop mode: show the roll to the player. When false, outcomes must be explained in-world instead. */
+  visible: z.boolean().default(false),
+  /** Let the named stat shift the roll (tabletop); otherwise the stat only labels the check. */
+  stat_modifier: z.boolean().default(false),
 });
 export type DiceConfig = z.infer<typeof DiceConfigSchema>;
 
@@ -111,8 +115,20 @@ export const ThreadSeedSchema = z.object({
   text: z.string(),
   due: LocalDateTimeSchema.optional(),
   entities: z.array(IdSchema).default([]),
+  /** Consequence if the deadline passes unresolved. Injected as a due event; the GM narrates the fallout. */
+  on_overdue: z.string().optional(),
 });
 export type ThreadSeed = z.infer<typeof ThreadSeedSchema>;
+
+export const ThreadsConfigSchema = z.object({
+  /** Threads shown in the prompt at once. The stored pool is unlimited. */
+  max_in_context: z.number().int().positive().default(4),
+  /** Unprompted reminders a thread gets before it goes cold and leaves the prompt. */
+  max_reminders: z.number().int().min(0).default(2),
+  /** A cold thread with a deadline comes back this many hours before it falls due. */
+  rewarm_hours: z.number().min(0).default(12),
+});
+export type ThreadsConfig = z.infer<typeof ThreadsConfigSchema>;
 
 export const GmStyleSchema = z.object({
   max_words: z.number().int().positive().default(90),
@@ -133,7 +149,12 @@ export type Presentation = z.infer<typeof PresentationSchema>;
 export const TimeConfigSchema = z.object({
   start: LocalDateTimeSchema,
   min_per_action: z.number().int().min(0).default(1),
+  /** Guard on ordinary action turns, so a scene cannot drift hours by accident. */
   max_per_turn: z.number().int().positive().default(480),
+  /** Cap on one deliberate clock.skip (sleep, travel, waiting). 0 forbids skipping entirely. */
+  max_skip_minutes: z.number().int().min(0).default(840),
+  /** What rest means for this character, for example "does not sleep". Shown to the GM. */
+  rest_note: z.string().default(""),
 });
 export type TimeConfig = z.infer<typeof TimeConfigSchema>;
 
@@ -146,12 +167,21 @@ export const ConfigSchema = z
       tone: z.string(),
       premise: z.string().default(""),
       content_rating: ContentRatingSchema.default("clean"),
+      /**
+       * How the GM handles the player attacking someone.
+       * `deflect`: no injury narration; hostile acts land as social, domestic and legal fallout.
+       * `adventure`: genre combat, wounds and deaths of NPCs are in bounds, not gory.
+       */
+      violence: z.enum(["deflect", "adventure"]).default("deflect"),
+      /** How hard the world bites back. Scales consequences, never the dice. */
+      harshness: z.enum(["forgiving", "normal", "unforgiving"]).default("normal"),
     }),
     player_id: IdSchema.default("player"),
     modules: z.array(IdSchema),
     gm_style: GmStyleSchema,
     presentation: PresentationSchema,
     time: TimeConfigSchema,
+    threads: ThreadsConfigSchema.default({}),
     stats: z.array(StatDefSchema).default([]),
     items: z.array(ItemDefSchema).default([]),
     events: EventsConfigSchema.default({}),

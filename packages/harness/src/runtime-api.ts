@@ -16,6 +16,7 @@ export interface TurnResultLike {
   panel: string[];
   outcome: TurnRecord["outcome"];
   interlude?: string;
+  roll?: { value: number; band: string; what: string; stat?: string };
   record: TurnRecord;
 }
 
@@ -26,6 +27,8 @@ export interface CreateRuntimeOptions {
   modules?: Module[];
   /** Ask for the delta before the narration (section 5.3 streaming note). Ignored by runtimes that do not support it. */
   deltaFirst?: boolean;
+  /** Keep every model reply verbatim in the turn log. */
+  logRaw?: boolean;
 }
 
 export interface RuntimeApi {

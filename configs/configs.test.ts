@@ -6,7 +6,7 @@ import { ConfigSchema, type Config } from "../packages/schema/src/index.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ALLOWED_MODULES = ["stats", "inventory", "relationships", "events", "dice", "offscreen"];
-const RESERVED_STATUS_KEYS = ["location", "time"];
+const RESERVED_STATUS_KEYS = ["turn", "location", "time"];
 
 const configNames = readdirSync(here, { withFileTypes: true })
   .filter((d) => d.isDirectory() && existsSync(join(here, d.name, "config.json")))
@@ -155,7 +155,7 @@ describe("uk-life specifics", () => {
     expect(config.modules).toEqual(["stats", "inventory", "relationships", "events", "dice", "offscreen"]);
     expect(config.time.start).toBe("2026-10-03T09:20");
     expect(config.meta.content_rating).toBe("romance");
-    expect(config.presentation).toEqual({ profile: "light", status_line: ["money", "health", "location", "time"] });
+    expect(config.presentation).toEqual({ profile: "light", status_line: ["turn", "money", "health", "location", "time"] });
     expect(config.stats.find((s) => s.key === "money")?.start).toBe(45);
     expect(config.dice).toMatchObject({ sides: 100, thresholds: [10, 25, 50, 75, 90] });
     expect(config.offscreen).toMatchObject({ enabled: true, min_skip_hours: 6, max_entities: 4, max_tokens: 600 });

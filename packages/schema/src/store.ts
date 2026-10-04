@@ -7,6 +7,8 @@ export type TurnKind = "act" | "continue" | "ooc";
 export interface Attempt {
   kind: "draft" | "format_repair" | "delta_repair" | "rewrite_repair";
   draft?: unknown;
+  /** The model's reply verbatim, kept only when raw logging is on. Diagnoses format drift. */
+  raw?: string;
   violations: Violation[];
   usage?: LLMUsage;
 }
@@ -19,7 +21,11 @@ export interface TurnRecord {
   beat: string | null;
   delta: unknown[];
   fate?: number;
+  /** What the GM said it was rolling for, when it used the die. */
+  check?: { what: string; stat?: string };
   due: string[];
+  /** Thread ids the prompt showed, so reminder accounting is auditable. */
+  threads_shown?: string[];
   attempts: Attempt[];
   outcome: "ok" | "repaired" | "rewritten" | "rolled_back";
   interlude?: string;

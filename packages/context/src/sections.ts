@@ -1,5 +1,5 @@
 import type { Config, DueItem, Entity, Fact, Module, State } from "@book/schema";
-import { orderThreads } from "./attention.ts";
+import { orderThreads, selectThreads } from "./attention.ts";
 import { MAX_BEATS, MAX_FACTS_PER_ENTITY_IN_CONTEXT, WINDOW_TURNS } from "./budget.ts";
 import { dayOfWeek, fitLines, renderSection, tokensOf, trimOldestSentences } from "./text.ts";
 
@@ -57,17 +57,35 @@ export function dueSection(config: Config, due: DueItem[], fate: number | undefi
   return { text: renderSection(header, lines), trimmed: fit.trimmed };
 }
 
-export function threadsSection(state: State, cap: number): Section {
+/** Every open thread, for out-of-character recall ("what am I meant to be doing?"). Costs a cheap call only. */
+export function allThreadsSection(state: State, cap: number): Section {
   const ordered = orderThreads(state.threads);
   const lines = ordered.slice(0, MAX_THREADS).map((t) => {
+    const due = t.due ? ` due ${t.due}` : "";
+    return `- ${t.id} [${t.kind}]${due}: ${t.text}`;
+  });
+  const fit = fitLines("## OPEN THREADS", lines, cap, "end");
+  return { text: renderSection("## OPEN THREADS", fit.lines), trimmed: fit.trimmed || ordered.length > MAX_THREADS };
+}
+
+export interface ThreadsSection extends Section {
+  /** Ids rendered, so the engine can count the reminder against them. */
+  shown: string[];
+}
+
+export function threadsSection(state: State, config: Config, focusIds: string[], cap: number): ThreadsSection {
+  const chosen = selectThreads(state, config, focusIds);
+  const lines = chosen.map((t) => {
     const due = t.due ? ` due ${t.due}` : "";
     const ents = t.entities.length ? ` (${t.entities.join(", ")})` : "";
     return `- ${t.id} [${t.kind}]${due}: ${t.text}${ents}`;
   });
   const fit = fitLines("## OPEN THREADS", lines, cap, "end");
+  const openCount = state.threads.filter((t) => t.status === "open").length;
   return {
     text: renderSection("## OPEN THREADS", fit.lines),
-    trimmed: fit.trimmed || ordered.length > MAX_THREADS,
+    trimmed: fit.trimmed || openCount > chosen.length,
+    shown: chosen.slice(0, fit.lines.length).map((t) => t.id),
   };
 }
 

@@ -149,6 +149,7 @@ export async function runCli(argv: string[], deps: CliDeps = {}): Promise<number
             llm: setup.llm,
             saveId: flagString(args, "save") ?? `play-${config.id}`,
             deltaFirst: flagBool(args, "delta-first"),
+            logRaw: flagBool(args, "log-raw"),
             io,
             debug: flagBool(args, "debug"),
           });
@@ -220,7 +221,14 @@ export async function runCli(argv: string[], deps: CliDeps = {}): Promise<number
           const cost = r.usage.reduce((n, u) => n + u.cost_usd, 0);
           const ms = r.usage.reduce((n, u) => n + u.latency_ms, 0);
           cumulative += input;
-          const flags = [r.interlude ? "interlude" : "", r.fate !== undefined ? `fate ${r.fate}` : ""].filter(Boolean).join(" ");
+          const flags = [
+            r.interlude ? "interlude" : "",
+            r.fate !== undefined ? `fate ${r.fate}` : "",
+            r.check ? `check "${r.check.what}"${r.check.stat ? ` (${r.check.stat})` : ""}` : "",
+            r.threads_shown?.length ? `threads ${r.threads_shown.join(",")}` : "",
+          ]
+            .filter(Boolean)
+            .join(" ");
           out(
             `turn ${String(r.turn).padStart(3)} ${r.kind.padEnd(8)} ${r.outcome.padEnd(11)} calls ${r.usage.length} in ${input} out ${output} cached ${cached} $${cost.toFixed(4)} ${Math.round(ms)}ms ${flags}`.trimEnd(),
           );

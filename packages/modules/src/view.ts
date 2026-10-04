@@ -14,7 +14,8 @@ export function renderView(config: Config, state: State, modules: Module[]): Pla
 
   const parts: string[] = [];
   for (const key of config.presentation.status_line) {
-    if (key === "time") parts.push(humanTime(state.clock.now));
+    if (key === "turn") parts.push(`Turn ${state.turn}`);
+    else if (key === "time") parts.push(humanTime(state.clock.now));
     else if (key === "location") {
       const loc = state.entities[config.player_id]?.location;
       const place = loc ? state.entities[loc] : undefined;

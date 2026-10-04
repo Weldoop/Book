@@ -25,9 +25,17 @@ export const ThreadSchema = z.object({
   kind: ThreadKindSchema,
   text: z.string(),
   due: LocalDateTimeSchema.optional(),
-  status: z.enum(["open", "resolved"]).default("open"),
+  status: z.enum(["open", "resolved", "failed"]).default("open"),
   entities: z.array(IdSchema).default([]),
+  /** False once the thread has used up its unprompted reminders. Cold threads stay in state but leave the prompt. */
   warm: z.boolean().default(true),
+  /** Unprompted reminders spent so far; see `Config.threads.max_reminders`. */
+  reminders: z.number().int().min(0).default(0),
+  last_shown_turn: z.number().int().min(0).default(0),
+  /** Thread this one grew out of, so chains are visible in the logs. */
+  parent: z.string().optional(),
+  /** What happens if the deadline passes unresolved. Fires as a due event. */
+  on_overdue: z.string().optional(),
   opened_turn: z.number().int().min(0),
   resolved_turn: z.number().int().min(0).optional(),
 });

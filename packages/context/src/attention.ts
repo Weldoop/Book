@@ -1,3 +1,4 @@
+import { diffMinutes } from "@book/engine";
 import type { Config, DueItem, Entity, Module, State, Thread } from "@book/schema";
 import { DEFAULT_FOCUS_LIMIT } from "./budget.ts";
 import { wordMatcher } from "./text.ts";
@@ -35,6 +36,33 @@ export function orderThreads(threads: Thread[]): Thread[] {
     }
     return b.opened_turn - a.opened_turn || a.id.localeCompare(b.id);
   });
+}
+
+/**
+ * Picks the few threads worth prompt space. The stored pool is unlimited; a thread earns a place by
+ * having a deadline in view, by involving someone on screen, or by still having reminders left.
+ * A cold thread stays in state and bites later through `overdueThreads`.
+ */
+export function selectThreads(state: State, config: Config, focusIds: string[] = []): Thread[] {
+  const now = state.clock.now;
+  const window = config.threads.rewarm_hours * 60;
+  const onScreen = new Set(focusIds);
+  const near = (t: Thread): boolean => t.due !== undefined && diffMinutes(t.due, now) <= window;
+  const inFocus = (t: Thread): boolean => t.entities.some((id) => onScreen.has(id));
+
+  const rank = (t: Thread): number => (near(t) ? 0 : inFocus(t) ? 1 : 2);
+  const eligible = state.threads.filter((t) => t.status === "open" && (t.warm || near(t) || inFocus(t)));
+
+  return eligible
+    .sort((a, b) => {
+      const ra = rank(a);
+      const rb = rank(b);
+      if (ra !== rb) return ra - rb;
+      if (a.due && b.due && a.due !== b.due) return a.due.localeCompare(b.due);
+      if (a.due !== b.due) return a.due ? -1 : 1;
+      return b.opened_turn - a.opened_turn || a.id.localeCompare(b.id);
+    })
+    .slice(0, config.threads.max_in_context);
 }
 
 function mentioned(entity: Entity, input: string): boolean {

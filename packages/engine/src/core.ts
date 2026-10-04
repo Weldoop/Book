@@ -20,6 +20,7 @@ export const coreModule: Module = {
   id: "core",
   ops: [
     "clock.advance",
+    "clock.skip",
     "entity.create",
     "entity.move",
     "entity.fact.add",
@@ -43,6 +44,29 @@ export const coreModule: Module = {
           );
         }
         break;
+      case "clock.skip": {
+        const cap = config.time.max_skip_minutes;
+        if (cap === 0) {
+          out.push(
+            bad(
+              "skip_forbidden",
+              `Op ${index}: this game does not allow skipping time${config.time.rest_note ? ` (${config.time.rest_note})` : ""}. Play the hours through instead.`,
+              index,
+              "game_breaking",
+            ),
+          );
+        } else if (op.minutes > cap) {
+          out.push(
+            bad(
+              "skip_too_long",
+              `Op ${index}: clock.skip of ${op.minutes} minutes exceeds the limit of ${cap} for one skip. Skip at most ${cap} minutes and let the player carry on.`,
+              index,
+              "game_breaking",
+            ),
+          );
+        }
+        break;
+      }
       case "entity.create":
         if (state.entities[op.id]) {
           out.push(bad("entity_exists", `Op ${index}: entity '${op.id}' already exists; use entity.fact.add to add facts.`, index));
@@ -95,6 +119,9 @@ export const coreModule: Module = {
       case "clock.advance":
         s.clock.now = addMinutes(s.clock.now, op.minutes);
         break;
+      case "clock.skip":
+        s.clock.now = addMinutes(s.clock.now, op.minutes);
+        break;
       case "entity.create":
         s.entities[op.id] = {
           id: op.id,
@@ -137,6 +164,9 @@ export const coreModule: Module = {
           status: "open",
           entities: op.entities ?? [],
           warm: true,
+          reminders: 0,
+          last_shown_turn: turn,
+          ...(op.parent ? { parent: op.parent } : {}),
           opened_turn: turn,
         });
         for (const ref of op.entities ?? []) {

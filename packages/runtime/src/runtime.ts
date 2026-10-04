@@ -20,7 +20,7 @@ import {
   parseCompactionResult,
   shouldCompact,
 } from "@book/context";
-import { getActiveModules, renderView } from "@book/modules";
+import { fateLabel, getActiveModules, renderView } from "@book/modules";
 import type {
   Attempt,
   Config,
@@ -44,6 +44,8 @@ export interface Runtime {
   store: Store;
   llm: LLMProvider;
   outputOrder: "narration_first" | "delta_first";
+  /** Keep every model reply verbatim in the turn log. Off by default; on while testing. */
+  logRaw: boolean;
 }
 
 export interface TurnResult {
@@ -54,6 +56,8 @@ export interface TurnResult {
   panel: string[];
   outcome: TurnRecord["outcome"];
   interlude?: string;
+  /** Set when the GM resolved the action with the die and the config shows rolls to the player. */
+  roll?: { value: number; band: string; what: string; stat?: string };
   record: TurnRecord;
 }
 
@@ -68,6 +72,7 @@ export function createRuntime(opts: {
   modules?: Module[];
   outputOrder?: "narration_first" | "delta_first";
   deltaFirst?: boolean;
+  logRaw?: boolean;
 }): Runtime {
   return {
     config: opts.config,
@@ -75,6 +80,7 @@ export function createRuntime(opts: {
     llm: opts.llm,
     modules: opts.modules ?? getActiveModules(opts.config),
     outputOrder: opts.outputOrder ?? (opts.deltaFirst ? "delta_first" : "narration_first"),
+    logRaw: opts.logRaw ?? false,
   };
 }
 
@@ -181,8 +187,9 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
     max_tokens: TURN_MAX_TOKENS,
     json: true,
   });
+  const rawOf = (text: string) => (rt.logRaw ? { raw: text } : {});
   let current = evaluate(state, rt, first.text);
-  attempts.push({ kind: "draft", draft: current.draft ?? current.text, violations: current.violations, usage: first.usage });
+  attempts.push({ kind: "draft", draft: current.draft ?? current.text, ...rawOf(first.text), violations: current.violations, usage: first.usage });
 
   let repairs = 0;
   let rewrote = false;
@@ -212,7 +219,7 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
           })
         : await call({ tier: "strong", purpose: "format_repair", system: ctx.system, messages: ctx.messages, max_tokens: TURN_MAX_TOKENS, json: true });
       current = evaluate(state, rt, res.text);
-      attempts.push({ kind: "format_repair", draft: current.draft ?? current.text, violations: current.violations, usage: res.usage });
+      attempts.push({ kind: "format_repair", draft: current.draft ?? current.text, ...rawOf(res.text), violations: current.violations, usage: res.usage });
     } else if (canPatchDelta && current.draft) {
       const rc = buildRepairContext({
         kind: "delta_repair",
@@ -237,7 +244,7 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
           violations: [{ severity: "fixable", code: "repair_unreadable", message: `The delta repair could not be read (${fixed.error}).` }],
         };
       }
-      attempts.push({ kind: "delta_repair", draft: current.draft ?? current.text, violations: current.violations, usage: res.usage });
+      attempts.push({ kind: "delta_repair", draft: current.draft ?? current.text, ...rawOf(res.text), violations: current.violations, usage: res.usage });
     } else {
       if (!rewrote && !formatFailure && severity === "game_breaking") {
         interlude = pickInterlude(state, config);
@@ -267,7 +274,7 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
         json: true,
       });
       current = evaluate(state, rt, res.text);
-      attempts.push({ kind: "rewrite_repair", draft: current.draft ?? current.text, violations: current.violations, usage: res.usage });
+      attempts.push({ kind: "rewrite_repair", draft: current.draft ?? current.text, ...rawOf(res.text), violations: current.violations, usage: res.usage });
     }
     repairs++;
   }
@@ -278,6 +285,7 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
     input,
     ...(fate !== undefined ? { fate } : {}),
     due: due.map((d) => d.id),
+    ...(ctx.threads_shown?.length ? { threads_shown: ctx.threads_shown } : {}),
     attempts,
     context_parts: ctx.parts,
     at: new Date().toISOString(),
@@ -305,7 +313,11 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
     };
   }
 
-  let next = applyDraft(state, config, modules, current.draft, { input, due });
+  let next = applyDraft(state, config, modules, current.draft, {
+    input,
+    due,
+    shown_threads: ctx.threads_shown ?? [],
+  });
 
   if (shouldCompact(next)) {
     try {
@@ -334,11 +346,13 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
     narration: current.draft.narration,
     beat: current.draft.beat,
     delta: current.draft.delta,
+    ...(current.draft.check ? { check: current.draft.check } : {}),
     outcome: rewrote ? "rewritten" : repairs > 0 ? "repaired" : "ok",
     usage: usages,
   };
   await rt.store.commitTurn({ save_id: saveId, expected_turn: state.turn, state: next, record });
 
+  const check = current.draft.check;
   return {
     turn: next.turn,
     kind,
@@ -346,6 +360,16 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
     ...view(rt, next),
     outcome: record.outcome,
     ...(interlude ? { interlude } : {}),
+    ...(check && fate !== undefined && config.dice?.visible
+      ? {
+          roll: {
+            value: fate,
+            band: fateLabel(config, fate),
+            what: check.what,
+            ...(check.stat ? { stat: check.stat } : {}),
+          },
+        }
+      : {}),
     record,
   };
 }

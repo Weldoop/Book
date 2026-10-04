@@ -1,7 +1,7 @@
 import type { Config, Module, State } from "@book/schema";
 import { mapAttention } from "./attention.ts";
 import { resolveBudget } from "./budget.ts";
-import { beatsSection, focusSection, sceneSection, stateSection, storySection, threadsSection, windowSection } from "./sections.ts";
+import { allThreadsSection, beatsSection, focusSection, sceneSection, stateSection, storySection, windowSection } from "./sections.ts";
 import { tokensOf } from "./text.ts";
 import { joinSections, sumTokens } from "./turn.ts";
 import type { BuiltContext, ContextPart } from "./types.ts";
@@ -37,7 +37,7 @@ export function buildOocContext(i: OocInput): BuiltContext {
   const sections = [
     { part: "scene", section: sceneSection(i.config, i.state) },
     { part: "state_snapshot", section: stateSection(i.config, i.state, i.modules, budget.state_snapshot) },
-    { part: "threads", section: threadsSection(i.state, budget.threads) },
+    { part: "threads", section: allThreadsSection(i.state, budget.threads) },
     { part: "entities_in_focus", section: focus.section },
     { part: "story_so_far", section: storySection(i.state, budget.story_so_far) },
     { part: "beats", section: beatsSection(i.state, budget.beats) },

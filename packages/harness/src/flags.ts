@@ -4,7 +4,7 @@ export interface ParsedArgs {
   flags: Record<string, string | true>;
 }
 
-const BOOLEAN_FLAGS = new Set(["delta-first", "debug", "help"]);
+const BOOLEAN_FLAGS = new Set(["delta-first", "debug", "log-raw", "help"]);
 
 /** `--key value`, `--key=value` and bare boolean flags. The first non-flag token is the command. */
 export function parseFlags(argv: string[]): ParsedArgs {

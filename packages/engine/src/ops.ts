@@ -4,7 +4,9 @@ export interface ProcessedOps {
   state: State;
   applied: Op[];
   violations: Violation[];
+  /** Minutes from clock.advance only; clock.skip is capped separately and excluded. */
   minutes: number;
+  skipped: number;
 }
 
 function ownerOf(modules: Module[], op: Op): Module | undefined {
@@ -20,6 +22,7 @@ export function processOps(state: State, config: Config, modules: Module[], rawO
   const applied: Op[] = [];
   let current = state;
   let minutes = 0;
+  let skipped = 0;
 
   rawOps.forEach((raw, index) => {
     const parsed = OpSchema.safeParse(raw);
@@ -51,6 +54,7 @@ export function processOps(state: State, config: Config, modules: Module[], rawO
       return;
     }
     if (op.op === "clock.advance") minutes += op.minutes;
+    if (op.op === "clock.skip") skipped += op.minutes;
     current = owner.applyOp(op, current, config);
     applied.push(op);
   });
@@ -63,5 +67,5 @@ export function processOps(state: State, config: Config, modules: Module[], rawO
     });
   }
 
-  return { state: current, applied, violations, minutes };
+  return { state: current, applied, violations, minutes, skipped };
 }
