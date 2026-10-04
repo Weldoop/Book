@@ -649,5 +649,16 @@
     "max_in_context": 4,
     "max_reminders": 2,
     "rewarm_hours": 24
+  },
+  "scenes": {
+    "min_beats": 10,
+    "max_beats": 24,
+    "keep_scene_turns": 14
+  },
+  "notes": {
+    "enabled": true,
+    "ttl_turns": 5,
+    "max_in_context": 3,
+    "max_chars": 200
   }
 }

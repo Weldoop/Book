@@ -18,6 +18,7 @@ export interface TurnResultLike {
   interlude?: string;
   roll?: { value: number; band: string; what: string; stat?: string };
   ending?: { id: string; title: string; text: string; continuation?: string };
+  scene_ended?: boolean;
   record: TurnRecord;
 }
 

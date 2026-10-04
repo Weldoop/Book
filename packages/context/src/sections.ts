@@ -23,7 +23,11 @@ export function sceneSection(config: Config, state: State): Section {
   const dow = dayOfWeek(now);
   const player = state.entities[config.player_id];
   const locId = player?.location ?? null;
-  const lines = [`Now: ${now}${dow ? ` (${dow})` : ""}`];
+  const sceneTurns = state.turn - state.scene.started_turn;
+  const lines = [
+    `Scene ${state.scene.index}, running ${sceneTurns} turn${sceneTurns === 1 ? "" : "s"}`,
+    `Now: ${now}${dow ? ` (${dow})` : ""}`,
+  ];
   if (locId) {
     lines.push(`Location: ${nameOf(state, locId)} [${locId}]`);
     const present = Object.values(state.entities)
@@ -87,6 +91,20 @@ export function threadsSection(state: State, config: Config, input: string, cap:
     trimmed: fit.trimmed || openCount > chosen.length,
     shown: chosen.slice(0, fit.lines.length).map((t) => t.id),
   };
+}
+
+/**
+ * The GM's own notes from the last few turns. Private: this section exists so the GM can set up a
+ * payoff, and it is the one part of the context that is never rendered to the player.
+ */
+export function notesSection(state: State, config: Config, cap: number): Section {
+  if (!config.notes.enabled || state.notes.length === 0) return EMPTY;
+  const lines = [...state.notes]
+    .sort((a, b) => b.turn - a.turn)
+    .slice(0, config.notes.max_in_context)
+    .map((n) => `- t${n.turn}: ${n.text}`);
+  const fit = fitLines("## YOUR PRIVATE NOTES", lines, cap, "end");
+  return { text: renderSection("## YOUR PRIVATE NOTES", fit.lines), trimmed: fit.trimmed };
 }
 
 interface FocusEntry {

@@ -7,6 +7,7 @@ import {
   pickInterlude,
   rollFate,
   severityOf,
+  openScene,
   stripOocPrefix,
   validateDraft,
 } from "@book/engine";
@@ -69,6 +70,8 @@ export interface TurnResult {
   interlude?: string;
   /** Set on the turn an ending fires, and on any input after a final ending. */
   ending?: { id: string; title: string; text: string; continuation?: string };
+  /** Set on the turn the GM closed a scene, so the UI can offer the way on rather than guessing. */
+  scene_ended?: boolean;
   /** Set when the GM resolved the action with the die and the config shows rolls to the player. */
   roll?: { value: number; band: string; what: string; stat?: string };
   record: TurnRecord;
@@ -199,6 +202,9 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
 
   const { config, modules } = rt;
   const input = kind === "continue" ? "..." : rawInput.trim();
+
+  // The GM closed the last scene, so the player is acting in a new one.
+  state = openScene(state);
 
   // A pending ending is resolved before anything else: either the story carries on from the
   // situation the config describes, or it is final and this input cannot move it.
@@ -375,7 +381,7 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
     shown_threads: ctx.threads_shown ?? [],
   });
 
-  if (shouldCompact(next)) {
+  if (shouldCompact(next, config)) {
     try {
       const req = buildCompactionRequest({ config, state: next, modules });
       const res = await call({ tier: "cheap", purpose: "compaction", system: req.system, messages: req.messages, max_tokens: 900, json: true });
@@ -419,6 +425,7 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
     ...view(rt, next),
     outcome: record.outcome,
     ...(interlude ? { interlude } : {}),
+    ...(next.scene.closed ? { scene_ended: true } : {}),
     ...(fired
       ? {
           ending: {

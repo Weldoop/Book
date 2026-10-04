@@ -40,6 +40,15 @@ export function endingLines(result: TurnResultLike): string[] {
   return lines;
 }
 
+/**
+ * Offered only when the GM says the scene has closed, which is the console's version of a "move to
+ * the next scene" button: the prompt to move on never lands in the middle of something.
+ */
+export function sceneLine(result: TurnResultLike): string | null {
+  if (!result.scene_ended || result.ending) return null;
+  return "--- the scene closes --- press enter to move on, or say what you do next";
+}
+
 /** One quiet line when the turn did not come back clean, so a stutter can be reported without running inspect. */
 export function stutterLine(result: TurnResultLike): string | null {
   const kinds = result.record.attempts.slice(1).map((a) => a.kind);
@@ -134,6 +143,8 @@ export async function runPlay(opts: PlayOptions): Promise<void> {
     if (opts.config.presentation.profile === "tabletop" && result.panel.length > 0) {
       io.write(result.panel.map((p) => `  ${p}`).join("\n") + "\n");
     }
+    const scene = sceneLine(result);
+    if (scene) io.write(`\n${dim(scene)}\n`);
     const ending = endingLines(result);
     if (ending.length > 0) io.write(`\n${ending.join("\n\n")}\n`);
     const stutter = stutterLine(result);

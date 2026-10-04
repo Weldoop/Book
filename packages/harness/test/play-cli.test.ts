@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { MockProvider } from "@book/llm";
 import { MemoryStore } from "@book/store";
-import { endingLines, runCli, runPlay } from "../src/index.ts";
+import { endingLines, runCli, runPlay, sceneLine } from "../src/index.ts";
 import type { PlayIO } from "../src/index.ts";
 import { fakeRuntimeApi, makeConfig } from "./helpers.ts";
 import { writeFile } from "node:fs/promises";
@@ -99,6 +99,23 @@ async function setup() {
   await writeFile(probes, JSON.stringify([{ after_turn: 3, question: "What did I do?", expect_any: ["what did i do"] }]));
   return { dir, config, fx, probes };
 }
+
+describe("sceneLine", () => {
+  const base = { turn: 4, kind: "act", narration: "n", status: null, panel: [], outcome: "ok", record: {} } as never;
+
+  it("says nothing while the scene is still running", () => {
+    expect(sceneLine(base)).toBeNull();
+  });
+
+  it("offers the way on once the GM closes the scene", () => {
+    expect(sceneLine({ ...(base as object), scene_ended: true } as never)).toContain("the scene closes");
+  });
+
+  it("stays quiet when an ending is already doing the talking", () => {
+    const ended = { ...(base as object), scene_ended: true, ending: { id: "e", title: "T", text: "x" } };
+    expect(sceneLine(ended as never)).toBeNull();
+  });
+});
 
 describe("endingLines", () => {
   const base = { turn: 4, kind: "act", narration: "n", status: null, panel: [], outcome: "ok", record: {} } as never;

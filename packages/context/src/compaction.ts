@@ -28,9 +28,26 @@ const REQUEST_ENTITIES_CAP = 1800;
 const REQUEST_THREADS_CAP = 600;
 const REQUEST_STORY_CAP = 700;
 
-export function shouldCompact(state: State, opts?: { everyBeats?: number }): boolean {
-  const every = opts?.everyBeats ?? COMPACT_EVERY_BEATS;
-  return recentBeats(state).length >= every;
+/**
+ * Compaction waits for the GM to close a scene, so a chapter summary is never cut through the middle
+ * of one. `max_beats` is the backstop: a GM that never closes a scene still gets compacted, because
+ * unbounded beats would break the context budget.
+ */
+export function shouldCompact(state: State, config: Config): boolean {
+  const beats = recentBeats(state).length;
+  if (beats >= config.scenes.max_beats) return true;
+  return state.scene.closed && beats >= config.scenes.min_beats;
+}
+
+/**
+ * How many turns stay verbatim after compacting. A scene that has closed can safely drop to the
+ * standard window; a forced mid-scene compaction keeps the live scene so the GM does not lose the
+ * start of what it is in the middle of narrating.
+ */
+export function windowKeep(state: State, config: Config): number {
+  if (state.scene.closed) return KEEP_WINDOW;
+  const sceneTurns = state.turn - state.scene.started_turn;
+  return Math.min(Math.max(KEEP_WINDOW, sceneTurns), Math.max(KEEP_WINDOW, config.scenes.keep_scene_turns));
 }
 
 export const COMPACTION_SYSTEM = [
@@ -169,7 +186,7 @@ function consolidate(existing: Fact[], incoming: CompactionFact[], turn: number)
   return ranked.sort((a, b) => a.index - b.index).map((r) => r.f);
 }
 
-export function applyCompaction(state: State, result: CompactionResult, _config: Config): State {
+export function applyCompaction(state: State, result: CompactionResult, config: Config): State {
   const chapter = result.chapter_summary.trim()
     ? trimOldestSentences(result.chapter_summary, CHAPTER_CAP_TOKENS).text
     : "";
@@ -206,6 +223,6 @@ export function applyCompaction(state: State, result: CompactionResult, _config:
       story_so_far: story,
       last_compacted_turn: state.turn,
     },
-    window: state.window.slice(-KEEP_WINDOW),
+    window: state.window.slice(-windowKeep(state, config)),
   };
 }

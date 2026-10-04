@@ -381,6 +381,17 @@
       }
     ]
   },
+  "scenes": {
+    "min_beats": 8,
+    "max_beats": 20,
+    "keep_scene_turns": 12
+  },
+  "notes": {
+    "enabled": true,
+    "ttl_turns": 4,
+    "max_in_context": 3,
+    "max_chars": 200
+  },
   "endings": [
     {
       "id": "charged",

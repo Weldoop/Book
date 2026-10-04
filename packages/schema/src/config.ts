@@ -161,6 +161,36 @@ export const ThreadsConfigSchema = z.object({
 });
 export type ThreadsConfig = z.infer<typeof ThreadsConfigSchema>;
 
+/**
+ * When memory is allowed to compact. Only the GM knows whether a scene has closed, so it says so on
+ * the draft and the engine waits for that moment rather than cutting at a fixed turn count.
+ */
+export const ScenesConfigSchema = z.object({
+  /** Beats that must have piled up before a scene close is worth compacting. */
+  min_beats: z.number().int().min(1).default(8),
+  /** Compact anyway at this many beats, so a GM that never closes a scene cannot grow memory for ever. */
+  max_beats: z.number().int().min(1).default(20),
+  /** Turns of the live scene kept verbatim when a forced compaction does land mid-scene. */
+  keep_scene_turns: z.number().int().min(0).default(12),
+});
+export type ScenesConfig = z.infer<typeof ScenesConfigSchema>;
+
+/**
+ * Short-lived private notes the GM writes to itself: a secret the player has not found, a twist due
+ * in a scene or two, something to pay off soon. Never shown to the player, and they expire, so
+ * anything that matters beyond the next few turns has to become a thread.
+ */
+export const NotesConfigSchema = z.object({
+  enabled: z.boolean().default(true),
+  /** Turns a note survives before it is dropped. */
+  ttl_turns: z.number().int().min(1).default(4),
+  /** Notes shown in the prompt at once, newest first. */
+  max_in_context: z.number().int().min(1).default(3),
+  /** Longer notes are truncated, to keep them notes rather than prose. */
+  max_chars: z.number().int().min(20).default(200),
+});
+export type NotesConfig = z.infer<typeof NotesConfigSchema>;
+
 export const GmStyleSchema = z.object({
   max_words: z.number().int().positive().default(90),
   person: z.enum(["first", "second", "third"]).default("second"),
@@ -214,6 +244,8 @@ export const ConfigSchema = z
     presentation: PresentationSchema,
     time: TimeConfigSchema,
     threads: ThreadsConfigSchema.default({}),
+    scenes: ScenesConfigSchema.default({}),
+    notes: NotesConfigSchema.default({}),
     stats: z.array(StatDefSchema).default([]),
     items: z.array(ItemDefSchema).default([]),
     events: EventsConfigSchema.default({}),

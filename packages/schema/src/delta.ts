@@ -63,6 +63,10 @@ export const TurnDraftSchema = z.object({
   focus_next: z.array(IdSchema).optional(),
   need: z.array(IdSchema).optional(),
   check: CheckSchema.optional(),
+  /** Set only when the scene has come to a natural close, which is when memory may compact. */
+  scene_ended: z.boolean().optional(),
+  /** Short private notes for the GM's own use over the next few turns. Never shown to the player. */
+  notes: z.array(z.string()).optional(),
 });
 /** Raw model draft. `delta` is parsed op-by-op by the validator so one bad op can be reported precisely. */
 export type TurnDraft = z.infer<typeof TurnDraftSchema>;
