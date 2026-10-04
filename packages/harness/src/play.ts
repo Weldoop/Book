@@ -67,7 +67,7 @@ export async function runPlay(opts: PlayOptions): Promise<void> {
     while (line.trimEnd().endsWith("\\")) {
       const more = await io.readLine("... ");
       if (more === null) break;
-      line = `${line.trimEnd().slice(0, -1)}\n${more}`;
+      line = `${line.trimEnd().slice(0, -1).trimEnd()}\n${more}`;
     }
     const text = line.trim();
     if (text === "/quit" || text === "/exit") break;
