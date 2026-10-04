@@ -22,6 +22,16 @@ pnpm book report .book-data/reports/baseline-uk-life-01-mock.json .book-data/rep
 
 Inject faults to exercise the repair flow: `--faults every=7,kind=game_breaking`.
 
+While playing: one line is one turn, end a line with `\` to continue it, `/debug` toggles the context
+and repair dump, `/quit` exits. Add `--log-raw` to keep every model reply verbatim in the turn log,
+which is what makes format problems diagnosable afterwards.
+
+```bash
+pnpm book inspect --save <name>            # per-turn calls, tokens, cost, latency, rolls, threads shown
+pnpm book inspect --save <name> --turn 4   # the full record for one turn
+pnpm book models                           # list the model ids your key can reach
+```
+
 ## Real model runs
 
 Store `ANTHROPIC_API_KEY` as a Cursor secret (never commit it or type it into a command). If it is not set, the CLI asks for it with hidden input and does not save it. Real runs need `--provider anthropic` and at least one cap:
@@ -30,7 +40,11 @@ Store `ANTHROPIC_API_KEY` as a Cursor secret (never commit it or type it into a 
 pnpm book replay ... --provider anthropic --max-cost-usd 2
 ```
 
-Models default to `claude-sonnet-4-5` (strong) and `claude-haiku-4-5` (cheap); override with `BOOK_MODEL_STRONG` and `BOOK_MODEL_CHEAP`.
+Models default to `claude-sonnet-4-5` (strong) and `claude-haiku-4-5` (cheap); override with `BOOK_MODEL_STRONG` and `BOOK_MODEL_CHEAP`. Run `pnpm book models` to see what your key can reach.
+
+Extended thinking is disabled by default: its hidden tokens are billed at the output rate and were
+eating the output cap (ADR 0003). Set `BOOK_THINKING=on` to turn it back on and measure the
+difference.
 
 ## Layout
 
@@ -43,6 +57,6 @@ Models default to `claude-sonnet-4-5` (strong) and `claude-haiku-4-5` (cheap); o
 | `packages/runtime` | Turn controller: validate-then-release, repair, rollback |
 | `packages/llm` | Mock and Anthropic providers, usage metering, budget caps |
 | `packages/store` | Memory and file stores |
-| `packages/harness` | CLI: play, replay, baseline, report |
+| `packages/harness` | CLI: play, replay, baseline, report, inspect, models |
 | `configs/` | Game configs (UK life, pirate) |
 | `fixtures/` | Golden session and recall probes |

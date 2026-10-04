@@ -204,13 +204,19 @@ Rule: nothing reaches the player until it has passed validation and been committ
   ],
   "beat": "Borrowed Glenys's mower; promised it back clean by four.",
   "focus_next": ["glenys", "cerys"],
-  "need": []
+  "need": [],
+  "check": { "what": "talking Glenys round", "stat": "charm" }
 }
 ```
 
 Rules:
 - Ops are a closed, versioned set. Each module registers the ops it owns.
-- The model proposes elapsed time; the engine clamps it to config bounds.
+- The model proposes elapsed time; the engine clamps it to config bounds. `clock.advance` covers the
+  action and is capped by `time.max_per_turn`; `clock.skip` covers a deliberate stretch of sleeping,
+  travelling or waiting and is capped separately by `time.max_skip_minutes`, which is how a full
+  night becomes legal without letting a scene drift for hours by accident.
+- `check` is set only when the GM resolved the action with the fate die. It is what lets the engine
+  show the player a roll that was actually used, rather than one drawn every turn regardless.
 - Unknown ops, unknown entity ids and out-of-range values are rejected, not guessed.
 - The `beat` (about 20 words) is the raw material for memory, so no extra call is needed to summarise each turn.
 
@@ -271,9 +277,29 @@ Layers, from hot to cold:
 | Chapter summaries | ~150-200 tokens each, written by compaction | Older ones merge into story-so-far |
 | Story so far | Rolling summary | Hard cap (~500 tokens) |
 | Entity facts | Short facts per entity with importance and last-touched turn | Cap per entity; consolidated at compaction |
-| Threads | Commitments, goals, debts, mysteries, callbacks | Resolved threads archived; callbacks kept while "warm" |
+| Threads | Commitments, goals, debts, mysteries, callbacks | Pool unlimited; at most `threads.max_in_context` reach the prompt |
 
 **Callbacks** are first-class: running jokes, favours owed, nicknames, recurring side characters and promises. Compaction must carry them forward as threads or entity facts. This is the main protection against a story that feels flat after summarising.
+
+### 7.1 Threads earn prompt space (ADR 0004)
+
+Storing a thread is nearly free; putting it in the prompt is not, and not because of tokens. A model
+holding ten open threads services none of them and the prose turns into a to-do list. So the thread
+pool is the long-term memory and the prompt sees only a few of them:
+
+- A thread reaches the prompt if its deadline is inside `threads.rewarm_hours`, if it involves
+  someone in the scene, or if it has reminders left. At most `threads.max_in_context`.
+- Each turn spends one reminder per thread actually shown. After `threads.max_reminders` unprompted
+  reminders the thread goes cold and leaves the prompt. It stays in state.
+- A cold thread with a deadline comes back as the deadline approaches.
+- An open thread whose deadline passes raises a due event carrying its `on_overdue` text, then is
+  marked `failed`. This is what replaces nagging: the garden can be ignored for a hundred turns and
+  still lose the inspection.
+- "On screen" means entities sharing the player's location plus entities the player named. It is
+  deliberately narrower than attention mapping, which falls back to every entity and so cannot tell
+  whether a thread is live.
+- Player-created and config-seeded threads are weighted the same, one action may resolve several,
+  and a resolution may open a follow-up with `parent` set so chains are traceable.
 
 **Compaction call** (cheap tier, batched, every ~20 turns or when a budget part overflows): input is the beats, current summary and entity facts; output is a new chapter summary, consolidated facts and thread clean-up as a delta. It goes through the same validator.
 
@@ -288,7 +314,7 @@ save
   config_id, config_version
   turn, clock
   entities { id: { type, name, aliases, location, facts[], tags[] } }
-  threads  [ { id, kind, text, due?, status, entities[], warm } ]
+  threads  [ { id, kind, text, due?, status, entities[], warm, reminders, parent?, on_overdue? } ]
   beats    [ { turn, text } ]
   summaries { chapters[], story_so_far }
   modules  { stats, inventory, relationships, factions, events, dice, ... }
@@ -311,7 +337,10 @@ Notes:
 {
   "id": "uk-life",
   "version": 1,
-  "meta": { "title": "...", "tone": "grounded, dry, British", "content_rating": "romance" },
+  "meta": {
+    "title": "...", "tone": "grounded, dry, British", "content_rating": "romance",
+    "violence": "deflect", "harshness": "normal"
+  },
   "modules": ["stats", "inventory", "relationships", "events", "dice", "offscreen"],
   "offscreen": { "enabled": true, "min_skip_hours": 6, "max_entities": 4, "max_tokens": 600, "scope": ["npc_goals", "threads"] },
   "gm_style": {
@@ -322,17 +351,30 @@ Notes:
     ],
     "rollback_note": "The Game Master pauses. That didn't quite work. Try a different approach?"
   },
-  "presentation": { "profile": "light", "status_line": ["money", "health", "location", "time"] },
-  "time": { "start": "2026-10-03T09:20", "min_per_action": 1, "max_per_turn": 480 },
+  "presentation": { "profile": "light", "status_line": ["turn", "money", "health", "location", "time"] },
+  "time": {
+    "start": "2026-10-03T09:20", "min_per_action": 1, "max_per_turn": 480,
+    "max_skip_minutes": 840, "rest_note": "A full night is seven to nine hours"
+  },
+  "threads": { "max_in_context": 4, "max_reminders": 2, "rewarm_hours": 12 },
+  "dice": { "sides": 100, "thresholds": [10, 25, 50, 75, 90], "visible": false, "stat_modifier": false },
   "stats": [ { "key": "money", "type": "currency", "start": 45, "display": "GBP" } ],
   "events": {
     "scheduled": [ { "at": "2026-10-05T10:00", "id": "inspection", "text": "Letting agent inspection window opens" } ],
     "conditional": [ { "when": "relationship(player,cerys) > 60", "fire": "romance_beat" } ],
     "random": [ { "table": "street_encounters", "chance_per_hour": 0.15 } ]
   },
-  "seed": { "entities": [], "threads": [] }
+  "seed": { "entities": [], "threads": [ { "kind": "goal", "text": "...", "due": "...", "on_overdue": "..." } ] }
 }
 ```
+
+`meta.violence` picks how the GM handles the player attacking someone: `deflect` means the attempt
+fails for a physical reason and the cost lands socially, which is what a grounded domestic setting
+needs; `adventure` means genre combat where blows land and characters can die, which is what a
+pirate or fantasy game needs. The model's own policy is the ceiling regardless of the setting.
+`meta.harshness` scales what a mistake costs and never touches the dice. `dice.visible` shows the
+roll to the player; when it is false, the contract instead requires every failure to carry a
+concrete in-world cause. See ADR 0004.
 
 ### 9.2 Module interface (contract)
 
@@ -590,18 +632,38 @@ Owner approval is required for: changes to `packages/schema`, changes to the mod
 16. The "delta first, then narration" output order is tested as an early experiment.
 17. Interlude and repair history is visible in the debug panel only.
 
+### Decided after live play (4 Oct 2026, saves `live-3` and `live-4`)
+
+18. Extended thinking is off by default. Hidden reasoning tokens are billed at the output rate and
+    were consuming the output cap, truncating replies (ADR 0003).
+19. A malformed reply is a format problem, not a story problem: it gets a cheap reformat with no GM
+    interlude, and the provider prefills `{` so the model cannot write prose before the JSON
+    (ADR 0003).
+20. Threads earn prompt space and ignored threads bite later through `on_overdue` instead of being
+    repeated every turn (ADR 0004, section 7.1).
+21. Violence is per config: `deflect` for grounded settings, `adventure` for genre combat. Harshness
+    is a separate dial that scales consequences and never the dice (ADR 0004).
+22. `clock.skip` with its own cap makes sleeping legal; `time.rest_note` and a cap of 0 express a
+    character that does not sleep (ADR 0004).
+23. A roll is either shown to the player (`dice.visible`) or explained in-world. A hidden die must
+    never leave an action looking as though it fizzled for no reason (ADR 0004).
+24. The status line may show the turn number, the console names what the engine did when a turn did
+    not come back clean, and `--log-raw` keeps raw replies for diagnosis.
+
 ### Build status (4 Oct 2026)
 
-Phase 0 (contracts) and Phase 1 (core build) are implemented on the mock provider; 250 tests pass.
+Phase 0 (contracts) and Phase 1 (core build) are implemented, plus the fixes from the first two live
+sessions; 299 tests pass.
 
 | Area | State |
 |---|---|
 | Contracts, engine, modules (stats, inventory, relationships, events, dice, offscreen) | done |
 | Turn runtime: validate-then-release, delta repair, GM interlude rewrite, rollback, compaction, off-screen simulator | done |
 | Context builder, attention mapping, memory compaction | done |
-| Mock and Anthropic providers, file store, harness CLI (play, replay, baseline, report) | done; Anthropic adapter tested only with injected fetch |
+| Mock and Anthropic providers, file store, harness CLI (play, replay, baseline, report, inspect, models) | done; Anthropic adapter tested only with injected fetch |
 | UK and pirate configs, golden session, recall probes | done |
-| Real-model benchmark (Phase 2) | blocked on `ANTHROPIC_API_KEY` |
+| Thread lifecycle and overdue consequences, per-config violence and harshness, `clock.skip`, visible dice | done; not yet exercised against a real model |
+| Real-model benchmark (Phase 2) | two short live sessions played; full golden-session benchmark not yet run |
 | `need` / attention-miss handling, delta-first experiment results | not yet implemented / not yet measured |
 | Nuxt UI, Supabase, hosted trial, wizard | later phases |
 
