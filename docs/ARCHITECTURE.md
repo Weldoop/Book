@@ -33,9 +33,11 @@ Evidence from a real 121-turn session on a plain chat setup (figures are estimat
 |---|---|
 | Input tokens per turn at turn 200 | under 5k, and flat from turn ~20 onward |
 | Output tokens per turn | under 250 (narration plus structured delta) |
-| Model calls per turn | 1 (plus a batched cheap call every ~20 turns) |
+| Model calls per turn | 1 normally; at most 3 including repairs (plus a batched cheap call every ~20 turns) |
+| Time until the player sees the story | to be measured; target under 8 seconds on the typical turn |
+| GM interlude rate (game-breaking drafts) | under 3% of turns |
 | Recall probes (facts from turns 1-50 asked at turn 200) | at least 90% correct |
-| State delta rejection rate | under 3% after one retry |
+| Turns that fail all repairs and roll back | under 0.5% |
 | Replay determinism | identical state from the delta log, 100% |
 
 ---
@@ -63,7 +65,8 @@ Hosted trial and billing, bring-your-own-key, publishing and discovery, stars, f
 
 1. **AI proposes, engine commits.** The model never writes state. It returns a delta; code validates and applies it.
 2. **Code owns anything countable.** Clock, money, stats, inventory, dice, schedules and the status line are deterministic.
-3. **One call per turn where possible.** Narration and delta come from the same call so the story and the state cannot drift apart. If the delta fails validation, a short second call repairs only the delta; the story the player is reading is never rewritten or interrupted (section 5.3).
+3. **One call per turn where possible.** Narration and delta come from the same call so the story and the state cannot drift apart. If validation fails, a repair call fixes it (section 5.3).
+3a. **Validate before the player sees anything.** The player only ever sees narration that has passed validation and been committed. A broken draft is never shown.
 4. **Bounded context.** Per-turn context has a hard token budget independent of game length or world size.
 5. **Structure over transcript.** Facts, threads and callbacks live in structured state; prose history is only a recent window.
 6. **Modules, not a mega-engine.** Every mechanic is an optional module with the same interface.
@@ -147,21 +150,44 @@ Trivial deterministic actions (for example "wait until 14:00") may later be reso
 2. **Due events.** Engine checks the clock, scheduled events, conditional triggers and random tables, and lists anything that fires this turn.
 3. **Build context** (section 6).
 4. **One model call** returning strict JSON: `{ narration, delta, beat, suggestions? }`.
-5. **Validate** the delta (schema, module rules, permission, clock bounds). The narration is shown to the player immediately; validation does not hold up the story. On failure, run the delta repair flow (section 5.3).
-6. **Commit** state, delta, beat and usage atomically (single transaction on database stores; single write on file store).
-7. **Render** narration plus the status line or stat panel built from config presentation settings. The model never writes the status line.
+5. **Validate** the draft (schema, module rules, permission, clock bounds, state contradictions). The narration is held back until validation passes. While waiting, the UI shows a "storyteller is writing" indicator. On failure, run the repair flow (section 5.3).
+6. **Commit** state, delta, beat and usage atomically (single transaction on database stores; single write on file store). The commit includes only the approved narration.
+7. **Release and render** the approved narration plus the status line or stat panel built from config presentation settings. The model never writes the status line.
 
-### 5.3 Delta repair flow (keeps the player in the story)
+### 5.3 Validate-then-release and the repair flow
 
-The player should never see a validation error or a rewritten scene. Narration is the part the player experiences; the delta is bookkeeping.
+Rule: nothing reaches the player until it has passed validation and been committed to the database. The player never sees a rejected draft, an error message, or a half-applied turn.
 
-1. **Show the narration** as soon as it arrives (streamed if the provider supports it).
-2. If the delta is invalid, make a **repair call** that is small by design. Its input is only: the narration, the rejected ops with their error messages, and the relevant state slice (not the full context). Its output is a corrected delta only. It never re-writes the story.
-3. If the repaired delta passes, commit it as normal. Target: the repair finishes before the player sends the next message.
-4. If the repair also fails, commit **narration only** and record a `reconcile` thread describing the unapplied change (for example "player paid the cafe, amount unknown"). The next turn's context includes it so the storyteller can correct state naturally.
-5. Every repair and reconcile is logged. The benchmark reports the repair rate and the reconcile rate; the single-call design is judged against these.
+**Failure severity** (decided by the validator, in code):
 
-If repairs are frequent, the escalation order is: tighten the op schema and prompt, then try a stronger tier on the turn call, and only then move to a standing two-call pipeline (decide, then write).
+| Severity | Meaning | Examples | Repair |
+|---|---|---|---|
+| `fixable` | The narration is fine; the bookkeeping is wrong | Malformed op, unknown field, rounding, missing `beat`, wrong entity id spelling | Delta-only repair. Silent; the player just sees the normal "writing" indicator for a little longer |
+| `game_breaking` | The narration contradicts the rules or state | Spends money the player does not have, uses an item not owned, moves somewhere unreachable, time jump beyond bounds, acts through a dead or absent character, invents an entity without declaring it | Narration and delta are both rewritten, with a GM interlude (below) |
+
+**Flow**
+
+1. Draft arrives (`narration`, `delta`, `beat`). It is held back and not stored in the visible transcript.
+2. Validator runs. If it passes: commit, then release the narration (section 5.2).
+3. If `fixable`: small **delta repair** call. Input is only the draft narration, the rejected ops with errors, and the relevant state slice. Output is a corrected delta. Re-validate; on pass, commit and release the original narration.
+4. If `game_breaking`: the engine shows the player a **GM interlude** (below), then makes a **rewrite repair** call. Input is the original player input, the rejected draft, the specific rule violations in plain language, and the relevant state slice. Output is a new `narration`, `delta` and `beat` that respect the rules. Re-validate; on pass, commit and release the corrected narration.
+5. If the rewrite also fails, make one more attempt on the strong tier. If that fails too, the turn is rolled back: no state change, no draft shown, and the engine shows an in-world GM note asking the player to rephrase or try a different approach. The turn counter does not advance.
+6. Maximum two repair calls per turn. Cost is capped per turn.
+
+**Logging (as normal)**
+- The delta log records every attempt: original draft, violations, repair calls, final result and tokens, marked `source: repair`.
+- Rejected narration is stored in the log only. It never enters the recent-turns window, the beats, the summaries or the transcript, so the model never sees its own broken version as history.
+- The debug panel shows the violations, the repair path taken and the cost.
+
+**GM interlude (game-breaking only)**
+- A short in-world line written by the engine from templates in the config, so it costs no tokens. Example for the UK sim: *"The moment wobbles and slips out of focus... the Game Master rewinds a few seconds and tries again."* Example for the pirate sim: *"The tide turns against the tale... the Game Master redraws the chart."*
+- Templates live in `gm_style.interludes` (section 9.1) and are chosen at random so they do not repeat every time.
+- The interlude is shown while the rewrite is running, then replaced by or followed by the corrected narration. Only the corrected story is saved as the turn.
+- Interludes are logged and counted. If they are frequent they hurt immersion, so the benchmark reports the interlude rate against a target of under 3% of turns.
+
+**Escalation if repairs are frequent:** tighten the op schema and prompt, then use the stronger tier for the turn call, then consider asking for the delta before the narration in the output (below), and only then consider a standing two-call pipeline (decide, then write).
+
+**Streaming note.** Because narration is held until validation, there is no word-by-word streaming of unvalidated text. Option to test: order the model output as delta first, then narration. The delta can be validated while the narration is still being generated, and the narration is released the moment the delta commits. This keeps perceived speed close to normal streaming.
 
 ### 5.4 Model output contract (draft)
 
@@ -288,7 +314,14 @@ Notes:
   "meta": { "title": "...", "tone": "grounded, dry, British", "content_rating": "romance" },
   "modules": ["stats", "inventory", "relationships", "events", "dice", "offscreen"],
   "offscreen": { "enabled": true, "min_skip_hours": 6, "max_entities": 4, "max_tokens": 600, "scope": ["npc_goals", "threads"] },
-  "gm_style": { "max_words": 90, "person": "second", "never_decide_for_player": true },
+  "gm_style": {
+    "max_words": 90, "person": "second", "never_decide_for_player": true,
+    "interludes": [
+      "The moment wobbles and slips out of focus... the Game Master rewinds a few seconds and tries again.",
+      "Reality shifts for a heartbeat as the Game Master smooths a crease in the story..."
+    ],
+    "rollback_note": "The Game Master pauses. That didn't quite work. Try a different approach?"
+  },
   "presentation": { "profile": "light", "status_line": ["money", "health", "location", "time"] },
   "time": { "start": "2026-10-03T09:20", "min_per_action": 1, "max_per_turn": 480 },
   "stats": [ { "key": "money", "type": "currency", "start": 45, "display": "GBP" } ],
@@ -410,6 +443,7 @@ The 121 player messages from the real session (about 4k tokens) become `fixtures
 - Unit: every op handler, clock bounds, dice, event firing, budget trimming.
 - Replay determinism: delta log reproduces identical state.
 - Adversarial inputs: attempts to set money, skip time, contradict state; state must not corrupt.
+- Repair paths: forced `fixable` and `game_breaking` drafts from the mock provider (overspending, absent characters, bad ids) must produce the right interlude, a corrected committed turn, and a log entry; rejected text must never appear in the transcript or window.
 - Recall probes: scripted questions at turns 50, 100, 200 about early facts and open threads.
 - Cross-model: same session on at least two models once the adapter has a second provider.
 - Engagement (human): 2-3 testers; session length, "would continue" rating, and a free-text list of what felt flat or broke.
@@ -520,7 +554,9 @@ Owner approval is required for: changes to `packages/schema`, changes to the mod
 | Risk | Mitigation |
 |---|---|
 | Flat or generic stories after compression | Callbacks as first-class threads; widen window before adding calls; human engagement tests |
-| Delta rejection loops with weaker models | Closed op set, small repair call, reconcile thread and narrate-only fallback (section 5.3) |
+| Repair loops with weaker models | Closed op set, severity-based repair, max two repair calls, rollback with a GM note (section 5.3) |
+| Interludes break immersion if frequent | Engine-written templates in the game's tone; interlude rate is a tracked target; escalate model tier or prompt if above 3% |
+| Waiting for validation makes the story feel slow | Delta-first output order experiment; measure time-to-story; typing indicator |
 | Module interface too rigid for unusual worlds | Prove with two very different configs; add an escape-hatch "freeform note" op only if needed |
 | Over-engineering again | Every addition needs a measured failure from the benchmark |
 | Prompt fragments grow with each module | Load only relevant fragments; budget enforced per part |
@@ -541,11 +577,16 @@ Owner approval is required for: changes to `packages/schema`, changes to the mod
 6. The fate die is visible to the player.
 7. The working name is `book` and this repository is the home of the monorepo.
 
-8. One model call per turn where possible; if the delta fails validation, a small repair call fixes only the delta while the player keeps reading, with a standing two-call pipeline only as a later escalation (section 5.3).
+8. One model call per turn where possible. The player sees nothing until the draft is validated and committed. Minor bookkeeping errors are fixed silently with a small delta repair; game-breaking drafts trigger an in-world GM interlude, a rewrite, and only the corrected story is shown and saved. A standing two-call pipeline is a later escalation (section 5.3).
 9. Four development agents in parallel (tracks A to D), with owner approval for schema, module interface, token budget, new dependencies and real-model API use (section 16.1.1).
 10. The off-screen simulator is included as an optional module that each game enables in its config (section 9.3.1).
 11. Attention is shown in a debug panel only, not to players.
 
-### Still open
+### Still open (proposed defaults in brackets)
 
-None blocking Phase 0. Next step: owner approves this plan, then Track A drafts the contracts (`packages/schema`, `AGENTS.md`).
+12. Should minor bookkeeping fixes be silent, with only the normal writing indicator and no GM interlude? [yes]
+13. After two failed repairs, should the turn roll back with an in-world GM note asking the player to try another approach, rather than showing anything unvalidated? [yes]
+14. Should the GM interlude lines be written by the engine from per-game templates, so they cost no tokens, rather than generated by the model? [yes, templates]
+15. How long is acceptable to wait for the story to appear on a normal turn, and on a repaired turn? [normal under 8s; repaired up to ~15s]
+16. Should the output order test "delta first, then narration" be run as an early experiment to keep perceived speed? [yes]
+17. Should the player be able to see the interlude history (how often reality was rewritten), or debug panel only? [debug panel only]
