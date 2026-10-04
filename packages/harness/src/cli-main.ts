@@ -26,6 +26,7 @@ export const USAGE = `Usage: pnpm book <command> [flags]
             [--faults every=7,kind=game_breaking] [--save name] [--out <dir>]
   baseline  --config <path> --fixture <path> [same flags as replay]
   report    <report.json> [<other.json>]
+  models                                (list the model ids your API key can use)
   inspect   --save <name> [--turn N]   (per-turn tokens, outcomes, repairs for a saved game)
 
 Real-model runs need --provider anthropic, ANTHROPIC_API_KEY in the environment,
@@ -176,6 +177,21 @@ export async function runCli(argv: string[], deps: CliDeps = {}): Promise<number
         out("");
         out(formatReport(report));
         out(`report written to ${path}`);
+        return 0;
+      }
+      case "models": {
+        const key = env.ANTHROPIC_API_KEY;
+        if (!key) throw new Error("ANTHROPIC_API_KEY is not set in this terminal.");
+        const res = await fetch("https://api.anthropic.com/v1/models?limit=100", {
+          headers: { "x-api-key": key, "anthropic-version": "2023-06-01" },
+        });
+        if (!res.ok) throw new Error(`Model list failed (HTTP ${res.status}). Check that the key is valid.`);
+        const body = (await res.json()) as { data?: { id: string; display_name?: string }[] };
+        for (const m of body.data ?? []) out(`${m.id}${m.display_name ? `   (${m.display_name})` : ""}`);
+        out("");
+        out("Set the ones you want, then start the game:");
+        out("  export BOOK_MODEL_STRONG=<a sonnet or opus id above>");
+        out("  export BOOK_MODEL_CHEAP=<a haiku id above>");
         return 0;
       }
       case "inspect": {
