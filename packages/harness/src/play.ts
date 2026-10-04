@@ -1,0 +1,95 @@
+import type { Config, LLMUsage, Store, LLMProvider } from "@book/schema";
+import type { RuntimeApi, TurnResultLike } from "./runtime-api.ts";
+
+export interface PlayIO {
+  /** Resolves null at end of input. */
+  readLine(prompt: string): Promise<string | null>;
+  write(text: string): void;
+  color?: boolean;
+}
+
+export interface PlayOptions {
+  api: RuntimeApi;
+  config: Config;
+  store: Store;
+  llm: LLMProvider;
+  saveId: string;
+  deltaFirst?: boolean;
+  io: PlayIO;
+  debug?: boolean;
+}
+
+export function usageLine(result: TurnResultLike, wallMs: number): string {
+  const u: LLMUsage[] = result.record.usage;
+  const sum = (pick: (x: LLMUsage) => number): number => u.reduce((n, x) => n + pick(x), 0);
+  const secs = (wallMs / 1000).toFixed(1);
+  return `in ${sum((x) => x.input_tokens)}  out ${sum((x) => x.output_tokens)}  cached ${sum((x) => x.cached_input_tokens)}  $${sum((x) => x.cost_usd).toFixed(4)}  ${secs}s  ${result.outcome}`;
+}
+
+export function debugDump(result: TurnResultLike): string {
+  const r = result.record;
+  const lines = [`turn ${r.turn} (${r.kind}) outcome ${r.outcome}`, "context parts:"];
+  for (const p of r.context_parts) lines.push(`  ${p.name.padEnd(20)} ${String(p.tokens).padStart(5)}${p.trimmed ? "  (trimmed)" : ""}`);
+  lines.push(`attempts: ${r.attempts.length}`);
+  r.attempts.forEach((a, i) => {
+    lines.push(`  ${i + 1}. ${a.kind}: ${a.violations.length} violation(s)`);
+    for (const v of a.violations) lines.push(`     [${v.severity}] ${v.code}: ${v.message}`);
+  });
+  return lines.join("\n");
+}
+
+export async function runPlay(opts: PlayOptions): Promise<void> {
+  const { io } = opts;
+  const dim = (s: string): string => (io.color ? `\x1b[2m${s}\x1b[0m` : s);
+  const rt = opts.api.createRuntime({
+    config: opts.config,
+    store: opts.store,
+    llm: opts.llm,
+    ...(opts.deltaFirst ? { deltaFirst: true } : {}),
+  });
+
+  const existing = (await opts.store.listSaves()).some((s) => s.save_id === opts.saveId);
+  if (existing) {
+    const state = await opts.store.loadSave(opts.saveId);
+    io.write(dim(`Resumed "${opts.saveId}" at turn ${state.turn}.`) + "\n");
+  } else {
+    await opts.api.newGame(rt, opts.saveId);
+    io.write(dim(`New game "${opts.saveId}": ${opts.config.meta.title}. Type your first action (for example "Start the game").`) + "\n");
+  }
+  io.write(dim("/quit to exit, /debug to toggle the debug dump.") + "\n");
+
+  let debug = opts.debug ?? false;
+  let last: TurnResultLike | undefined;
+
+  for (;;) {
+    const line = await io.readLine("\n> ");
+    if (line === null) break;
+    const text = line.trim();
+    if (text === "/quit" || text === "/exit") break;
+    if (text === "/debug") {
+      debug = !debug;
+      io.write(dim(`debug ${debug ? "on" : "off"}`) + "\n");
+      if (debug && last) io.write(dim(debugDump(last)) + "\n");
+      continue;
+    }
+
+    const t0 = performance.now();
+    let result: TurnResultLike;
+    try {
+      result = await opts.api.playTurn(rt, opts.saveId, text, {
+        onInterlude: (t) => io.write(`\n${dim(t)}\n`),
+      });
+    } catch (err) {
+      io.write(`\nError: ${err instanceof Error ? err.message : String(err)}\n`);
+      break;
+    }
+    last = result;
+    io.write(`\n${result.narration}\n`);
+    if (result.status) io.write(`\n${result.status}\n`);
+    if (opts.config.presentation.profile === "tabletop" && result.panel.length > 0) {
+      io.write(result.panel.map((p) => `  ${p}`).join("\n") + "\n");
+    }
+    io.write(dim(`[${usageLine(result, performance.now() - t0)}]`) + "\n");
+    if (debug) io.write(dim(debugDump(result)) + "\n");
+  }
+}

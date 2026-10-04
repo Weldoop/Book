@@ -66,13 +66,14 @@ export function createRuntime(opts: {
   llm: LLMProvider;
   modules?: Module[];
   outputOrder?: "narration_first" | "delta_first";
+  deltaFirst?: boolean;
 }): Runtime {
   return {
     config: opts.config,
     store: opts.store,
     llm: opts.llm,
     modules: opts.modules ?? getActiveModules(opts.config),
-    outputOrder: opts.outputOrder ?? "narration_first",
+    outputOrder: opts.outputOrder ?? (opts.deltaFirst ? "delta_first" : "narration_first"),
   };
 }
 
@@ -227,6 +228,7 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
         state,
         modules,
         input,
+        turn_kind: kind,
         draftText: current.text,
         violations: current.violations,
         ...(current.draft ? { narration: current.draft.narration } : {}),
