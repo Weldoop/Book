@@ -130,7 +130,7 @@ interface Evaluated {
   violations: Violation[];
 }
 
-function evaluate(state: State, rt: Runtime, text: string): Evaluated {
+function evaluate(state: State, rt: Runtime, text: string, input = ""): Evaluated {
   const parsed = parseDraftText(text);
   if (!parsed.ok) {
     return {
@@ -145,7 +145,7 @@ function evaluate(state: State, rt: Runtime, text: string): Evaluated {
       ],
     };
   }
-  const result = validateDraft(state, rt.config, rt.modules, parsed.draft);
+  const result = validateDraft(state, rt.config, rt.modules, parsed.draft, input);
   return { draft: parsed.draft, text, violations: result.violations };
 }
 
@@ -266,7 +266,7 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
     json: true,
   });
   const rawOf = (text: string) => (rt.logRaw ? { raw: text } : {});
-  let current = evaluate(state, rt, first.text);
+  let current = evaluate(state, rt, first.text, input);
   attempts.push({ kind: "draft", draft: current.draft ?? current.text, ...rawOf(first.text), violations: current.violations, usage: first.usage });
 
   let repairs = 0;
@@ -296,7 +296,7 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
             json: true,
           })
         : await call({ tier: "strong", purpose: "format_repair", system: ctx.system, messages: ctx.messages, max_tokens: TURN_MAX_TOKENS, json: true });
-      current = evaluate(state, rt, res.text);
+      current = evaluate(state, rt, res.text, input);
       attempts.push({ kind: "format_repair", draft: current.draft ?? current.text, ...rawOf(res.text), violations: current.violations, usage: res.usage });
     } else if (canPatchDelta && current.draft) {
       const rc = buildRepairContext({
@@ -313,7 +313,7 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
       const fixed = parseDeltaRepair(res.text);
       if (fixed.ok) {
         const candidate: TurnDraft = { ...current.draft, delta: fixed.delta, beat: fixed.beat ?? current.draft.beat };
-        const result = validateDraft(state, config, modules, candidate);
+        const result = validateDraft(state, config, modules, candidate, input);
         current = { draft: candidate, text: JSON.stringify(candidate), violations: result.violations };
       } else {
         current = {
@@ -351,7 +351,7 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
         max_tokens: TURN_MAX_TOKENS,
         json: true,
       });
-      current = evaluate(state, rt, res.text);
+      current = evaluate(state, rt, res.text, input);
       attempts.push({ kind: "rewrite_repair", draft: current.draft ?? current.text, ...rawOf(res.text), violations: current.violations, usage: res.usage });
     }
     repairs++;

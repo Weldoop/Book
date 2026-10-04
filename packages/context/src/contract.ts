@@ -31,6 +31,7 @@ export function outputFormatText(order: OutputOrder, config?: Config): string {
     '- "need": optional array of ids you lack information on.',
     '- "check": optional {"what": "what was at stake", "stat": "stat id"} - set this ONLY when you resolved the action with the fate die.',
     '- "scene_ended": optional true - set this ONLY when the scene has just come to a natural close.',
+    '- "at": optional place id. Set it to where the narration stops whenever anyone travels.',
   ];
   if (config?.notes.enabled) {
     lines.push('- "notes": optional array of short private strings, for your eyes only (see NOTES).');
@@ -116,6 +117,7 @@ export function threadText(config: Config): string {
     `- OPEN THREADS shows at most ${config.threads.max_in_context} of the live threads, not all of them. Threads the player ignores drop off this list and come back as consequences when their deadline passes.`,
     "- Thread the player caused and threads the world set matter equally. One action may resolve more than one: list every thread.resolve it earns.",
     "- When resolving a thread opens a new question, open the follow-up with thread.open and set parent to the thread it came from.",
+    "- Do not open a thread that repeats one already open. The same deadline does not need a second thread.",
     "- Do not nag. Mention a thread only when the scene gives it a reason to come up.",
   ].join("\n");
 }
@@ -152,6 +154,9 @@ export function contractText(config: Config, modules: Module[], order: OutputOrd
     "- Use only ids shown in the context. Never invent ops or fields. Item ids come from the world sheet.",
     "- Other people know only what they have seen, heard, or been told. An intention written only in the player's command is invisible to them until the player acts on it or says it.",
     "- If the player goes somewhere, entity.move the player in that same delta. Create a new place with entity.create before the move. A place someone mentions before the player enters it is created in that turn with the tag \"unvisited\".",
+    "- When anyone travels, set \"at\" to the place id where the narration stops.",
+    "- Refuse a trip once, and give the reason. If the player asks to leave again, create the place if it is not on the world sheet and entity.move them. A second refusal is not allowed.",
+    "- If the narration buys, orders, eats, drinks, or puts down a catalog item, the same delta must record the inventory change and, for a purchase, the price. Otherwise do not narrate it.",
     "- Do not name a person tagged unmet, and do not treat them as present, until they share the player's location.",
     tabletop
       ? "- Stat numbers and rolls may appear in narration (tabletop profile)."

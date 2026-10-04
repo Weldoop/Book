@@ -42,6 +42,8 @@ describe("buildTurnContext structure", () => {
     expect(contract?.text).toContain("fades to black");
     expect(contract?.text).toContain("involving minors");
     expect(contract?.text).toContain("single JSON object");
+    expect(contract?.text).toContain("Refuse a trip once");
+    expect(contract?.text).toContain('"at"');
     expect(contract?.text).toContain("stat.add{");
     expect(contract?.text).toContain("inventory.remove{");
     expect(frags?.text).toContain("STATS: money is in GBP");

@@ -67,6 +67,11 @@ export const TurnDraftSchema = z.object({
   check: CheckSchema.optional(),
   /** Set only when the scene has come to a natural close, which is when memory may compact. */
   scene_ended: z.boolean().optional(),
+  /**
+   * Place id where the narration stops. Optional: a missing `at` is not a violation.
+   * When it is set, it has to be the player's location after the delta.
+   */
+  at: IdSchema.optional(),
   /** Short private notes for the GM's own use over the next few turns. Never shown to the player. */
   notes: z.array(z.string()).optional(),
 });

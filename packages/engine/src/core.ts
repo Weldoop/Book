@@ -1,4 +1,5 @@
 import type { Config, DueItem, Entity, Module, Op, RenderOutput, State, Violation } from "@book/schema";
+import { duplicateOpenThread } from "./threads.ts";
 import { addMinutes, diffMinutes } from "./time.ts";
 
 const MAX_FACT_CHARS = 220;
@@ -107,6 +108,18 @@ export const coreModule: Module = {
         }
         if (op.due && diffMinutes(op.due, state.clock.now) < 0) {
           out.push(bad("due_in_past", `Op ${index}: thread due time ${op.due} is already in the past.`, index));
+        }
+        {
+          const dup = duplicateOpenThread(state.threads, op.text, op.due);
+          if (dup) {
+            out.push(
+              bad(
+                "duplicate_thread",
+                `Op ${index}: this repeats open thread '${dup.id}'. Do not open a second thread for the same matter.`,
+                index,
+              ),
+            );
+          }
         }
         break;
       case "thread.resolve": {

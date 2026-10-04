@@ -56,10 +56,11 @@ export const COMPACTION_SYSTEM = [
   "You are the archivist of an interactive story. Compress old events into durable memory. Reply with a single JSON object only, no prose, no code fences.",
   "Keys:",
   '- "chapter_summary": string, at most 80 words, covering the beats shown.',
-  '- "story_so_far": string, at most 160 words, merging the current story so far with the new chapter. You MUST keep running jokes, favours owed, promises, nicknames and recurring characters.',
+  '- "story_so_far": string, at most 160 words, merging the current story so far with the new chapter. You MUST keep running jokes, favours owed, promises and recurring characters. Keep nicknames only when a beat uses them.',
   '- "facts": array of {"id": string, "fact": string, "importance": 1|2|3}. For each entity you want to tidy, list ALL the facts it should keep (consolidated: merge duplicates, drop outdated or trivial ones, at most 8 per entity). Your list replaces its old facts. Only use entity ids shown below; omit entities that need no change.',
   '- "resolve_threads": array of thread ids that are clearly finished. Only use ids shown below.',
   "Never invent events. Use only what is shown.",
+  "Never write live money, health, energy, or the clock. Those belong to the engine. Do not copy a stale balance from the old summary. A goal that says how much had to last is not the current balance.",
 ].join("\n");
 
 export interface CompactionInput {
@@ -100,7 +101,18 @@ export function buildCompactionRequest(i: CompactionInput): BuiltContext {
   const entityFit = fitLines("## ENTITY FACTS (importance 1-3)", entityLines, REQUEST_ENTITIES_CAP, "end");
   const entitiesText = renderSection("## ENTITY FACTS (importance 1-3)", entityFit.lines);
 
+  const locId = state.entities[i.config.player_id]?.location ?? null;
+  const locName = locId ? (state.entities[locId]?.name ?? locId) : "unknown";
+  const stateLines = [
+    "Engine truth. Do not copy these balances into the summary.",
+    locId ? `Location: ${locName} [${locId}]` : "Location: unknown",
+    ...i.modules.flatMap((m) => m.snapshot(state, i.config)).filter((line) => line.trim()),
+  ];
+  const stateFit = fitLines("## STATE", stateLines, 400, "end");
+  const stateText = renderSection("## STATE", stateFit.lines);
+
   const sections: { part: string; text: string; trimmed: boolean }[] = [
+    { part: "state_snapshot", text: stateText, trimmed: stateFit.trimmed },
     { part: "story_so_far", text: storyText, trimmed: storyFit.trimmed },
     { part: "beats", text: beatsText, trimmed: beatFit.trimmed },
     { part: "threads", text: threadsText, trimmed: threadFit.trimmed },

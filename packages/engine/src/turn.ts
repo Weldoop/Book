@@ -9,8 +9,10 @@ import {
   type TurnKind,
   type Violation,
 } from "@book/schema";
+import { consistencyViolations } from "./consistency.ts";
 import { syncPresence } from "./core.ts";
 import { processOps } from "./ops.ts";
+import { duplicateOpenThread } from "./threads.ts";
 import { rngFor } from "./rng.ts";
 import { addMinutes, diffMinutes } from "./time.ts";
 
@@ -77,12 +79,22 @@ export function severityOf(violations: Violation[]): "none" | "fixable" | "game_
   return violations.some((v) => v.severity === "game_breaking") ? "game_breaking" : "fixable";
 }
 
-export function validateDraft(state: State, config: Config, modules: Module[], draft: TurnDraft): ValidationResult {
-  const { violations } = processOps(state, config, modules, draft.delta);
+export function validateDraft(
+  state: State,
+  config: Config,
+  modules: Module[],
+  draft: TurnDraft,
+  input = "",
+): ValidationResult {
+  const processed = processOps(state, config, modules, draft.delta);
   const warnings: string[] = [];
   const words = draft.narration.trim().split(/\s+/).length;
   if (words > config.gm_style.max_words * 2) {
     warnings.push(`narration has ${words} words (limit ${config.gm_style.max_words})`);
+  }
+  const violations = [...processed.violations];
+  if (processed.violations.length === 0) {
+    violations.push(...consistencyViolations(state, processed.state, config, draft, input, processed.applied));
   }
   return { ok: violations.length === 0, violations, warnings };
 }
@@ -168,7 +180,7 @@ export function applyDraft(state: State, config: Config, modules: Module[], draf
 
   next = structuredClone(next);
   for (const item of ctx.due) {
-    if (item.thread) {
+    if (item.thread && !duplicateOpenThread(next.threads, item.thread.text)) {
       next.threads.push({
         id: `t${next.threads.length + 1}`,
         kind: item.thread.kind,

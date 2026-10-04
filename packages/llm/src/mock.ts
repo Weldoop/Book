@@ -27,8 +27,52 @@ function lastUserMessage(req: LLMRequest): string {
 
 /** The context builder may wrap the player's text; pick it out when it is labelled, else use the message start. */
 function playerText(content: string): string {
+  const section = /## PLAYER INPUT\s*\n([\s\S]*)$/i.exec(content);
+  if (section?.[1]) return section[1].trim();
   const labelled = /^\s*(?:player input|player|input)\s*:\s*(.+)$/im.exec(content);
   return labelled?.[1] ?? content;
+}
+
+const TRIP =
+  /\b(?:walk|head|go|travel|ride|drive|hurry|set off|leave)\b[^.]{0,40}?\b(?:to|towards|toward|into)\s+(?:the\s+|a\s+|an\s+)?([a-z][a-z' -]{2,40})/gi;
+
+function tripDestination(input: string): string | null {
+  let last: string | null = null;
+  for (const match of input.toLowerCase().matchAll(new RegExp(TRIP.source, "gi"))) {
+    const cut = (match[1] ?? "").split(/\b(?:again|and|then|if|but|so|while|when|please)\b/)[0] ?? "";
+    const dest = cut
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (dest.length >= 3) last = dest;
+  }
+  return last;
+}
+
+function playerId(req: LLMRequest): string {
+  const blob = req.system.map((block) => block.text).join("\n");
+  return /player character id is "([^"]+)"/.exec(blob)?.[1] ?? "player";
+}
+
+/** A world-sheet place whose name or id matches where the player asked to go. */
+function placeForDestination(content: string, dest: string): { id: string; name: string } | null {
+  const sheet = /## WORLD SHEET\n([\s\S]*?)(?:\n## |$)/.exec(content)?.[1] ?? "";
+  const places = sheet.split(/^Places:\s*$/m)[1] ?? "";
+  const needle = dest.toLowerCase();
+  let best: { id: string; name: string; score: number } | null = null;
+  for (const line of places.split("\n")) {
+    const match = /^- ([a-z0-9-]+): (.+)$/.exec(line.trim());
+    if (!match?.[1] || !match[2]) continue;
+    const name = match[2].replace(/\s*\(not yet visited\)\s*$/, "");
+    const id = match[1];
+    const hay = `${name} ${id.replace(/-/g, " ")}`.toLowerCase();
+    const hit = hay === needle || new RegExp(`\\b${needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(hay);
+    if (!hit) continue;
+    const score = name.length;
+    if (!best || score < best.score) best = { id, name, score };
+  }
+  return best ? { id: best.id, name: best.name } : null;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -163,13 +207,22 @@ export class MockProvider implements LLMProvider {
   }
 
   private turnJson(req: LLMRequest, fault: FaultKind | undefined): string {
-    const echo = words(playerText(lastUserMessage(req)), 12);
+    const content = lastUserMessage(req);
+    const echo = words(playerText(content), 12);
     const narration = `You ${echo}. The moment passes and the world shifts a little around you.`;
     const beat = `Player: ${words(echo, 8)}.`;
     if (fault === "unparseable") return `${narration} (the storyteller forgot to use JSON here)`;
+    const dest = fault ? null : tripDestination(playerText(content));
+    const place = dest ? placeForDestination(content, dest) : null;
     let delta: unknown[] = [{ op: "clock.advance", minutes: 10 }];
+    if (place) {
+      delta = [
+        { op: "entity.move", id: playerId(req), location: place.id },
+        { op: "clock.advance", minutes: 10 },
+      ];
+    }
     if (fault === "fixable") delta = [{ op: "clock.advance", minutes: "ten" }];
     if (fault === "game_breaking") delta = [{ op: "stat.add", key: "money", amount: -1000000, reason: "mock fault" }];
-    return JSON.stringify({ narration, delta, beat });
+    return JSON.stringify({ narration, delta, beat, ...(place ? { at: place.id } : {}) });
   }
 }

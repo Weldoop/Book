@@ -40,6 +40,8 @@ function deltaRepairSystem(modules: Module[]): string {
     "- Elapsed time goes in delta as clock.advance (minutes).",
     "- Declare every new named person or place with entity.create before any op refers to it.",
     "- Use only ids shown in the context. Item ids must be copied from the world sheet. Move the player with entity.move to a place id.",
+    "- A purchase, order, meal, or item put down in the narration needs the inventory op and, for a purchase, a negative stat.add of the catalog price.",
+    "- If the player asked to go somewhere and was not refused, entity.move them to a place that matches. Create the place first when the world sheet has no such place.",
     "- Never invent ops or fields.",
     "OPS",
     describeOps(modules),

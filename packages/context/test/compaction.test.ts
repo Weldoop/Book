@@ -90,6 +90,18 @@ describe("buildCompactionRequest", () => {
     expect(req.total_tokens).toBe(req.parts.reduce((n, p) => n + p.tokens, 0));
   });
 
+  it("shows the live balances and forbids copying them or an unused nickname", () => {
+    const req = buildCompactionRequest({ config, state: makeState(), modules: [statsModule] });
+    const text = req.messages[0]?.content ?? "";
+    expect(text).toContain("45.00");
+    expect(text).toContain("Do not copy these balances");
+    expect(text).toContain("The Flat");
+    const sys = req.system[0]?.text ?? "";
+    expect(sys).toContain("stale balance");
+    expect(sys).toContain("Never write live money");
+    expect(sys).toContain("Keep nicknames only when a beat uses them");
+  });
+
   it("stays bounded on a big state and never lists half an entity", () => {
     const state = makeBigState(200);
     for (const e of Object.values(state.entities)) e.last_touched = 190;

@@ -353,9 +353,11 @@ document, and compaction is the process that rewrites them.
 - **Call:** one cheap-tier call, in line with the turn rather than on a background worker. It is
   best-effort: if it fails or cannot be parsed, the state is left alone and the next turn retries.
   The player never waits on a failed compaction.
-- **Input:** the current story-so-far, the beats since the last compaction, open threads, and the
-  full fact list of every entity touched since then. Whole entities only, because a partial list
-  would silently drop facts when the reply replaces it.
+- **Input:** a code-written state block (location and module snapshots, including money), the
+  current story-so-far, the beats since the last compaction, open threads, and the full fact list
+  of every entity touched since then. Whole entities only, because a partial list would silently
+  drop facts when the reply replaces it. The archivist is told not to copy live balances, and that
+  a nickname counts only when a beat used it.
 - **Output:** a dedicated `CompactionResult` (`chapter_summary`, `story_so_far`, `facts`,
   `resolve_threads`), not a delta. It has its own parser and is applied by `applyCompaction`, so it
   does not travel through the turn validator or the op set.
@@ -850,10 +852,20 @@ engine, and its model-authored status line had already drifted within a single s
     the player UI and are felt only in the writing.
 42. Other people know only what they have seen, heard, or been told. There is no knowledge store.
 
+### Decided after the second Uplands playtest (4 Oct 2026)
+
+43. The validator still does not invent ops from prose. It rejects a turn whose bookkeeping does
+    not match what was played. Optional `at` must be the player's place when it is set. A trip that
+    is not refused must end at a matching place, or at a place created in that delta; the second
+    refusal in a row is game-breaking so the rewrite has to narrate the departure. A catalog item
+    the narration buys, or that the player eats or puts down while still holding it, needs the
+    inventory and money ops. A new thread that repeats an open one is dropped. The archivist sees
+    engine state and must not copy a live balance or an unused nickname. See ADR 0008.
+
 ### Build status (4 Oct 2026)
 
 Phase 0 (contracts) and Phase 1 (core build) are implemented, plus the fixes from the first two live
-sessions and the ADR 0005, 0006 and 0007 changes; 356 tests pass.
+sessions and the ADR 0005, 0006, 0007 and 0008 changes; 369 tests pass.
 
 | Area | State |
 |---|---|
@@ -866,6 +878,7 @@ sessions and the ADR 0005, 0006 and 0007 changes; 356 tests pass.
 | Endings with deterministic continuations, `violence: consequence`, `jeopardy` stat on `uk-life` | done; not yet exercised against a real model |
 | Scene-aware compaction and the GM's private notes | done; the mock never closes a scene or writes a note, so both need a real model |
 | World sheet, dealt opening, catalog item ids, release-before-archivist (ADR 0007) | done; opening is exercised with the mock, not yet against a real model |
+| Trip, price and thread checks; archivist state block (ADR 0008) | done; exercised with the mock, not yet against a real model |
 | Real-model benchmark (Phase 2) | two short live sessions played; full golden-session benchmark not yet run |
 | `need` / attention-miss handling, delta-first experiment results | not yet implemented / not yet measured |
 | Nuxt UI, Supabase, hosted trial, wizard | later phases |
