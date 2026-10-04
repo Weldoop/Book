@@ -124,6 +124,12 @@ mode, `State.ending`, `State.endings_seen`, and the `ended` turn outcome.
 Endings are checked on every committed turn, which is a condition evaluation over state and costs no
 tokens. A continuation costs no tokens either. A final ending saves a model call.
 
+Context cost, measured on the 125-turn golden session with the mock provider: average input per turn
+goes from 2,809 to 2,937, up 128 tokens (4.6%), against a budget target of under 5k. The rise is the
+longer `consequence` fragment, the `jeopardy` rule and stat, and two extra seeded places. Most of it
+(about 10k of the 16k cumulative increase) lands in the cacheable static block, which is the cheap
+kind of growth. Flatness is unaffected: turn 25 reads 2,927 and turn 125 reads 2,818.
+
 The deflect-to-consequence switch is the first change in this project that makes the game harsher
 rather than safer, and it has not yet been played against a real model. The Phase 2 benchmark should
 include a session that provokes it.

@@ -777,3 +777,8 @@ sessions and the ADR 0005 changes; 314 tests pass.
 | Nuxt UI, Supabase, hosted trial, wizard | later phases |
 
 First mock benchmark (125 turns, estimates only, mock replies are short so baseline growth is understated): engine input stays flat at about 2.4k tokens per turn from turn 25; baseline grows to about 7.7k by turn 125.
+
+After ADR 0005 the same replay averages 2,937 input tokens per turn (2,927 at turn 25, 2,818 at turn
+125), up 128 on the run before it. The rise is the `consequence` fragment, the `jeopardy` rule and
+stat and two extra seeded places, and most of it sits in the cacheable static block. Still well
+inside the 5k target, and still flat.

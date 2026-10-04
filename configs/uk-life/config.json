@@ -30,7 +30,7 @@
       "Never narrate the player's words, decisions or feelings for them; describe the world and what other people say and do.",
       "Other characters have their own plans and moods; they do not simply agree with the player.",
       "Romance may be warm and flirtatious; anything explicit fades to black at the door.",
-      "The hidden 'jeopardy' stat is how much trouble the law is in a position to cause. Raise it with stat.add when the player does something a court would care about, by a little for a shove or a theft and a lot for a weapon or a serious injury, and lower it when charges are dropped or time passes quietly. Never mention it."
+      "The hidden 'jeopardy' stat is how much trouble the law could cause the player. Raise it with stat.add for anything a court would care about: a little for a shove, a lot for a weapon or a real injury. Never mention it."
     ],
     "interludes": [
       "The room stutters for a heartbeat. The Game Master rewinds a few seconds, tuts quietly, and tidies the moment.",
