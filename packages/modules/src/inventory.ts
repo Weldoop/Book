@@ -1,0 +1,86 @@
+import type { Config, Module, Op, State, Violation } from "@book/schema";
+
+export interface InventoryState {
+  owners: Record<string, Record<string, number>>;
+}
+
+export function inventoryOf(state: State): InventoryState {
+  return (state.modules.inventory as InventoryState | undefined) ?? { owners: {} };
+}
+
+export function itemName(config: Config, id: string): string {
+  return config.items.find((i) => i.id === id)?.name ?? id.replace(/[_-]/g, " ");
+}
+
+export const inventoryModule: Module = {
+  id: "inventory",
+  ops: ["inventory.add", "inventory.remove"],
+
+  initState(config) {
+    const owners: Record<string, Record<string, number>> = {};
+    for (const row of config.seed.inventory) {
+      const bag = (owners[row.owner] ??= {});
+      bag[row.item] = (bag[row.item] ?? 0) + row.qty;
+    }
+    return { owners } satisfies InventoryState;
+  },
+
+  validateOp(op: Op, index: number, state: State, config: Config): Violation[] {
+    if (op.op !== "inventory.add" && op.op !== "inventory.remove") return [];
+    if (!state.entities[op.owner]) {
+      return [
+        {
+          severity: "fixable",
+          code: "unknown_entity",
+          op_index: index,
+          message: `Op ${index}: inventory owner '${op.owner}' does not exist.`,
+        },
+      ];
+    }
+    if (op.op === "inventory.remove") {
+      const have = inventoryOf(state).owners[op.owner]?.[op.item] ?? 0;
+      if (have < op.qty) {
+        return [
+          {
+            severity: "game_breaking",
+            code: "item_not_owned",
+            op_index: index,
+            message: `Op ${index}: '${op.owner}' has ${have} of '${itemName(config, op.item)}' but ${op.qty} would be removed. The item is not available.`,
+          },
+        ];
+      }
+    }
+    return [];
+  },
+
+  applyOp(op: Op, state: State): State {
+    if (op.op !== "inventory.add" && op.op !== "inventory.remove") return state;
+    const s = structuredClone(state);
+    const inv = (s.modules.inventory as InventoryState | undefined) ?? { owners: {} };
+    const bag = (inv.owners[op.owner] ??= {});
+    const delta = op.op === "inventory.add" ? op.qty : -op.qty;
+    const next = (bag[op.item] ?? 0) + delta;
+    if (next <= 0) delete bag[op.item];
+    else bag[op.item] = next;
+    s.modules.inventory = inv;
+    return s;
+  },
+
+  promptFragment: () =>
+    "INVENTORY: Items change hands only through inventory.add / inventory.remove. The player can only use or give away items listed in STATE. Buying an item needs both a stat.add (payment) and an inventory.add.",
+
+  focus: () => [],
+  due: () => [],
+
+  snapshot(state, config) {
+    const bag = inventoryOf(state).owners[config.player_id] ?? {};
+    const items = Object.entries(bag).map(([id, qty]) => (qty > 1 ? `${itemName(config, id)} x${qty}` : itemName(config, id)));
+    return [`Carrying: ${items.length ? items.join(", ") : "nothing"}`];
+  },
+
+  render(state, config) {
+    const bag = inventoryOf(state).owners[config.player_id] ?? {};
+    const items = Object.entries(bag).map(([id, qty]) => (qty > 1 ? `${itemName(config, id)} x${qty}` : itemName(config, id)));
+    return { panel: [`Inventory: ${items.length ? items.join(", ") : "empty"}`] };
+  },
+};

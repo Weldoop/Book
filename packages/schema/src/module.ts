@@ -41,4 +41,9 @@ export interface Module {
   snapshot(state: State, config: Config): string[];
   /** Deterministic, player-facing output. */
   render(state: State, config: Config): RenderOutput;
+  /**
+   * Optional bookkeeping after a turn is applied (for example marking events as fired).
+   * Returns a new state; must not mutate its input.
+   */
+  onTurnCommitted?(state: State, config: Config, ctx: { due: DueItem[]; now: string }): State;
 }
