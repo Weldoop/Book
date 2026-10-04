@@ -73,8 +73,8 @@ export interface ThreadsSection extends Section {
   shown: string[];
 }
 
-export function threadsSection(state: State, config: Config, focusIds: string[], cap: number): ThreadsSection {
-  const chosen = selectThreads(state, config, focusIds);
+export function threadsSection(state: State, config: Config, input: string, cap: number): ThreadsSection {
+  const chosen = selectThreads(state, config, input);
   const lines = chosen.map((t) => {
     const due = t.due ? ` due ${t.due}` : "";
     const ents = t.entities.length ? ` (${t.entities.join(", ")})` : "";

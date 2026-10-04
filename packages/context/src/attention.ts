@@ -39,16 +39,28 @@ export function orderThreads(threads: Thread[]): Thread[] {
 }
 
 /**
+ * Who is actually in the scene: whoever shares the player's location, plus anyone the player named.
+ * Deliberately narrower than `mapAttention`, which falls back to every entity and so cannot
+ * tell us whether a thread is live.
+ */
+function onScreen(state: State, config: Config, input: string): Set<string> {
+  const locationId = state.entities[config.player_id]?.location ?? null;
+  const ids = Object.values(state.entities)
+    .filter((e) => e.id !== config.player_id && ((locationId !== null && e.location === locationId) || mentioned(e, input)))
+    .map((e) => e.id);
+  return new Set(ids);
+}
+
+/**
  * Picks the few threads worth prompt space. The stored pool is unlimited; a thread earns a place by
  * having a deadline in view, by involving someone on screen, or by still having reminders left.
  * A cold thread stays in state and bites later through `overdueThreads`.
  */
-export function selectThreads(state: State, config: Config, focusIds: string[] = []): Thread[] {
+export function selectThreads(state: State, config: Config, input = ""): Thread[] {
   const now = state.clock.now;
   const window = config.threads.rewarm_hours * 60;
-  const onScreen = new Set(focusIds);
   const near = (t: Thread): boolean => t.due !== undefined && diffMinutes(t.due, now) <= window;
-  const inFocus = (t: Thread): boolean => t.entities.some((id) => onScreen.has(id));
+  const inFocus = (t: Thread): boolean => t.entities.some((id) => onScreen(state, config, input).has(id));
 
   const rank = (t: Thread): number => (near(t) ? 0 : inFocus(t) ? 1 : 2);
   const eligible = state.threads.filter((t) => t.status === "open" && (t.warm || near(t) || inFocus(t)));

@@ -52,7 +52,7 @@ export function assembleTurn(i: BuildContextInput): TurnAssembly {
   });
   const focus = focusSection(i.state, focusIds, budget.entities_in_focus);
 
-  const threads = threadsSection(i.state, i.config, focusIds, budget.threads);
+  const threads = threadsSection(i.state, i.config, i.input, budget.threads);
   const sections: { part: string; section: Section }[] = [
     { part: "scene", section: sceneSection(i.config, i.state) },
     { part: "state_snapshot", section: stateSection(i.config, i.state, i.modules, budget.state_snapshot) },

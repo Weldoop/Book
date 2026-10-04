@@ -1,0 +1,152 @@
+import { describe, expect, it } from "vitest";
+import { selectThreads } from "../src/attention.ts";
+import { contractText } from "../src/contract.ts";
+import { threadsSection } from "../src/sections.ts";
+import { makeConfig, makeEntity, makeState, makeThread } from "./fixtures.ts";
+
+const NOW = "2026-10-03T12:00";
+
+function withThreads(threads: Parameters<typeof makeThread>[0][], over: Record<string, unknown> = {}) {
+  const config = makeConfig(over);
+  const state = makeState({
+    clock: { now: NOW },
+    threads: threads.map((t) => makeThread(t)),
+    entities: { player: makeEntity({ id: "player" }), dai: makeEntity({ id: "dai" }) },
+  });
+  return { config, state };
+}
+
+describe("selectThreads", () => {
+  it("caps the prompt at max_in_context while the pool stays whole", () => {
+    const { config, state } = withThreads(
+      [1, 2, 3, 4, 5, 6].map((n) => ({ id: `t${n}`, opened_turn: n })),
+      { threads: { max_in_context: 4, max_reminders: 2, rewarm_hours: 12 } },
+    );
+    expect(selectThreads(state, config)).toHaveLength(4);
+    expect(state.threads).toHaveLength(6);
+  });
+
+  it("drops a cold thread entirely", () => {
+    const { config, state } = withThreads([
+      { id: "warm" },
+      { id: "cold", warm: false },
+    ]);
+    expect(selectThreads(state, config).map((t) => t.id)).toEqual(["warm"]);
+  });
+
+  it("brings a cold thread back when its deadline is in view", () => {
+    const { config, state } = withThreads([{ id: "cold", warm: false, due: "2026-10-03T18:00" }]);
+    expect(selectThreads(state, config).map((t) => t.id)).toEqual(["cold"]);
+  });
+
+  it("does not treat naming the player as a reason to keep a thread alive", () => {
+    const { config, state } = withThreads([{ id: "cold", warm: false, entities: ["player"] }]);
+    expect(selectThreads(state, config, "I look around")).toEqual([]);
+  });
+
+  it("brings a cold thread back when someone it involves is on screen", () => {
+    const { config, state } = withThreads([{ id: "cold", warm: false, entities: ["dai"] }]);
+    expect(selectThreads(state, config, "where is Dai").map((t) => t.id)).toEqual(["cold"]);
+    expect(selectThreads(state, config, "stare at the wall")).toEqual([]);
+  });
+
+  it("puts a near deadline ahead of an on-screen thread, and both ahead of the rest", () => {
+    const { config, state } = withThreads([
+      { id: "later", opened_turn: 9 },
+      { id: "onscreen", entities: ["dai"] },
+      { id: "deadline", due: "2026-10-03T16:00" },
+    ]);
+    expect(selectThreads(state, config, "talk to Dai").map((t) => t.id)).toEqual(["deadline", "onscreen", "later"]);
+  });
+
+  it("orders competing deadlines soonest first", () => {
+    const { config, state } = withThreads([
+      { id: "late", due: "2026-10-03T22:00" },
+      { id: "soon", due: "2026-10-03T14:00" },
+    ]);
+    expect(selectThreads(state, config).map((t) => t.id)).toEqual(["soon", "late"]);
+  });
+
+  it("ignores resolved and failed threads", () => {
+    const { config, state } = withThreads([
+      { id: "done", status: "resolved" },
+      { id: "missed", status: "failed" },
+      { id: "live" },
+    ]);
+    expect(selectThreads(state, config).map((t) => t.id)).toEqual(["live"]);
+  });
+});
+
+describe("threadsSection", () => {
+  it("reports the ids it rendered so reminders can be counted", () => {
+    const { config, state } = withThreads([{ id: "t1" }, { id: "t2" }]);
+    const section = threadsSection(state, config, "", 500);
+    expect(section.shown).toEqual(["t1", "t2"]);
+    expect(section.text).toContain("t1");
+  });
+
+  it("marks itself trimmed when threads were left out of the prompt", () => {
+    const { config, state } = withThreads([{ id: "t1" }, { id: "t2", warm: false }]);
+    const section = threadsSection(state, config, "", 500);
+    expect(section.shown).toEqual(["t1"]);
+    expect(section.trimmed).toBe(true);
+  });
+
+  it("claims no reminder for a thread the budget dropped", () => {
+    const { config, state } = withThreads([{ id: "t1" }, { id: "t2" }, { id: "t3" }]);
+    const section = threadsSection(state, config, "", 12);
+    expect(section.shown.length).toBeLessThan(3);
+    expect(section.text.split("\n").filter((l) => l.startsWith("- "))).toHaveLength(section.shown.length);
+  });
+});
+
+describe("contract text", () => {
+  it("tells the GM to explain failure in-world when the dice are hidden", () => {
+    const text = contractText(makeConfig({ dice: { sides: 100, thresholds: [50], visible: false, stat_modifier: false } }), [], "narration_first");
+    expect(text).toContain("concrete in-world reason");
+    expect(text).not.toContain("The player sees the roll");
+  });
+
+  it("tells the GM the roll is on screen when the dice are visible", () => {
+    const text = contractText(
+      makeConfig({ dice: { sides: 20, thresholds: [10], visible: true, stat_modifier: true } }),
+      [],
+      "narration_first",
+    );
+    expect(text).toContain("The player sees the roll");
+    expect(text).toContain("check\".stat");
+  });
+
+  it("switches the violence rule with the config", () => {
+    const deflect = contractText(makeConfig({ meta: { ...makeConfig().meta, violence: "deflect" } }), [], "narration_first");
+    const adventure = contractText(makeConfig({ meta: { ...makeConfig().meta, violence: "adventure" } }), [], "narration_first");
+    expect(deflect).toContain("you never narrate the injury");
+    expect(adventure).toContain("characters can die");
+    expect(adventure).not.toContain("you never narrate the injury");
+  });
+
+  it("scales the consequence rule with harshness", () => {
+    const soft = contractText(makeConfig({ meta: { ...makeConfig().meta, harshness: "forgiving" } }), [], "narration_first");
+    const hard = contractText(makeConfig({ meta: { ...makeConfig().meta, harshness: "unforgiving" } }), [], "narration_first");
+    expect(soft).toContain("Consequences are gentle");
+    expect(hard).toContain("Consequences are heavy");
+  });
+
+  it("states the skip allowance and any rest rule", () => {
+    const text = contractText(
+      makeConfig({ time: { start: NOW, min_per_action: 1, max_per_turn: 480, max_skip_minutes: 0, rest_note: "machines do not sleep" } }),
+      [],
+      "narration_first",
+    );
+    expect(text).toContain("does not skip time");
+    expect(text).toContain("machines do not sleep");
+  });
+
+  it("warns the GM that the thread list is partial", () => {
+    expect(contractText(makeConfig(), [], "narration_first")).toContain("not all of them");
+  });
+
+  it("forbids writing the narration twice", () => {
+    expect(contractText(makeConfig(), [], "narration_first")).toContain("Never write the story as plain text as well");
+  });
+});

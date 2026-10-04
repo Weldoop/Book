@@ -29,6 +29,34 @@ describe("runPlay", () => {
     expect(text).toContain("rewritten");
   });
 
+  it("shows the roll above the narration when the runtime reports one", async () => {
+    const io = scriptedIO(["pick the lock"]);
+    const api = fakeRuntimeApi({ roll: { value: 3, band: "Disaster", what: "picking the lock", stat: "dexterity" } });
+    await runPlay({ api, config: makeConfig("light"), store: new MemoryStore(), llm: new MockProvider(), saveId: "p", io });
+    const text = io.out.join("");
+    expect(text).toContain("Fate 3 - Disaster (picking the lock, dexterity)");
+    expect(text.indexOf("Fate 3")).toBeLessThan(text.indexOf("You pick the lock"));
+  });
+
+  it("marks a turn that stuttered and says what the engine did", async () => {
+    const io = scriptedIO(["one", "two"]);
+    const api = fakeRuntimeApi({ outcomeFor: (t) => (t === 2 ? "repaired" : "ok") });
+    await runPlay({ api, config: makeConfig("light"), store: new MemoryStore(), llm: new MockProvider(), saveId: "p", io });
+    const text = io.out.join("");
+    expect(text).toContain("[turn 2 needed a repair: delta_repair]");
+    expect(text).not.toContain("turn 1 needed");
+  });
+
+  it("passes the raw-logging choice to the runtime only when asked", async () => {
+    const api = fakeRuntimeApi();
+    await runPlay({ api, config: makeConfig("light"), store: new MemoryStore(), llm: new MockProvider(), saveId: "p", io: scriptedIO([]) });
+    expect((api.created[0] as { logRaw?: boolean }).logRaw).toBeUndefined();
+
+    const api2 = fakeRuntimeApi();
+    await runPlay({ api: api2, config: makeConfig("light"), store: new MemoryStore(), llm: new MockProvider(), saveId: "q", io: scriptedIO([]), logRaw: true });
+    expect((api2.created[0] as { logRaw?: boolean }).logRaw).toBe(true);
+  });
+
   it("hides the panel for non-tabletop profiles, handles /debug and /quit", async () => {
     const io = scriptedIO(["go", "/debug", "/debug", "/quit", "never reached"]);
     const api = fakeRuntimeApi();

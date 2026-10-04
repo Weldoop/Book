@@ -186,6 +186,80 @@ describe("playTurn", () => {
     expect(statsOf(state).values.money).toBe(45);
   });
 
+  it("shows the roll when the config puts the dice on screen, and names what was at stake", async () => {
+    const tabletop: Config = { ...config, dice: { ...config.dice!, visible: true } };
+    const llm = scripted({ turn: [JSON.stringify({ narration: "The drawer sticks, then gives.", delta: [], beat: "Opened the drawer.", check: { what: "forcing the swollen drawer", stat: "health" } })] });
+    const { rt } = await setup(llm, { config: tabletop });
+    const res = await playTurn(rt, "s1", "Force the drawer");
+    expect(res.roll).toMatchObject({ what: "forcing the swollen drawer", stat: "health" });
+    expect(res.roll?.value).toBe(res.record.fate);
+    expect(config.dice?.labels).toContain(res.roll?.band);
+    expect(res.record.check).toEqual({ what: "forcing the swollen drawer", stat: "health" });
+  });
+
+  it("keeps the roll off screen when the config hides the dice, but still logs the check", async () => {
+    const llm = scripted({ turn: [JSON.stringify({ narration: "The drawer gives.", delta: [], beat: "Opened it.", check: { what: "forcing the drawer" } })] });
+    const { rt } = await setup(llm);
+    const res = await playTurn(rt, "s1", "Force the drawer");
+    expect(res.roll).toBeUndefined();
+    expect(res.record.check).toEqual({ what: "forcing the drawer" });
+  });
+
+  it("counts a reminder against the threads the prompt showed, and cools an ignored one", async () => {
+    const { rt, store } = await setup(new MockProvider());
+    for (let i = 0; i < 4; i++) await playTurn(rt, "s1", "Stare out of the window");
+    const state = await store.loadSave("s1");
+    const garden = state.threads.find((t) => t.text.includes("garden"));
+    expect(garden?.reminders).toBeGreaterThan(config.threads.max_reminders);
+    expect(garden?.warm).toBe(false);
+    const records = await store.readTurnRecords("s1");
+    expect(records[0]?.threads_shown).toContain(garden?.id);
+  });
+
+  it("makes a missed deadline bite, once, on the turn after it passes", async () => {
+    const skip = JSON.stringify({ narration: "Time passes.", delta: [{ op: "clock.skip", minutes: 840, reason: "slept" }], beat: "Slept." });
+    const llm = scripted({ turn: [skip, skip, skip, draft([])] });
+    const { rt, store } = await setup(llm);
+
+    // Three long sleeps, never touching the garden, whose deadline was Sunday evening.
+    const records = [];
+    for (let i = 0; i < 4; i++) records.push(await playTurn(rt, "s1", "sleep"));
+
+    const state = await store.loadSave("s1");
+    const garden = state.threads.find((t) => t.kind === "goal" && t.text.includes("overgrown"))!;
+    // Nothing fires while the deadline is still ahead.
+    expect(records.slice(0, 3).flatMap((r) => r.record.due)).not.toContain(`overdue:${garden.id}`);
+    expect(records.at(-1)?.record.due).toContain(`overdue:${garden.id}`);
+    expect(garden.status).toBe("failed");
+
+    // Having had its consequence, it does not ask for another one.
+    const after = await playTurn(rt, "s1", "look around");
+    expect(after.record.due).not.toContain(`overdue:${garden.id}`);
+  });
+
+  it("refuses a skip longer than the world allows and rolls the turn back", async () => {
+    const tooLong = JSON.stringify({ narration: "You sleep for a week.", delta: [{ op: "clock.skip", minutes: 10080, reason: "a week" }], beat: "Slept." });
+    const llm = scripted({ turn: [tooLong], rewrite_repair: [tooLong, tooLong] });
+    const { rt, store } = await setup(llm);
+    const res = await playTurn(rt, "s1", "sleep for a week");
+    expect(res.outcome).toBe("rolled_back");
+    expect(res.record.attempts[0]?.violations[0]?.code).toBe("skip_too_long");
+    expect((await store.loadSave("s1")).clock.now).toBe(config.time.start);
+  });
+
+  it("keeps raw model replies out of the log unless logging is asked for", async () => {
+    const llm = scripted({ turn: [draft([])] });
+    const plain = await setup(llm);
+    const a = await playTurn(plain.rt, "s1", "Look around");
+    expect(a.record.attempts[0]?.raw).toBeUndefined();
+
+    const store = new MemoryStore();
+    const rt = createRuntime({ config, store, llm, logRaw: true });
+    await newGame(rt, "s2");
+    const b = await playTurn(rt, "s2", "Look around");
+    expect(b.record.attempts[0]?.raw).toBe(draft([]));
+  });
+
   it("supports a game with different modules (pirate config)", async () => {
     const pirate = ConfigSchema.parse(JSON.parse(readFileSync(new URL("../../../configs/pirate/config.json", import.meta.url), "utf8")));
     expect(() => getActiveModules(pirate)).not.toThrow();

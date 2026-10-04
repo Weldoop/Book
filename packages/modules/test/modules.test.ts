@@ -184,6 +184,11 @@ describe("renderView", () => {
     expect(view.panel).toEqual([]);
   });
 
+  it("puts the turn number on the status line when the config asks for it", () => {
+    const { config, modules, state } = testSetup({ presentation: { profile: "light", status_line: ["turn", "money"] } });
+    expect(renderView(config, { ...state, turn: 7 }, modules).status).toBe("Turn 7 | money: £45.00");
+  });
+
   it("hides everything in the novel profile and shows a panel in tabletop", () => {
     const novel = testSetup({ presentation: { profile: "novel", status_line: [] } });
     expect(renderView(novel.config, novel.state, novel.modules)).toEqual({ status: null, panel: [] });

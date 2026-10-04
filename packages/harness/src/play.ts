@@ -29,19 +29,17 @@ export function rollLine(result: TurnResultLike): string | null {
 
 /** One quiet line when the turn did not come back clean, so a stutter can be reported without running inspect. */
 export function stutterLine(result: TurnResultLike): string | null {
-  const kinds = result.record.attempts
-    .slice(1)
-    .map((a) => a.kind)
-    .join(", ");
+  const kinds = result.record.attempts.slice(1).map((a) => a.kind);
+  const how = kinds.length ? `: ${kinds.join(", ")}` : "";
   switch (result.outcome) {
     case "ok":
       return null;
     case "repaired":
-      return `[turn ${result.turn} needed a repair: ${kinds}]`;
+      return `[turn ${result.turn} needed a repair${how}]`;
     case "rewritten":
-      return `[turn ${result.turn} was rewritten: ${kinds}]`;
+      return `[turn ${result.turn} was rewritten${how}]`;
     default:
-      return `[turn did not commit and was rolled back: ${kinds}]`;
+      return `[turn did not commit and was rolled back${how}]`;
   }
 }
 

@@ -38,6 +38,7 @@ export interface FakeRuntimeOptions {
   outcomeFor?: (turn: number, input: string) => TurnRecord["outcome"];
   answers?: (input: string) => string;
   throwAt?: number;
+  roll?: { value: number; band: string; what: string; stat?: string };
 }
 
 /** A tiny stand-in for @book/runtime: one flat-context model call per turn, plus a repair call when asked. */
@@ -100,7 +101,13 @@ export function fakeRuntimeApi(opts: FakeRuntimeOptions = {}): RuntimeApi & { ca
         beat: null,
         delta: [],
         due: [],
-        attempts: [],
+        attempts:
+          outcome === "ok"
+            ? [{ kind: "draft" as const, violations: [] }]
+            : [
+                { kind: "draft" as const, violations: [] },
+                { kind: outcome === "rewritten" ? ("rewrite_repair" as const) : ("delta_repair" as const), violations: [] },
+              ],
         outcome,
         context_parts: [{ name: "static", tokens: 100, trimmed: false }],
         usage,
@@ -114,6 +121,7 @@ export function fakeRuntimeApi(opts: FakeRuntimeOptions = {}): RuntimeApi & { ca
         panel: ["Money: 10"],
         outcome,
         ...(outcome === "rewritten" ? { interlude: "The moment wobbles." } : {}),
+        ...(opts.roll ? { roll: opts.roll } : {}),
         record,
       };
     },
