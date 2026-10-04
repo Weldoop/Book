@@ -109,6 +109,24 @@ Hosted trial and billing, bring-your-own-key, publishing and discovery, stars, f
    compaction: beats -> chapter summary, fact consolidation, thread cleanup
 ```
 
+### 4.1 Roles in the game (components, not separate AI agents)
+
+The game has several roles, but only some of them are model calls. A role that is a model call re-sends context and adds cost and latency, so a role is code unless it needs language understanding.
+
+| Role | Implemented as | Tokens |
+|---|---|---|
+| World keeper (stats, money, inventory, clock, schedules, database) | Code and the store; updates only when a validated delta arrives | none |
+| Validator | Code: schema, module rules, bounds, permissions | none |
+| Attention mapper (decides what the storyteller sees) | Code in the context builder (section 6.1) | none |
+| Storyteller | The single strong-model call per turn | main cost |
+| Archivist (summaries, fact consolidation) | Cheap-model call, batched every ~20 turns | small |
+| Out-of-character helper | Cheap-model call, read-only | small |
+| World simulator (off-screen NPC goals during long time skips) | Cheap-model call, only on large time jumps; **post-PoC experiment** | small, rare |
+
+An LLM validator is not part of the default design. It is only considered later as an occasional consistency check if code validation proves too weak, because it would add a second call to every turn.
+
+The storyteller does not hold the game state. It is shown the relevant slice each turn and returns proposed changes; the world keeper owns the truth. Deterministic changes can also be resolved by code before the call (for example a purchase at a config-defined price), so the model narrates the result instead of working out the arithmetic.
+
 ---
 
 ## 5. Turn pipeline
@@ -146,7 +164,9 @@ Trivial deterministic actions (for example "wait until 14:00") may later be reso
     { "op": "thread.resolve", "id": "t12" },
     { "op": "relationship.add", "a": "player", "b": "cerys", "amount": 5 }
   ],
-  "beat": "Borrowed Glenys's mower; promised it back clean by four."
+  "beat": "Borrowed Glenys's mower; promised it back clean by four.",
+  "focus_next": ["glenys", "cerys"],
+  "need": []
 }
 ```
 
@@ -181,6 +201,24 @@ Rules:
 - "In focus" is decided by code: scene location, name or alias match in the input, and threads that reference the entity. No embeddings in the PoC.
 - Static parts (1-2) are placed first so provider prompt caching helps where available.
 - The debug view shows every part, its token count, and what was trimmed.
+
+### 6.1 Attention mapping
+
+Attention mapping decides which slice of the world the storyteller sees each turn. It is the core of the token plan and is first-class in the design.
+
+How focus is computed (all code, no tokens):
+- **Scene:** the current location and entities present there.
+- **Input match:** names and aliases mentioned in the player message.
+- **Thread links:** entities referenced by open threads that are due soon.
+- **Due events:** entities attached to events firing this turn.
+- **Decay:** entities touched recently or with high importance stay warm; others cool off and drop out.
+- **Module hints:** each module's `focus()` adds what it needs (for example the stat being spent, the faction in the room).
+
+Safeguards against missing something important:
+- A one-line **scene roster** (who is present, where we are) is always included.
+- The storyteller may return `focus_next`, a short list of entity ids likely to matter next turn (about 20 tokens), which helps on "..." turns.
+- The storyteller may return `need: [ids]` when it lacks information. This triggers one extra call and is logged as an attention miss. It should be rare.
+- The benchmark tracks the **attention miss rate** and recall probes. If misses are high, widen focus rules before adding any retrieval system.
 
 ---
 
@@ -455,12 +493,19 @@ Proposed tooling: TypeScript, pnpm workspaces, Vitest, Zod, ESLint and Prettier.
 
 ## 18. Open questions
 
-1. TypeScript monorepo with pnpm, Vitest and Zod: acceptable?
-2. Harness CLI first, then a minimal Nuxt UI after the benchmark: right order?
-3. Can an Anthropic API key be supplied as a secret so agents can run capped real-model benchmarks?
-4. May the 121 player messages be committed as a fixture (it is your personal story text)?
-5. Confirm UK life sim as the flagship config for the benchmark and pirate as the universality test.
-6. Is the fate die visible to the player in `light` profile, or only in `tabletop`?
-7. Is one model call per turn acceptable even if narration quality needs tuning, before any two-call fallback is considered?
-8. How many agents do you want running in parallel, and which changes need your approval beyond schema changes?
-9. Is the existing `Book` repository the right home for the monorepo, and do you have a working title?
+### Decided (4 Oct 2026)
+
+1. TypeScript monorepo with pnpm, Vitest and Zod.
+2. Harness CLI first, then a minimal Nuxt UI after the benchmark.
+3. Anthropic API key will be added as a Cursor secret by the owner. **Reminder: required before the Phase 2 benchmark.** Until then everything runs on the mock provider.
+4. The 121 player messages may be committed as a test fixture.
+5. UK life sim is the flagship benchmark config; pirate sim is the universality test.
+6. The fate die is visible to the player.
+7. The working name is `book` and this repository is the home of the monorepo.
+
+### Still open
+
+8. One call per turn: is it acceptable to start with a single call (narration plus state change together) and only move to two calls (decide what happens, then write the prose) if the writing quality is measurably worse?
+9. Development agents: how many Cursor agents in parallel, and which changes need your approval beyond schema changes?
+10. Should the world simulator (off-screen NPC activity during time skips) be an early experiment after the benchmark, or stay on the later list?
+11. How visible should attention to the player be (a debug-only panel, or a "what the storyteller remembers" view for players)?
