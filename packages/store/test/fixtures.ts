@@ -15,6 +15,8 @@ export function makeState(saveId = "s1", turn = 0): State {
     summaries: { chapters: [], story_so_far: "", last_compacted_turn: 0 },
     window: [],
     focus_next: [],
+    ending: null,
+    endings_seen: [],
     modules: {},
   };
 }

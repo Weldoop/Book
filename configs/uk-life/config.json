@@ -6,7 +6,7 @@
     "tone": "grounded, dry, British",
     "premise": "You are a first-year student in a rented shared house in Uplands, Swansea. It is a damp Saturday in early October, you have £45 to last, the garden is a jungle, and the letting agent is due to inspect the house on Monday.",
     "content_rating": "romance",
-    "violence": "deflect",
+    "violence": "consequence",
     "harshness": "normal"
   },
   "player_id": "player",
@@ -29,7 +29,8 @@
       "Money is in pounds sterling. Prices are realistic for a Swansea student: a cob is a few quid, a pint is under five.",
       "Never narrate the player's words, decisions or feelings for them; describe the world and what other people say and do.",
       "Other characters have their own plans and moods; they do not simply agree with the player.",
-      "Romance may be warm and flirtatious; anything explicit fades to black at the door."
+      "Romance may be warm and flirtatious; anything explicit fades to black at the door.",
+      "The hidden 'jeopardy' stat is how much trouble the law is in a position to cause. Raise it with stat.add when the player does something a court would care about, by a little for a shove or a theft and a lot for a weapon or a serious injury, and lower it when charges are dropped or time passes quietly. Never mention it."
     ],
     "interludes": [
       "The room stutters for a heartbeat. The Game Master rewinds a few seconds, tuts quietly, and tidies the moment.",
@@ -92,6 +93,15 @@
       "min": 0,
       "max": 100,
       "start": 15,
+      "hidden": true
+    },
+    {
+      "key": "jeopardy",
+      "label": "Legal jeopardy",
+      "type": "bounded",
+      "min": 0,
+      "max": 100,
+      "start": 0,
       "hidden": true
     }
   ],
@@ -371,6 +381,54 @@
       }
     ]
   },
+  "endings": [
+    {
+      "id": "charged",
+      "when": {
+        "kind": "stat",
+        "key": "jeopardy",
+        "op": ">=",
+        "value": 100
+      },
+      "title": "Charged",
+      "text": "The student year ends in a custody suite off Alexandra Road. Your prints, DNA and photograph are taken, your clothes are bagged, and a duty solicitor explains the charges in a room with a bolted-down table. The tenancy, the course and the garden are somebody else's problem now. This is where that version of the story stops.",
+      "continue": {
+        "label": "Wake up in a cell and carry on from there",
+        "location": "custody-suite",
+        "note": "Morning in the cells. The player has been charged and held overnight, their possessions are bagged at the booking desk, and a duty solicitor is due. Open the scene on waking: the light, the noise, the grey tracksuit, and someone wanting them at the desk. Do not recap the arrest.",
+        "skip_minutes": 600,
+        "set_stats": {
+          "jeopardy": 45,
+          "energy": 25,
+          "stress": 90
+        },
+        "clear_inventory": true
+      }
+    },
+    {
+      "id": "admitted",
+      "when": {
+        "kind": "stat",
+        "key": "health",
+        "op": "<=",
+        "value": 0
+      },
+      "title": "Admitted",
+      "text": "You go down somewhere between the kitchen and the hall, and the next thing with any shape to it is a stranger saying your name very clearly and very slowly. An ambulance takes you to Morriston. Whatever you had planned for the weekend is no longer on the table.",
+      "continue": {
+        "label": "Come round on the ward and carry on from there",
+        "location": "hospital-ward",
+        "note": "The player comes round in a curtained bay on an assessment ward, eight hours after collapsing. A nurse is taking observations and wants to know who can collect them. Open on waking: the cuff tightening, the noise of the ward, a phone that needs charging. Do not recap the collapse.",
+        "skip_minutes": 480,
+        "set_stats": {
+          "health": 35,
+          "energy": 20,
+          "stress": 60
+        },
+        "clear_inventory": false
+      }
+    }
+  ],
   "dice": {
     "sides": 100,
     "thresholds": [
@@ -553,6 +611,36 @@
         ],
         "tags": [
           "landlord"
+        ]
+      },
+      {
+        "id": "custody-suite",
+        "type": "place",
+        "name": "Swansea Central custody suite",
+        "aliases": [
+          "the cells",
+          "custody"
+        ],
+        "facts": [
+          "A booking desk, a corridor of concrete cells and a smell of floor cleaner. Belongings are bagged and logged on arrival."
+        ],
+        "tags": [
+          "institution"
+        ]
+      },
+      {
+        "id": "hospital-ward",
+        "type": "place",
+        "name": "Morriston Hospital, assessment ward",
+        "aliases": [
+          "the ward",
+          "hospital"
+        ],
+        "facts": [
+          "A curtained bay, a blood pressure cuff and a plastic jug of water. Discharge depends on someone coming to collect you."
+        ],
+        "tags": [
+          "institution"
         ]
       }
     ],

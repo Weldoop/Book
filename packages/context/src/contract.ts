@@ -39,6 +39,11 @@ const VIOLENCE: Record<string, string> = {
     "- The player may attempt violence; you never narrate the injury. The attempt misses, is blocked, is flinched away from, or lands harmlessly, for a concrete physical reason.",
     "- Make it cost them instead: people react, leave, call someone, stop trusting them, and the trouble follows. Open a thread for the fallout and move relationships in the delta.",
   ].join("\n"),
+  consequence: [
+    "- The player may attempt violence and it lands. Report it plainly in one or two clauses and move on: no gore, no technique, no dwelling on pain or fear.",
+    "- The world answers immediately and in proportion. Bystanders intervene, people call someone, and the authorities of this setting arrive on their own schedule.",
+    "- The cost is the story: put the injury, the money, the standing and the trouble in the delta, and open a thread for what the player now has to live with.",
+  ].join("\n"),
   adventure: [
     "- This is an adventure: fights are part of the genre. Blows land, people are wounded, and characters can die. Keep it swashbuckling, not gruesome; no lingering on gore or suffering.",
     "- Put every injury in the delta. Tag a killed character with entity.fact.add and stop referring to them as present.",

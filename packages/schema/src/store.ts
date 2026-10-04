@@ -27,7 +27,8 @@ export interface TurnRecord {
   /** Thread ids the prompt showed, so reminder accounting is auditable. */
   threads_shown?: string[];
   attempts: Attempt[];
-  outcome: "ok" | "repaired" | "rewritten" | "rolled_back";
+  /** `ended`: the story is over and no continuation was offered, so no model call was made. */
+  outcome: "ok" | "repaired" | "rewritten" | "rolled_back" | "ended";
   interlude?: string;
   context_parts: { name: string; tokens: number; trimmed: boolean }[];
   usage: LLMUsage[];

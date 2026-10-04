@@ -20,10 +20,21 @@ import {
   parseCompactionResult,
   shouldCompact,
 } from "@book/context";
-import { fateLabel, getActiveModules, renderView } from "@book/modules";
+import {
+  applyContinuation,
+  continuationDue,
+  endingById,
+  fateLabel,
+  getActiveModules,
+  markEnding,
+  pickEnding,
+  renderView,
+} from "@book/modules";
 import type {
   Attempt,
   Config,
+  DueItem,
+  Ending,
   LLMProvider,
   LLMRequest,
   LLMUsage,
@@ -56,6 +67,8 @@ export interface TurnResult {
   panel: string[];
   outcome: TurnRecord["outcome"];
   interlude?: string;
+  /** Set on the turn an ending fires, and on any input after a final ending. */
+  ending?: { id: string; title: string; text: string; continuation?: string };
   /** Set when the GM resolved the action with the die and the config shows rolls to the player. */
   roll?: { value: number; band: string; what: string; stat?: string };
   record: TurnRecord;
@@ -151,15 +164,58 @@ async function playOoc(rt: Runtime, state: State, rawInput: string): Promise<Tur
   return { turn: state.turn, kind: "ooc", narration: record.narration ?? "", ...view(rt, state), outcome: "ok", record };
 }
 
+/** Any input after a final ending. No model call: the story is over and the save stays closed. */
+async function replayEnding(rt: Runtime, state: State, rawInput: string, ending: Ending): Promise<TurnResult> {
+  const record: TurnRecord = {
+    turn: state.turn,
+    kind: "act",
+    input: rawInput,
+    narration: ending.text,
+    beat: null,
+    delta: [],
+    due: [],
+    attempts: [],
+    outcome: "ended",
+    context_parts: [],
+    usage: [],
+    at: new Date().toISOString(),
+  };
+  await rt.store.appendLog(state.save_id, { type: "ended", record });
+  return {
+    turn: state.turn,
+    kind: "act",
+    narration: ending.text,
+    ...view(rt, state),
+    outcome: "ended",
+    ending: { id: ending.id, title: ending.title, text: ending.text },
+    record,
+  };
+}
+
 export async function playTurn(rt: Runtime, saveId: string, rawInput: string, hooks: TurnHooks = {}): Promise<TurnResult> {
-  const state = await rt.store.loadSave(saveId);
+  let state = await rt.store.loadSave(saveId);
   const kind = classifyInput(rawInput);
   if (kind === "ooc") return playOoc(rt, state, rawInput);
 
   const { config, modules } = rt;
   const input = kind === "continue" ? "..." : rawInput.trim();
+
+  // A pending ending is resolved before anything else: either the story carries on from the
+  // situation the config describes, or it is final and this input cannot move it.
+  const carryOn: DueItem[] = [];
+  if (state.ending) {
+    const fired = endingById(config, state.ending.id);
+    if (fired && state.ending.continuable) {
+      state = applyContinuation(state, config, fired);
+      await rt.store.updateState(saveId, state, state.turn);
+      carryOn.push(continuationDue(fired));
+    } else if (fired) {
+      return replayEnding(rt, state, rawInput, fired);
+    }
+  }
+
   const fate = rollFate(state, config);
-  const due = collectDue(state, config, modules);
+  const due = [...carryOn, ...collectDue(state, config, modules)];
   const ctx = buildTurnContext({
     config,
     state,
@@ -341,6 +397,9 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
     }
   }
 
+  const fired = pickEnding(next, config);
+  if (fired) next = markEnding(next, fired);
+
   const record: TurnRecord = {
     ...baseRecord,
     narration: current.draft.narration,
@@ -360,6 +419,16 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
     ...view(rt, next),
     outcome: record.outcome,
     ...(interlude ? { interlude } : {}),
+    ...(fired
+      ? {
+          ending: {
+            id: fired.id,
+            title: fired.title,
+            text: fired.text,
+            ...(fired.continue ? { continuation: fired.continue.label } : {}),
+          },
+        }
+      : {}),
     ...(check && fate !== undefined && config.dice?.visible
       ? {
           roll: {

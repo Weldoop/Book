@@ -79,6 +79,37 @@ export const EventsConfigSchema = z.object({
 });
 export type EventsConfig = z.infer<typeof EventsConfigSchema>;
 
+/**
+ * How the player picks a story up after it has ended. Omit `continue` on an ending to make it final.
+ * Everything here is applied by code, so a continuation costs no tokens.
+ */
+export const ContinuationSchema = z.object({
+  /** Offered to the player as the way on, for example "Wake up in a police cell". */
+  label: z.string(),
+  /** Where the next scene starts. Must be a place that already exists in state. */
+  location: IdSchema,
+  /** The situation handed to the GM as a due event on the first turn after the ending. */
+  note: z.string(),
+  /** Time passing between the ending and the continuation (unconscious, remanded, recovering). */
+  skip_minutes: z.number().int().min(0).default(0),
+  /** Stats forced to a value on the way through, for example money to 0 after confiscation. */
+  set_stats: z.record(IdSchema, z.number()).default({}),
+  /** Strip everything the player was carrying (confiscation, hospital admission). */
+  clear_inventory: z.boolean().default(false),
+});
+export type Continuation = z.infer<typeof ContinuationSchema>;
+
+export const EndingSchema = z.object({
+  id: IdSchema,
+  /** Same condition shape as a conditional event, so endings need no new evaluator. */
+  when: ConditionSchema,
+  title: z.string(),
+  /** Engine-written closing text in the game's voice. */
+  text: z.string(),
+  continue: ContinuationSchema.optional(),
+});
+export type Ending = z.infer<typeof EndingSchema>;
+
 export const DiceConfigSchema = z.object({
   sides: z.number().int().min(2).default(100),
   thresholds: z.array(z.number()).default([10, 25, 50, 75, 90]),
@@ -168,11 +199,12 @@ export const ConfigSchema = z
       premise: z.string().default(""),
       content_rating: ContentRatingSchema.default("clean"),
       /**
-       * How the GM handles the player attacking someone.
-       * `deflect`: no injury narration; hostile acts land as social, domestic and legal fallout.
+       * How the GM handles the player attacking someone. A tone dial, not a capability limit.
+       * `deflect`: the attempt fails for a physical reason; nothing lands. For cosy games.
+       * `consequence`: it lands, narrated plainly and briefly, and the cost is social, legal and medical.
        * `adventure`: genre combat, wounds and deaths of NPCs are in bounds, not gory.
        */
-      violence: z.enum(["deflect", "adventure"]).default("deflect"),
+      violence: z.enum(["deflect", "consequence", "adventure"]).default("deflect"),
       /** How hard the world bites back. Scales consequences, never the dice. */
       harshness: z.enum(["forgiving", "normal", "unforgiving"]).default("normal"),
     }),
@@ -185,6 +217,8 @@ export const ConfigSchema = z
     stats: z.array(StatDefSchema).default([]),
     items: z.array(ItemDefSchema).default([]),
     events: EventsConfigSchema.default({}),
+    /** Checked in order after every committed turn; the first match ends the story. */
+    endings: z.array(EndingSchema).default([]),
     dice: DiceConfigSchema.optional(),
     offscreen: OffscreenConfigSchema.optional(),
     seed: z

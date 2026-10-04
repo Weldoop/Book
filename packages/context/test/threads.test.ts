@@ -125,6 +125,14 @@ describe("contract text", () => {
     expect(adventure).not.toContain("you never narrate the injury");
   });
 
+  it("lets violence land under `consequence` and makes the world answer for it", () => {
+    const text = contractText(makeConfig({ meta: { ...makeConfig().meta, violence: "consequence" } }), [], "narration_first");
+    expect(text).toContain("it lands");
+    expect(text).toContain("no gore");
+    expect(text).toContain("The world answers immediately");
+    expect(text).not.toContain("you never narrate the injury");
+  });
+
   it("scales the consequence rule with harshness", () => {
     const soft = contractText(makeConfig({ meta: { ...makeConfig().meta, harshness: "forgiving" } }), [], "narration_first");
     const hard = contractText(makeConfig({ meta: { ...makeConfig().meta, harshness: "unforgiving" } }), [], "narration_first");

@@ -59,6 +59,15 @@ export const SummariesSchema = z.object({
 });
 export type Summaries = z.infer<typeof SummariesSchema>;
 
+/** An ending that has fired and is waiting for the player to carry on or leave it here. */
+export const PendingEndingSchema = z.object({
+  id: IdSchema,
+  turn: z.number().int().min(0),
+  /** False when the ending is final, so the save is closed rather than paused. */
+  continuable: z.boolean(),
+});
+export type PendingEnding = z.infer<typeof PendingEndingSchema>;
+
 export const STATE_VERSION = 1 as const;
 
 export const StateSchema = z.object({
@@ -75,6 +84,10 @@ export const StateSchema = z.object({
   summaries: SummariesSchema,
   window: z.array(TranscriptTurnSchema),
   focus_next: z.array(IdSchema).default([]),
+  /** Set while an ending is waiting on the player. Cleared when the story carries on. */
+  ending: PendingEndingSchema.nullable().default(null),
+  /** Endings already fired, so one cannot fire twice after a continuation. */
+  endings_seen: z.array(IdSchema).default([]),
   modules: z.record(z.string(), z.unknown()),
 });
 export type State = z.infer<typeof StateSchema>;

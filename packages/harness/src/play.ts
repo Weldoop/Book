@@ -27,6 +27,19 @@ export function rollLine(result: TurnResultLike): string | null {
   return `Fate ${r.value} - ${r.band} (${r.what}${stat})`;
 }
 
+/** The closing card for an ending, plus how the player carries on if the config offers a way. */
+export function endingLines(result: TurnResultLike): string[] {
+  const e = result.ending;
+  if (!e) return [];
+  const lines = [`--- ${e.title} ---`, e.text];
+  lines.push(
+    e.continuation
+      ? `${e.continuation}. Type anything to carry on, or /quit to leave it here.`
+      : "This story is over. /quit to leave it here.",
+  );
+  return lines;
+}
+
 /** One quiet line when the turn did not come back clean, so a stutter can be reported without running inspect. */
 export function stutterLine(result: TurnResultLike): string | null {
   const kinds = result.record.attempts.slice(1).map((a) => a.kind);
@@ -121,6 +134,8 @@ export async function runPlay(opts: PlayOptions): Promise<void> {
     if (opts.config.presentation.profile === "tabletop" && result.panel.length > 0) {
       io.write(result.panel.map((p) => `  ${p}`).join("\n") + "\n");
     }
+    const ending = endingLines(result);
+    if (ending.length > 0) io.write(`\n${ending.join("\n\n")}\n`);
     const stutter = stutterLine(result);
     if (stutter) io.write(dim(stutter) + "\n");
     io.write(dim(`[${usageLine(result, performance.now() - t0)}]`) + "\n");
