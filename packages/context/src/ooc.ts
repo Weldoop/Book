@@ -1,7 +1,7 @@
 import type { Config, Module, State } from "@book/schema";
 import { mapAttention } from "./attention.ts";
 import { resolveBudget } from "./budget.ts";
-import { focusSection, sceneSection, stateSection, storySection, threadsSection } from "./sections.ts";
+import { beatsSection, focusSection, sceneSection, stateSection, storySection, threadsSection, windowSection } from "./sections.ts";
 import { tokensOf } from "./text.ts";
 import { joinSections, sumTokens } from "./turn.ts";
 import type { BuiltContext, ContextPart } from "./types.ts";
@@ -9,7 +9,7 @@ import type { BuiltContext, ContextPart } from "./types.ts";
 export const OOC_SYSTEM = [
   "You are the Game Master answering an out-of-character question from the player.",
   "Answer in square brackets, briefly, in plain text (not JSON).",
-  "Answer only from the provided state. If it is not there, say you do not know.",
+  "Answer only from the provided state, story summary, recent events and recent turns. If it is not there, say you do not know.",
   "Never change the story, never narrate new events, never reveal hidden plot you were not shown.",
 ].join("\n");
 
@@ -40,6 +40,8 @@ export function buildOocContext(i: OocInput): BuiltContext {
     { part: "threads", section: threadsSection(i.state, budget.threads) },
     { part: "entities_in_focus", section: focus.section },
     { part: "story_so_far", section: storySection(i.state, budget.story_so_far) },
+    { part: "beats", section: beatsSection(i.state, budget.beats) },
+    { part: "window", section: windowSection(i.state, budget.window) },
     { part: "input", section: { text: `## QUESTION\n${question}`, trimmed: false } },
   ];
   const parts: ContextPart[] = [

@@ -211,8 +211,8 @@ describe("buildOocContext", () => {
   const state = makeState({
     threads: [makeThread({ id: "t1", text: "Return the mower", due: "2026-10-03T16:00" })],
     summaries: { chapters: [], story_so_far: "You moved to town.", last_compacted_turn: 0 },
-    beats: [{ turn: 1, text: "BEAT-SHOULD-NOT-APPEAR" }],
-    window: [{ turn: 1, input: "hi", narration: "WINDOW-SHOULD-NOT-APPEAR", clock: "2026-10-03T09:00" }],
+    beats: [{ turn: 1, text: "BEAT-MUST-APPEAR" }],
+    window: [{ turn: 1, input: "hi", narration: "WINDOW-MUST-APPEAR", clock: "2026-10-03T09:00" }],
   });
   const ctx = buildOocContext({ config, state, modules, input: "OOC: what do I owe Glenys?" });
   const text = ctx.messages[0]?.content ?? "";
@@ -229,8 +229,8 @@ describe("buildOocContext", () => {
     }
     expect(text).toContain("what do I owe Glenys?");
     expect(text).not.toContain("OOC:");
-    expect(text).not.toContain("BEAT-SHOULD-NOT-APPEAR");
-    expect(text).not.toContain("WINDOW-SHOULD-NOT-APPEAR");
+    expect(text).toContain("BEAT-MUST-APPEAR");
+    expect(text).toContain("WINDOW-MUST-APPEAR");
     expect(ctx.total_tokens).toBe(ctx.parts.reduce((n, p) => n + p.tokens, 0));
   });
 });
