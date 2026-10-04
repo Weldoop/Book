@@ -1,0 +1,8 @@
+{
+  "name": "@book/runtime",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "@book/schema": "workspace:*", "@book/engine": "workspace:*", "@book/modules": "workspace:*", "@book/context": "workspace:*", "@book/llm": "workspace:*", "@book/store": "workspace:*", "zod": "^3.24.0" }
+}
