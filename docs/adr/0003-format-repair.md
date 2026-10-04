@@ -15,3 +15,10 @@ Real-model play showed two failures that the mock never produced:
 - `unparseable` is severity `fixable`. The first repair reformats the raw text into JSON on the cheap tier. If the raw text is empty, the original request is retried on the strong tier. No interlude is shown for format failures.
 - The Anthropic provider sends `thinking: {type: "disabled"}` by default (`BOOK_THINKING=on` to opt in). If the API returns 400 mentioning "thinking", it retries without the parameter and remembers.
 - `TURN_MAX_TOKENS` is raised from 700 to 1000 as headroom.
+
+## Follow-up: assistant prefill (save `live-4`)
+
+Disabling thinking did not reduce output tokens (turn 2: 651 vs 657). The logs showed the real cause: the model wrote the narration twice, once as plain prose and again inside the JSON, so the JSON was truncated mid-`delta`. 7 of 13 turns hit the 1000-token cap. The contract already said "Reply with a single JSON object only. No prose"; the model ignored it.
+
+When `LLMRequest.json` is set, the provider now appends an assistant message containing `{`, so the reply can only continue inside the JSON object, and `parse` puts the brace back. Prefill is skipped when `BOOK_THINKING=on`, since the API forbids both together, and for an empty reply so the empty-text retry path still triggers.
+

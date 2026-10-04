@@ -89,7 +89,11 @@ export class AnthropicProvider implements LLMProvider {
     }
     if (req.temperature !== undefined) body.temperature = req.temperature;
     // Hidden reasoning tokens count against max_tokens and can leave no room for the JSON reply.
-    if (!this.thinkingUnsupported && this.env.BOOK_THINKING !== "on") body.thinking = { type: "disabled" };
+    const thinkingOn = this.env.BOOK_THINKING === "on";
+    if (!this.thinkingUnsupported && !thinkingOn) body.thinking = { type: "disabled" };
+    // Prefill an open brace so the model cannot preface the JSON with prose. Not allowed alongside thinking.
+    const prefill = req.json === true && !thinkingOn && req.messages.at(-1)?.role === "user";
+    if (prefill) (body.messages as { role: string; content: string }[]).push({ role: "assistant", content: "{" });
     let payload = JSON.stringify(body);
 
     const started = performance.now();
@@ -116,7 +120,7 @@ export class AnthropicProvider implements LLMProvider {
       }
 
       const raw = await res.text();
-      if (res.ok) return this.parse(raw, model, req, started);
+      if (res.ok) return this.parse(raw, model, req, started, prefill);
 
       if (RETRYABLE(res.status) && attempt < this.maxRetries) {
         const retryAfter = Number(res.headers.get("retry-after"));
@@ -139,17 +143,18 @@ export class AnthropicProvider implements LLMProvider {
     }
   }
 
-  private parse(raw: string, model: string, req: LLMRequest, started: number): LLMResponse {
+  private parse(raw: string, model: string, req: LLMRequest, started: number, prefill = false): LLMResponse {
     let json: { content?: { type: string; text?: string }[]; usage?: ApiUsage; model?: string };
     try {
       json = JSON.parse(raw);
     } catch {
       throw new LLMError("Anthropic returned a non-JSON response body");
     }
-    const text = (json.content ?? [])
+    const body = (json.content ?? [])
       .filter((b) => b.type === "text" && typeof b.text === "string")
       .map((b) => b.text as string)
       .join("");
+    const text = prefill && body.trim() !== "" ? `{${body}` : body;
     const u = json.usage ?? {};
     const cacheRead = u.cache_read_input_tokens ?? 0;
     const cacheWrite = u.cache_creation_input_tokens ?? 0;

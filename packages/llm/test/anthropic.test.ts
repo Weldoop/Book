@@ -75,6 +75,28 @@ describe("AnthropicProvider", () => {
     expect(calls[1]!.body.model).toBe("claude-sonnet-4-5");
   });
 
+  it("prefills an open brace for json requests and restores it in the reply", async () => {
+    const { p, calls } = make([
+      { status: 200, body: { ...OK.body, content: [{ type: "text", text: '"narration":"Rain."}' }] } },
+    ]);
+    const r = await p.complete(req({ json: true }));
+    expect(calls[0]!.body.messages.at(-1)).toEqual({ role: "assistant", content: "{" });
+    expect(r.text).toBe('{"narration":"Rain."}');
+  });
+
+  it("does not prefill without the json hint, with thinking on, or for an empty reply", async () => {
+    const plain = make([OK]);
+    await plain.p.complete(req());
+    expect(plain.calls[0]!.body.messages).toHaveLength(1);
+
+    const thinking = make([OK], { BOOK_THINKING: "on" });
+    await thinking.p.complete(req({ json: true }));
+    expect(thinking.calls[0]!.body.messages).toHaveLength(1);
+
+    const empty = make([{ status: 200, body: { ...OK.body, content: [{ type: "text", text: "" }] } }]);
+    expect((await empty.p.complete(req({ json: true }))).text).toBe("");
+  });
+
   it("disables extended thinking by default and allows opting in", async () => {
     const a = make([OK]);
     await a.p.complete(req());
