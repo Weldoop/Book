@@ -236,6 +236,35 @@ describe("travel and place", () => {
     expect(pint.violations.map((v) => v.code)).not.toContain("arrived_elsewhere");
   });
 
+  it("keeps checking a phone in the room, and cuts the clause after the place", () => {
+    const cfg = config();
+    const checking = validateDraft(
+      fresh(),
+      cfg,
+      modules,
+      draft({ narration: "You stay in the room and look at the screen." }),
+      "Go in the house to check my phone",
+    );
+    expect(checking.violations).toEqual([]);
+
+    const coop = validateDraft(
+      fresh(),
+      cfg,
+      modules,
+      draft({ narration: "You say sorry on the way out." }),
+      "Polish it off and go to coop as I leave say to the lad sorry I didn't catch your name",
+    );
+    const coopMessage = coop.violations.find((v) => v.code === "arrived_elsewhere")?.message ?? "";
+    expect(coopMessage).toContain('go to "coop"');
+    expect(coopMessage).not.toContain("lad");
+
+    const shower = validateDraft(fresh(), cfg, modules, draft({ narration: "You stay on the sofa." }), "Go to the shower and get changed");
+    expect(shower.violations.find((v) => v.code === "arrived_elsewhere")?.message ?? "").toContain('go to "shower"');
+
+    const garden = validateDraft(fresh(), cfg, modules, draft({ narration: "You stay put." }), "I leave to the garden");
+    expect(garden.violations.find((v) => v.code === "arrived_elsewhere")?.message ?? "").toContain('go to "garden"');
+  });
+
   it("treats a voyage as a trip only when the book lists those words", () => {
     const plain = config();
     const ignored = validateDraft(fresh(), plain, modules, draft({ narration: "The bay stays grey." }), "Sail to the kitchen");
@@ -343,6 +372,28 @@ describe("catalog items", () => {
       "Eat the cob",
     );
     expect(eaten.violations).toEqual([]);
+  });
+
+  it("keeps a phone that is charging or sitting on the side, and still notices one left at the shop", () => {
+    const cfg: Config = { ...config(), items: [...config().items, { id: "phone", name: "Phone" }] };
+    const state = fresh();
+    const inv = state.modules.inventory as { owners: Record<string, Record<string, number>> };
+    inv.owners.player = { ...inv.owners.player, phone: 1, "business-textbook": 1 };
+
+    expect(
+      validateDraft(state, cfg, modules, draft({ narration: "You put the phone on charge." }), "Put my phone on charge").violations,
+    ).toEqual([]);
+    expect(
+      validateDraft(state, cfg, modules, draft({ narration: "You left the phone on the side." }), "Left my phone on the side").violations,
+    ).toEqual([]);
+    expect(
+      validateDraft(state, cfg, modules, draft({ narration: "You left the business textbook at the shop." }), "Look").violations.map(
+        (v) => v.code,
+      ),
+    ).toEqual(["item_still_held"]);
+    expect(
+      validateDraft(state, cfg, modules, draft({ narration: "You hand her the oat milk." }), "Hand it over").violations.map((v) => v.code),
+    ).toEqual(["item_still_held"]);
   });
 
   it("ignores a pint that can wait, a book left on the shelf, and a purchase the player cannot make", () => {

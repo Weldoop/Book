@@ -10,7 +10,33 @@ const PAY =
   /\b(buy|bought|pay|paid|order|ordered|purchase|purchased|spend|spent)\b/gi;
 
 const RELEASE =
-  /\b(eat|ate|drink|drank|finish|finished|put|leave|left|hand|handed|give|gave|given|return|returned|replace|replaced)\b/gi;
+  /\b(eat|ate|drink|drank|finish|finished|hand|handed|give|gave|given|return|returned|replace|replaced)\b/gi;
+
+/** "put" and "leave" set an item down. Plugging a phone in, or leaving it on the side, does not. */
+const PUT_OR_LEAVE = /\b(put|leave|left)\b/gi;
+
+const PARKED = /\b(?:on(?:to)?\s+charge|to\s+charge|on\s+the\s+side|on\s+the\s+bedside)\b/i;
+
+/** The word after "to" is the errand, not a place: "to check my phone", "to say sorry". */
+const PURPOSE = new Set([
+  "ask",
+  "buy",
+  "call",
+  "charge",
+  "check",
+  "find",
+  "get",
+  "grab",
+  "look",
+  "meet",
+  "pick",
+  "read",
+  "say",
+  "see",
+  "tell",
+  "text",
+  "watch",
+]);
 
 const NEGATED = /\b(?:can't|cannot|don't|do not|didn't|did not|won't|will not|never|not)\s*$/i;
 
@@ -41,14 +67,32 @@ function wordCovers(word: string, dest: string): boolean {
 }
 
 function cleanDestination(raw: string): string {
-  // "for" and a second "to" are the errand ("the shop for a cob", "the shop to buy milk"), not the place.
-  const cut = raw.split(/\b(?:again|and|then|if|but|so|while|when|please|for)\b|\bto\b/)[0] ?? raw;
+  // "for", "as" and a second "to" are the errand or the next clause ("the shop for a cob", "the coop as I leave"), not the place.
+  const cut = raw.split(/\b(?:again|and|then|if|but|so|while|when|please|for|as)\b|\bto\b/)[0] ?? raw;
   return norm(cut).replace(/^(?:the|a|an)\s+/, "");
+}
+
+function isPlaceDestination(dest: string): boolean {
+  const first = dest.split(" ")[0] ?? "";
+  return dest.length >= 3 && !PURPOSE.has(first);
 }
 
 function isLocalStep(dest: string, local: string[]): boolean {
   const needle = norm(dest);
   return local.some((step) => norm(step) === needle);
+}
+
+function departing(verb: string): boolean {
+  const word = verb.trim().toLowerCase();
+  return word === "leave" || word === "left";
+}
+
+/** "leave to the garden" is a trip. "as I leave, say to the lad" is not, so the preposition has to come next. */
+function immediateTripPattern(verbs: string[], prepositions: string): RegExp | null {
+  const list = verbs.map((verb) => verb.trim().toLowerCase()).filter(departing);
+  if (list.length === 0) return null;
+  const body = list.map(escapeRegExp).join("|");
+  return new RegExp(`\\b(?:${body})\\s+(?:${prepositions})\\s+${DEST}`, "gi");
 }
 
 /** Longer phrases first, so "set a course" wins over "set". Words come from the book, so they are escaped. */
@@ -67,11 +111,16 @@ export function tripDestination(input: string, config: Config): string | null {
     if (!pattern) return;
     for (const match of input.toLowerCase().matchAll(pattern)) {
       const dest = cleanDestination(match[1] ?? "");
-      if (dest.length >= 3 && match.index !== undefined) hits.push({ index: match.index, dest });
+      if (isPlaceDestination(dest) && match.index !== undefined) hits.push({ index: match.index, dest });
     }
   };
   const travel = config.travel;
-  scan(verbPattern(travel.means, "to|towards|toward|into", 40));
+  scan(verbPattern(
+    travel.means.filter((verb) => !departing(verb)),
+    "to|towards|toward|into",
+    40,
+  ));
+  scan(immediateTripPattern(travel.means, "to|towards|toward|into"));
   scan(verbPattern(travel.journeys, "to|towards|toward|into|for", 48));
   hits.sort((a, b) => a.index - b.index);
   return hits.at(-1)?.dest ?? null;
@@ -337,9 +386,11 @@ function checkItems(after: State, config: Config, draft: TurnDraft, applied: Op[
   for (const mention of findMentions(draft.narration, config.items)) {
     const window = text.slice(Math.max(0, mention.start - 60), mention.start);
     const row = byId.get(mention.id) ?? { name: mention.name, pay: false, release: false, wanted: 1 };
+    const after = text.slice(mention.end, mention.end + 48);
     const pay = hasVerb(window, PAY);
+    const parked = PARKED.test(after);
     row.pay = row.pay || pay;
-    row.release = row.release || hasVerb(window, RELEASE);
+    row.release = row.release || hasVerb(window, RELEASE) || (hasVerb(window, PUT_OR_LEAVE) && !parked);
     if (pay) row.wanted = Math.max(row.wanted, wantedQty(window));
     byId.set(mention.id, row);
   }

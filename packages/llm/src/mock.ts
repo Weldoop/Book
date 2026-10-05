@@ -34,20 +34,31 @@ function playerText(content: string): string {
 }
 
 const TRIP =
-  /\b(?:walk|head|go|travel|ride|drive|hurry|set off|leave)\b[^.]{0,40}?\b(?:to|towards|toward|into)\s+(?:the\s+|a\s+|an\s+)?([a-z][a-z' -]{2,40})/gi;
+  /\b(?:walk|head|go|travel|ride|drive|hurry|set off)\b[^.]{0,40}?\b(?:to|towards|toward|into)\s+(?:the\s+|a\s+|an\s+)?([a-z][a-z' -]{2,40})/gi;
+
+const LEAVE_TRIP =
+  /\b(?:leave|left)\s+(?:to|towards|toward|into)\s+(?:the\s+|a\s+|an\s+)?([a-z][a-z' -]{2,40})/gi;
+
+const PURPOSE = new Set(["ask", "buy", "call", "charge", "check", "find", "get", "grab", "look", "meet", "pick", "read", "say", "see", "tell", "text", "watch"]);
 
 function tripDestination(input: string): string | null {
-  let last: string | null = null;
-  for (const match of input.toLowerCase().matchAll(new RegExp(TRIP.source, "gi"))) {
-    const cut = (match[1] ?? "").split(/\b(?:again|and|then|if|but|so|while|when|please)\b/)[0] ?? "";
+  const hits: { index: number; dest: string }[] = [];
+  const take = (raw: string, index: number) => {
+    const cut = raw.split(/\b(?:again|and|then|if|but|so|while|when|please|for|as)\b|\bto\b/)[0] ?? "";
     const dest = cut
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, " ")
       .replace(/\s+/g, " ")
-      .trim();
-    if (dest.length >= 3) last = dest;
-  }
-  return last;
+      .trim()
+      .replace(/^(?:the|a|an)\s+/, "");
+    const first = dest.split(" ")[0] ?? "";
+    if (dest.length >= 3 && !PURPOSE.has(first)) hits.push({ index, dest });
+  };
+  const source = input.toLowerCase();
+  for (const match of source.matchAll(new RegExp(TRIP.source, "gi"))) take(match[1] ?? "", match.index ?? 0);
+  for (const match of source.matchAll(new RegExp(LEAVE_TRIP.source, "gi"))) take(match[1] ?? "", match.index ?? 0);
+  hits.sort((a, b) => a.index - b.index);
+  return hits.at(-1)?.dest ?? null;
 }
 
 function playerId(req: LLMRequest): string {

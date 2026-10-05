@@ -313,7 +313,7 @@ Layers, from hot to cold:
 | Beats | One line per turn since last compaction | Compacted when a scene closes, or at `scenes.max_beats` |
 | Chapter summaries | ~150-200 tokens each, written by compaction | Older ones merge into story-so-far |
 | Story so far | Rolling summary | Hard cap (~500 tokens) |
-| Entity facts | A person's memory, or a trait of a place. Importance 1 lapses after a day, 2 after a week, 3 stays | Cap per entity; consolidated at compaction |
+| Entity facts | A person's memory of what they witnessed, or a trait of a place. The game master adds one short fact per person on the turn they witnessed it, and only when it would change a later scene. Importance 1 lapses after a day, 2 after a week, 3 stays | Cap per entity; consolidated at compaction |
 | Threads | Commitments, goals, debts, mysteries, callbacks | Pool unlimited; at most `threads.max_in_context` reach the prompt |
 
 **Callbacks** are first-class: running jokes, favours owed, nicknames, recurring side characters and promises. Compaction must carry them forward as threads or entity facts. This is the main protection against a story that feels flat after summarising.
@@ -411,6 +411,16 @@ path when the intention turns out to matter. Notes are a structured field rather
 `[HIDDEN: ...]` written into the narration anyway is stripped and lifted into `notes` before
 validation. Setting `notes.enabled: false` removes the state, the contract block and the output key,
 so a game that does not want them pays nothing.
+
+### 7.4 What a person remembers (ADR 0015)
+
+The game master writes the memory in the same turn. When someone in the scene sees, hears, or is told
+something that would change a later scene, the delta adds one short `entity.fact.add` on that person.
+A passing remark adds nothing. Importance stays the game master's: a passing thing fades after a day,
+a promise or a favour after a week, and a fight stays. When the narration says what someone remembers,
+that fact is already on them, or this turn is adding it because they just witnessed it. A turn that
+says they will remember, and stores nothing, still stands. Next time, they do not remember. The
+engine does not invent the fact from the prose.
 
 ---
 
@@ -922,10 +932,18 @@ engine, and its model-authored status line had already drifted within a single s
     nears. A set-aside major is mentioned during the scene it steps back, then left quiet. The
     deadline still happens. See ADR 0014.
 
+### Decided with witnessed memory (5 Oct 2026)
+
+50. A person remembers what the game master writes on them. One short fact per person who was there,
+    and only when it would change a later scene. A missing fact does not roll the turn back. Charging
+    a phone, leaving it on the side, checking it, and the words after "as I leave" are not a dropped
+    item or a different place. A purchase, a meal, a handover, and a real "go to the kitchen" still
+    have to be recorded. See ADR 0015.
+
 ### Build status (5 Oct 2026)
 
 Phase 0 (contracts) and Phase 1 (core build) are implemented, plus the fixes from the live sessions
-and the ADR 0005, 0006, 0007, 0008, 0009, 0010, 0011, 0012, 0013 and 0014 changes; 397 tests pass.
+and the ADR 0005, 0006, 0007, 0008, 0009, 0010, 0011, 0012, 0013, 0014 and 0015 changes; 399 tests pass.
 
 | Area | State |
 |---|---|
@@ -945,6 +963,7 @@ and the ADR 0005, 0006, 0007, 0008, 0009, 0010, 0011, 0012, 0013 and 0014 change
 | Major, minor and potential threads (ADR 0012) | done; exercised with the mock, not yet against a real model |
 | A third major sets the quiet one aside (ADR 0013) | done; exercised with the mock, not yet against a real model |
 | Warm means recently dealt with (ADR 0014) | done; exercised with the mock, not yet against a real model |
+| Witnessed facts, and ordinary sentences that stay in the room (ADR 0015) | done; exercised with the mock, not yet against a real model |
 | Real-model benchmark (Phase 2) | three short live sessions played; full golden-session benchmark not yet run |
 | `need` / attention-miss handling, delta-first experiment results | not yet implemented / not yet measured |
 | Nuxt UI, Supabase, hosted trial, wizard | later phases |

@@ -153,6 +153,7 @@ function workedExamples(config: Config, modules: Module[]): string {
     "EXAMPLES",
     `{"op":"entity.move","id":"${config.player_id}","location":"<place id from the world sheet>"}`,
     '{"op":"entity.create","id":"new-place","type":"place","name":"A place someone mentioned","tags":["unvisited"]}',
+    '{"op":"entity.fact.add","id":"<person id who witnessed it>","fact":"Heard you promise to bring the mower back by four","importance":2}',
   ];
   if (modules.some((m) => m.ops.includes("inventory.add"))) {
     const item = config.items.find((i) => i.price !== undefined) ?? config.items[0];
@@ -179,7 +180,7 @@ export function contractText(config: Config, modules: Module[], order: OutputOrd
     "- Declare every new named person or place with entity.create before any op or focus_next refers to it.",
     "- Use only ids shown in the context. Never invent ops or fields. Item ids come from the world sheet.",
     "- Other people know only what they have seen, heard, or been told. An intention written only in the player's command is invisible to them until the player acts on it or says it.",
-    "- A person's facts are that person's memory. entity.fact.add with importance 1 is a passing or remedial thing and is forgotten after a day, importance 2 lasts about a week, and importance 3 is a fight, a betrayal, or real harm and is kept. Do not record a thought they could not have witnessed.",
+    "- A person's facts are that person's memory. When someone here sees, hears, or is told something that would change a later scene, add one short entity.fact.add on that person in this turn. A passing remark gets nothing. importance 1 is a passing or remedial thing and is forgotten after a day, importance 2 is a promise or a favour and lasts about a week, and importance 3 is a fight, a betrayal, or real harm and is kept. When you say what someone remembers, that memory is already on them, or you are adding it now because they just witnessed it. Do not record a thought they could not have witnessed.",
     "- ENGINE NOW is the save. It wins over LAST TURNS and STORY SO FAR when they disagree about money, place, time, or what is being carried. Do not narrate a different balance, place, or inventory.",
     ...travelLines(config),
     "- Refuse a trip once, and give the reason. If the player asks to leave again, create the place if it is not on the world sheet and entity.move them. A second refusal is not allowed.",

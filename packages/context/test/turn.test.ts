@@ -45,6 +45,10 @@ describe("buildTurnContext structure", () => {
     expect(contract?.text).toContain("Refuse a trip once");
     expect(contract?.text).toContain("ENGINE NOW is the save");
     expect(contract?.text).toContain("importance 3 is a fight");
+    expect(contract?.text).toContain("would change a later scene");
+    expect(contract?.text).toContain("A passing remark gets nothing");
+    expect(contract?.text).toContain("already on them");
+    expect(contract?.text).toContain('{"op":"entity.fact.add"');
     expect(contract?.text).not.toContain("weigh anchor");
     expect(contract?.text).not.toContain("airlock");
     expect(contract?.text).toContain('"at"');
