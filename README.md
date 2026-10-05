@@ -2,7 +2,7 @@
 
 A universal AI story engine (working name: `book`). Code owns the truth; one model call per turn writes the story and proposes state changes; nothing is shown until it passes validation and is committed.
 
-Start with `docs/ARCHITECTURE.md` and `AGENTS.md`.
+Start with `docs/OVERVIEW.md` for the idea and the current architecture. `docs/ARCHITECTURE.md` is the detailed plan; `AGENTS.md` is the working rules.
 
 ## Quick start
 
