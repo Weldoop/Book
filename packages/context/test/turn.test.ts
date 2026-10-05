@@ -37,6 +37,8 @@ describe("buildTurnContext structure", () => {
     expect(contract?.text).toContain("At most 90 words");
     expect(contract?.text).toContain("second person");
     expect(contract?.text).toContain("End on a small hook.");
+    expect(contract?.text).toContain("inventory.add of that one catalog item");
+    expect(contract?.text).toContain("An item on that line is already bought.");
     expect(contract?.text).toContain("Never decide the player's");
     expect(contract?.text).toContain("Tone: grounded, dry");
     expect(contract?.text).toContain("fades to black");
@@ -115,6 +117,7 @@ describe("buildTurnContext structure", () => {
     expect(text).toContain("Player: hello\nGM: Hi there.");
     expect(text).toContain("money: 45.00 GBP");
     expect(text).toContain("Factual. This is the save.");
+    expect(text).toContain("An item on that line is already bought.");
     expect(text.indexOf("## ENGINE NOW")).toBeGreaterThan(text.indexOf("## LAST TURNS"));
     expect(text).toContain("Location: The Flat [flat]");
 

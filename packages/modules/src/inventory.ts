@@ -96,7 +96,7 @@ export const inventoryModule: Module = {
   },
 
   promptFragment: () =>
-    "INVENTORY: Items change hands only through inventory.add / inventory.remove, and the item id must be one from the world sheet. Never entity.move an item onto a person. Buying needs both a stat.add for the price and an inventory.add. The player can only use or give away items listed in STATE. A currency balance is a stat, never a quantity of an object. The wallet is one object. Do not inventory.add a stack of wallets, notes, or coins to store money.",
+    "INVENTORY: Items change hands only through inventory.add / inventory.remove, and the item id must be one from the world sheet. Never entity.move an item onto a person. Buying one item needs both inventory.add of that item and stat.add of its price. ENGINE NOW Carrying is the bag from the whole save, including earlier turns. If the item is already on that line, it is bought. Do not add it or charge it again. The player can only use or give away items listed there. A currency balance is a stat, never a quantity of an object. The wallet is one object. Do not inventory.add a stack of wallets, notes, or coins to store money.",
 
   focus: () => [],
   due: () => [],
@@ -104,7 +104,7 @@ export const inventoryModule: Module = {
   snapshot(state, config) {
     const bag = inventoryOf(state).owners[config.player_id] ?? {};
     const items = Object.entries(bag).map(([id, qty]) => (qty > 1 ? `${itemName(config, id)} x${qty}` : itemName(config, id)));
-    return [`Carrying: ${items.length ? items.join(", ") : "nothing"}`];
+    return [`Carrying (already owned): ${items.length ? items.join(", ") : "nothing"}`];
   },
 
   truth(state, config) {

@@ -942,7 +942,9 @@ engine, and its model-authored status line had already drifted within a single s
 
 ### Decided after the Haiku week (5 Oct 2026)
 
-51. One spoken purchase names one catalog item. Something already carried is not bought again.
+51. One spoken purchase names one catalog item, and the game master records it as `inventory.add`
+    of that item plus `stat.add` of the price. Something already carried is not bought again.
+    Carrying in ENGINE NOW is that bag, including turns that have left the chat.
     Uplands keeps cash and the bank as two balances that still add up to £45, and a pile of more
     than 12 of one object is not money. A person, and a word such as town or upstairs, is not a
     destination. A repair that is not JSON is asked again with a short example of create, move,

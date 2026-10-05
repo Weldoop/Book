@@ -23,6 +23,16 @@ A stretch of text names one catalog item. The longest name wins, so "pint of lag
 A shared word does not select every item that contains it. "Lager" without a pack is the pint of
 lager. A four-pack is named only when a pack is named. Milk is named when milk is named.
 
+The game master tells the engine the purchase. The same delta carries `inventory.add` of that one
+item and `stat.add` of its price as a negative amount on cash, or on the bank when the card pays.
+The narration does not buy it. The worked example is those two ops. A second item needs its own pair.
+
+### The bag is in the prompt
+
+`Carrying` in ENGINE NOW is the bag from the whole save. A purchase stays on that line after the
+turn has left the last six messages. The contract and the repair both say an item on that line is
+already bought, so a later mention of the receipt is not a new sale.
+
 ### Already carried is not a new sale
 
 If the player already holds at least as many as this sentence asks for, mentioning the item is not

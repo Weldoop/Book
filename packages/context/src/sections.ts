@@ -226,6 +226,7 @@ export function windowSection(state: State, cap: number): Section {
 export function engineNowSection(config: Config, state: State, modules: Module[]): Section {
   const lines = [
     "Factual. This is the save. LAST TURNS may quote an older balance, place, or item. If they disagree, these lines win. Do not narrate a different one.",
+    "Carrying is the bag from the whole save, including purchases from turns that have left LAST TURNS. An item on that line is already bought.",
   ];
   const player = state.entities[config.player_id];
   const locId = player?.location ?? null;
@@ -242,7 +243,7 @@ export function engineNowSection(config: Config, state: State, modules: Module[]
   for (const m of [...modules].sort((a, b) => a.id.localeCompare(b.id))) {
     for (const line of m.truth?.(state, config) ?? []) {
       if (!line.trim()) continue;
-      if (line.startsWith("Carrying:")) carried.push(line);
+      if (line.startsWith("Carrying")) carried.push(line);
       else status.push(line);
     }
   }

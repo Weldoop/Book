@@ -151,6 +151,12 @@ export function threadText(config: Config): string {
   ].join("\n");
 }
 
+function payKey(config: Config): string {
+  const keys = config.stats.filter((stat) => stat.type === "currency").map((stat) => stat.key);
+  if (keys.includes("cash")) return "cash";
+  return keys[0] ?? "money";
+}
+
 function workedExamples(config: Config, modules: Module[]): string {
   const lines = [
     "EXAMPLES",
@@ -159,14 +165,30 @@ function workedExamples(config: Config, modules: Module[]): string {
     '{"op":"entity.fact.add","id":"<person id who witnessed it>","fact":"Heard you promise to bring the mower back by four","importance":2}',
   ];
   if (modules.some((m) => m.ops.includes("inventory.add"))) {
-    const item = config.items.find((i) => i.price !== undefined) ?? config.items[0];
-    lines.push(
-      item
-        ? `{"op":"inventory.add","owner":"${config.player_id}","item":"${item.id}","qty":1}`
-        : `{"op":"inventory.add","owner":"${config.player_id}","item":"<catalog item id>","qty":1}`,
-    );
+    const item = config.items.find((candidate) => candidate.price !== undefined && candidate.price > 0 && !/wallet|purse/.test(candidate.id))
+      ?? config.items.find((candidate) => candidate.price !== undefined)
+      ?? config.items[0];
+    if (item && item.price !== undefined && item.price > 0 && modules.some((m) => m.ops.includes("stat.add"))) {
+      lines.push(`{"op":"inventory.add","owner":"${config.player_id}","item":"${item.id}","qty":1}`);
+      lines.push(`{"op":"stat.add","key":"${payKey(config)}","amount":-${item.price},"reason":"${item.name}"}`);
+    } else {
+      lines.push(
+        item
+          ? `{"op":"inventory.add","owner":"${config.player_id}","item":"${item.id}","qty":1}`
+          : `{"op":"inventory.add","owner":"${config.player_id}","item":"<catalog item id>","qty":1}`,
+      );
+    }
   }
   return lines.join("\n");
+}
+
+function purchaseLines(config: Config, modules: Module[]): string[] {
+  if (!modules.some((m) => m.ops.includes("inventory.add"))) return [];
+  const key = payKey(config);
+  return [
+    `- A purchase is you telling the engine, in that same delta: inventory.add of that one catalog item to "${config.player_id}", and stat.add of its price as a negative amount on "${key}". The narration does not buy it. A second item needs its own pair of ops.`,
+    "- Carrying in ENGINE NOW is the bag from the whole save. It still lists a purchase after that turn has left LAST TURNS. An item on that line is already bought. Leave it unless the player asks for another.",
+  ];
 }
 
 function balanceLine(config: Config): string {
@@ -196,6 +218,7 @@ export function contractText(config: Config, modules: Module[], order: OutputOrd
     ...travelLines(config),
     "- Refuse a trip once, and give the reason. If the player asks to leave again, create the place if it is not on the world sheet and entity.move them. A second refusal is not allowed.",
     "- If the narration buys, orders, eats, drinks, or puts down a catalog item, the same delta must record the inventory change and, for a purchase, the price. Otherwise do not narrate it.",
+    ...purchaseLines(config, modules),
     "- One spoken purchase names one catalog item. A shared word such as pint does not buy every item that contains it.",
     "- Something the player already carries is not bought again. Another, or a count above what they hold, is a new purchase.",
     "- A priced purchase charges a whole number of units, at least one, at the catalog price, and puts the item in the player's hands. Do not take a smaller sum. If they cannot afford one unit, narrate the refusal and leave the money where it is.",
