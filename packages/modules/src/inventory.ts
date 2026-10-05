@@ -88,6 +88,10 @@ export const inventoryModule: Module = {
     return [`Carrying: ${items.length ? items.join(", ") : "nothing"}`];
   },
 
+  truth(state, config) {
+    return this.snapshot(state, config);
+  },
+
   render(state, config) {
     const bag = inventoryOf(state).owners[config.player_id] ?? {};
     const items = Object.entries(bag).map(([id, qty]) => (qty > 1 ? `${itemName(config, id)} x${qty}` : itemName(config, id)));

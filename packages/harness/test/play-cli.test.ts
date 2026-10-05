@@ -57,10 +57,25 @@ describe("runPlay", () => {
     expect(text.indexOf("Fate 3")).toBeLessThan(text.indexOf("You pick the lock"));
   });
 
-  it("marks a turn that stuttered and says what the engine did", async () => {
-    const io = scriptedIO(["one", "two"]);
+  it("keeps a repair out of the story and names it only in the debug view", async () => {
+    const quiet = scriptedIO(["one", "two"]);
     const api = fakeRuntimeApi({ outcomeFor: (t) => (t === 2 ? "repaired" : "ok") });
-    await runPlay({ api, config: makeConfig("light"), store: new MemoryStore(), llm: new MockProvider(), saveId: "p", io });
+    await runPlay({ api, config: makeConfig("light"), store: new MemoryStore(), llm: new MockProvider(), saveId: "p", io: quiet });
+    const quietText = quiet.out.join("");
+    expect(quietText).not.toContain("needed a repair");
+    expect(quietText).toContain("repaired");
+
+    const io = scriptedIO(["one", "two"]);
+    const debugApi = fakeRuntimeApi({ outcomeFor: (t) => (t === 2 ? "repaired" : "ok") });
+    await runPlay({
+      api: debugApi,
+      config: makeConfig("light"),
+      store: new MemoryStore(),
+      llm: new MockProvider(),
+      saveId: "p",
+      io,
+      debug: true,
+    });
     const text = io.out.join("");
     expect(text).toContain("[turn 2 needed a repair: delta_repair]");
     expect(text).not.toContain("turn 1 needed");

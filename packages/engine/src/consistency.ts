@@ -41,7 +41,8 @@ function wordCovers(word: string, dest: string): boolean {
 }
 
 function cleanDestination(raw: string): string {
-  const cut = raw.split(/\b(?:again|and|then|if|but|so|while|when|please)\b/)[0] ?? raw;
+  // "for" and a second "to" are the errand ("the shop for a cob", "the shop to buy milk"), not the place.
+  const cut = raw.split(/\b(?:again|and|then|if|but|so|while|when|please|for)\b|\bto\b/)[0] ?? raw;
   return norm(cut).replace(/^(?:the|a|an)\s+/, "");
 }
 

@@ -174,6 +174,8 @@ export function contractText(config: Config, modules: Module[], order: OutputOrd
     "- Declare every new named person or place with entity.create before any op or focus_next refers to it.",
     "- Use only ids shown in the context. Never invent ops or fields. Item ids come from the world sheet.",
     "- Other people know only what they have seen, heard, or been told. An intention written only in the player's command is invisible to them until the player acts on it or says it.",
+    "- A person's facts are that person's memory. entity.fact.add with importance 1 is a passing or remedial thing and is forgotten after a day, importance 2 lasts about a week, and importance 3 is a fight, a betrayal, or real harm and is kept. Do not record a thought they could not have witnessed.",
+    "- ENGINE NOW is the save. It wins over LAST TURNS and STORY SO FAR when they disagree about money, place, time, or what is being carried. Do not narrate a different balance, place, or inventory.",
     ...travelLines(config),
     "- Refuse a trip once, and give the reason. If the player asks to leave again, create the place if it is not on the world sheet and entity.move them. A second refusal is not allowed.",
     "- If the narration buys, orders, eats, drinks, or puts down a catalog item, the same delta must record the inventory change and, for a purchase, the price. Otherwise do not narrate it.",

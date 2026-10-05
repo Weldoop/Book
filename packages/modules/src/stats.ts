@@ -111,6 +111,17 @@ export const statsModule: Module = {
     return parts.length ? [`Stats: ${parts.join(" | ")}`] : [];
   },
 
+  truth(state, config) {
+    const values = statsOf(state).values;
+    const parts: string[] = [];
+    for (const key of config.presentation.status_line) {
+      const def = statDef(config, key);
+      if (!def || def.hidden) continue;
+      parts.push(`${def.label ?? def.key}: ${formatStat(def, values[def.key] ?? def.start)}`);
+    }
+    return parts.length ? [parts.join(" | ")] : [];
+  },
+
   render(state, config) {
     const values = statsOf(state).values;
     const panel = config.stats

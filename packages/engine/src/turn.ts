@@ -11,6 +11,7 @@ import {
 } from "@book/schema";
 import { consistencyViolations } from "./consistency.ts";
 import { syncPresence } from "./core.ts";
+import { forgetMemories } from "./memory.ts";
 import { processOps } from "./ops.ts";
 import { resolveStatKey } from "./stat-key.ts";
 import { duplicateOpenThread } from "./threads.ts";
@@ -223,6 +224,7 @@ export function applyDraft(state: State, config: Config, modules: Module[], draf
     }
   }
   ageThreads(next, config, ctx.shown_threads ?? [], turn);
+  forgetMemories(next);
 
   const clockBefore = state.clock.now;
   for (const m of modules) {

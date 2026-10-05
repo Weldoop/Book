@@ -43,6 +43,8 @@ describe("buildTurnContext structure", () => {
     expect(contract?.text).toContain("involving minors");
     expect(contract?.text).toContain("single JSON object");
     expect(contract?.text).toContain("Refuse a trip once");
+    expect(contract?.text).toContain("ENGINE NOW is the save");
+    expect(contract?.text).toContain("importance 3 is a fight");
     expect(contract?.text).not.toContain("weigh anchor");
     expect(contract?.text).not.toContain("airlock");
     expect(contract?.text).toContain('"at"');
@@ -99,6 +101,7 @@ describe("buildTurnContext structure", () => {
       "## STORY SO FAR",
       "## RECENT BEATS",
       "## LAST TURNS",
+      "## ENGINE NOW",
       "## PLAYER INPUT",
     ].map((h) => text.indexOf(h));
     expect(order.every((i) => i >= 0)).toBe(true);
@@ -107,6 +110,9 @@ describe("buildTurnContext structure", () => {
     expect(text).toContain("Present: Glenys [glenys]");
     expect(text).toContain("Player: hello\nGM: Hi there.");
     expect(text).toContain("money: 45.00 GBP");
+    expect(text).toContain("Factual. This is the save.");
+    expect(text.indexOf("## ENGINE NOW")).toBeGreaterThan(text.indexOf("## LAST TURNS"));
+    expect(text).toContain("Location: The Flat [flat]");
 
     const bare = build({}, makeState());
     const bareText = bare.messages[0]?.content ?? "";
@@ -114,6 +120,19 @@ describe("buildTurnContext structure", () => {
       expect(bareText).not.toContain(h);
     }
     expect(bare.messages).toHaveLength(1);
+  });
+
+  it("shows a fight in focus and leaves a lapsed memory out", () => {
+    const state = makeState();
+    const glenys = state.entities.glenys;
+    if (!glenys) throw new Error("missing glenys");
+    glenys.facts = [
+      { text: "You shoved her", importance: 3, turn: 1 },
+      { text: "You were short about the bins", importance: 1, turn: 1, expires: "2026-10-01T09:00" },
+    ];
+    const text = build({}, state).messages[0]?.content ?? "";
+    expect(text).toContain("remembers: You shoved her");
+    expect(text).not.toContain("short about the bins");
   });
 
   it("shows only a fate die section when there are no due events", () => {
@@ -195,6 +214,7 @@ describe("buildTurnContext structure", () => {
       "story_so_far",
       "beats",
       "window",
+      "engine_now",
       "input",
     ]);
     expect(ctx.total_tokens).toBe(ctx.parts.reduce((n, p) => n + p.tokens, 0));

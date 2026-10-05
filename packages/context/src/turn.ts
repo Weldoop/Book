@@ -5,6 +5,7 @@ import { buildStaticBlocks } from "./contract.ts";
 import {
   beatsSection,
   dueSection,
+  engineNowSection,
   focusSection,
   inputSection,
   notesSection,
@@ -66,6 +67,7 @@ export function assembleTurn(i: BuildContextInput): TurnAssembly {
     { part: "story_so_far", section: storySection(i.state, budget.story_so_far) },
     { part: "beats", section: beatsSection(i.state, budget.beats) },
     { part: "window", section: windowSection(i.state, budget.window) },
+    { part: "engine_now", section: engineNowSection(i.config, i.state, i.modules) },
     { part: "input", section: inputSection(i.input, i.kind) },
   ];
 

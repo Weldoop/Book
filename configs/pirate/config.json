@@ -30,14 +30,14 @@
       "Violence is cinematic and brief; no gore."
     ],
     "interludes": [
-      "The tide turns. The Game Master hauls the chart back across the table and redraws the last stretch of coast.",
-      "A sudden hush on the wind. The Game Master calls 'Belay that!' and rewinds the glass a few grains.",
-      "The sea shimmers like a mirage and the Game Master steadies the helm, then takes the moment from the top.",
-      "A gull screams, the lantern gutters, and the Game Master quietly corrects the ship's log.",
-      "The horizon folds like old parchment. The Game Master smooths the creases and tries the passage again.",
-      "Thunder somewhere far off. The Game Master rewinds the sand glass and sets the scene afresh."
+      "The tide turns, and the last stretch of coast draws itself again.",
+      "A sudden hush on the wind. The sand glass sits a few grains back.",
+      "The sea shimmers like a mirage, and the moment is taken from the top.",
+      "A gull screams, the lantern gutters, and the ship's log is corrected.",
+      "The horizon folds like old parchment, then lies flat.",
+      "Thunder somewhere far off. The last minute sets itself afresh."
     ],
-    "rollback_note": "The Game Master shakes their head. That course won't hold. Choose another heading, Captain?"
+    "rollback_note": "The wind dies in the sails. That course won't hold. Choose another heading, Captain."
   },
   "presentation": {
     "profile": "tabletop",

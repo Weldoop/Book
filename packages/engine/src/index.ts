@@ -1,4 +1,5 @@
 export * from "./time.ts";
+export * from "./memory.ts";
 export * from "./rng.ts";
 export * from "./core.ts";
 export * from "./ops.ts";

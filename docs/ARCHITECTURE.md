@@ -313,7 +313,7 @@ Layers, from hot to cold:
 | Beats | One line per turn since last compaction | Compacted when a scene closes, or at `scenes.max_beats` |
 | Chapter summaries | ~150-200 tokens each, written by compaction | Older ones merge into story-so-far |
 | Story so far | Rolling summary | Hard cap (~500 tokens) |
-| Entity facts | Short facts per entity with importance and last-touched turn | Cap per entity; consolidated at compaction |
+| Entity facts | A person's memory, or a trait of a place. Importance 1 lapses after a day, 2 after a week, 3 stays | Cap per entity; consolidated at compaction |
 | Threads | Commitments, goals, debts, mysteries, callbacks | Pool unlimited; at most `threads.max_in_context` reach the prompt |
 
 **Callbacks** are first-class: running jokes, favours owed, nicknames, recurring side characters and promises. Compaction must carry them forward as threads or entity facts. This is the main protection against a story that feels flat after summarising.
@@ -431,7 +431,7 @@ save
 Notes:
 - The delta log is cheap and gives replay, rollback and debugging. A heavier event-sourcing system is not needed for the PoC.
 - Saves pin `config_version`. Old saves are never reinterpreted under new rules.
-- Truth vs belief (NPC knowledge) is deferred. In the PoC, entity facts carry an optional `known_by` list; a full knowledge system is added only if playtests show the need.
+- A person's facts are what they remember. Trivial ones lapse; a fight does not. There is no second knowledge store. They still only cover what that person saw, heard, or was told.
 
 ---
 
@@ -881,10 +881,19 @@ engine, and its model-authored status line had already drifted within a single s
     names this book's title and premise. Memory, the ops, and the modules stay the engine's. A new
     mechanic is a module, not a sentence. See ADR 0010.
 
+### Decided after the third Uplands playtest (5 Oct 2026)
+
+46. The save outranks the verbatim window. `ENGINE NOW`, placed after the last six turns, is the
+    status line and what the player is carrying, and the contract says it is factual. A trip stops
+    at the place: "for a cob" and "to buy milk" are not part of the destination. A repair stays in
+    the debug view; the story does not announce it. Warm and cold threads are unchanged. A person's
+    facts are their memory: a passing one lapses after a day, an ordinary one after a week, and a
+    fight does not lapse. See ADR 0011.
+
 ### Build status (5 Oct 2026)
 
 Phase 0 (contracts) and Phase 1 (core build) are implemented, plus the fixes from the live sessions
-and the ADR 0005, 0006, 0007, 0008, 0009 and 0010 changes; 379 tests pass.
+and the ADR 0005, 0006, 0007, 0008, 0009, 0010 and 0011 changes; 384 tests pass.
 
 | Area | State |
 |---|---|
@@ -900,6 +909,7 @@ and the ADR 0005, 0006, 0007, 0008, 0009 and 0010 changes; 379 tests pass.
 | Trip, price and thread checks; archivist state block (ADR 0008) | done; exercised with the mock, not yet against a real model |
 | Stat ids, pirate die bands, voyages, whole-unit prices, week-long skip (ADR 0009) | done; exercised with the mock, not yet against a real model |
 | Travel words and the opening premise come from the book (ADR 0010) | done; exercised with the mock, not yet against a real model |
+| Factual status after the six turns, trip errands, fading NPC memory (ADR 0011) | done; exercised with the mock, not yet against a real model |
 | Real-model benchmark (Phase 2) | three short live sessions played; full golden-session benchmark not yet run |
 | `need` / attention-miss handling, delta-first experiment results | not yet implemented / not yet measured |
 | Nuxt UI, Supabase, hosted trial, wizard | later phases |

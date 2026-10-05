@@ -5,6 +5,11 @@ export const FactSchema = z.object({
   text: z.string(),
   importance: z.union([z.literal(1), z.literal(2), z.literal(3)]).default(2),
   turn: z.number().int().min(0),
+  /**
+   * When a person's memory lapses, as local time. Absent means it stays:
+   * a place, a seeded trait, or a serious memory such as a fight.
+   */
+  expires: LocalDateTimeSchema.optional(),
 });
 export type Fact = z.infer<typeof FactSchema>;
 

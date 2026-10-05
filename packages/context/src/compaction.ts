@@ -1,3 +1,4 @@
+import { memoryExpiry } from "@book/engine";
 import type { Config, Fact, Module, State } from "@book/schema";
 import { orderThreads } from "./attention.ts";
 import { recentBeats } from "./sections.ts";
@@ -184,14 +185,20 @@ export function parseCompactionResult(
   };
 }
 
-function consolidate(existing: Fact[], incoming: CompactionFact[], turn: number): Fact[] {
-  const turnByText = new Map(existing.map((f) => [f.text, f.turn]));
+function consolidate(existing: Fact[], incoming: CompactionFact[], turn: number, now: string, kind: string): Fact[] {
+  const prior = new Map(existing.map((f) => [f.text, f]));
   const seen = new Set<string>();
   const facts: Fact[] = [];
   for (const f of incoming) {
     if (seen.has(f.fact)) continue;
     seen.add(f.fact);
-    facts.push({ text: f.fact, importance: f.importance, turn: turnByText.get(f.fact) ?? turn });
+    const old = prior.get(f.fact);
+    const fact: Fact = { text: f.fact, importance: f.importance, turn: old?.turn ?? turn };
+    if (kind === "person" && f.importance < 3) {
+      const expires = old?.expires ?? memoryExpiry(now, f.importance);
+      if (expires) fact.expires = expires;
+    }
+    facts.push(fact);
   }
   const ranked = facts
     .map((f, index) => ({ f, index }))
@@ -219,7 +226,7 @@ export function applyCompaction(state: State, result: CompactionResult, config: 
   for (const [id, incoming] of byEntity) {
     const entity = state.entities[id];
     if (!entity) continue;
-    entities[id] = { ...entity, facts: consolidate(entity.facts, incoming, state.turn) };
+    entities[id] = { ...entity, facts: consolidate(entity.facts, incoming, state.turn, state.clock.now, entity.type) };
   }
 
   const resolve = new Set(result.resolve_threads);

@@ -1,4 +1,5 @@
-import type { Config, DueItem, Entity, Module, Op, RenderOutput, State, Violation } from "@book/schema";
+import type { Config, DueItem, Entity, Fact, Module, Op, RenderOutput, State, Violation } from "@book/schema";
+import { memoryExpiry } from "./memory.ts";
 import { duplicateOpenThread } from "./threads.ts";
 import { addMinutes, diffMinutes } from "./time.ts";
 
@@ -171,7 +172,12 @@ export const coreModule: Module = {
       case "entity.fact.add": {
         const e = s.entities[op.id];
         if (e) {
-          e.facts.push({ text: op.fact, importance: op.importance, turn });
+          const fact: Fact = { text: op.fact, importance: op.importance, turn };
+          if (e.type === "person" && op.importance < 3) {
+            const expires = memoryExpiry(s.clock.now, op.importance);
+            if (expires) fact.expires = expires;
+          }
+          e.facts.push(fact);
           if (e.facts.length > MAX_FACTS_PER_ENTITY) {
             e.facts.sort((a, b) => b.importance - a.importance || b.turn - a.turn);
             e.facts = e.facts.slice(0, MAX_FACTS_PER_ENTITY);

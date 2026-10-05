@@ -2,7 +2,7 @@ import type { Config, DueItem, Module, State, Violation } from "@book/schema";
 import { mapAttention } from "./attention.ts";
 import { resolveBudget } from "./budget.ts";
 import { describeOps } from "./ops.ts";
-import { focusSection, sceneSection, stateSection } from "./sections.ts";
+import { engineNowSection, focusSection, sceneSection, stateSection } from "./sections.ts";
 import { worldSheetSection } from "./world.ts";
 import { extractJsonObject, tokensOf } from "./text.ts";
 import { assembleTurn, joinSections, sumTokens } from "./turn.ts";
@@ -44,6 +44,7 @@ function deltaRepairSystem(config: Config, modules: Module[]): string {
     "- Use only ids shown in the context. Item ids must be copied from the world sheet. Move the player with entity.move to a place id.",
     "- A purchase, order, meal, or item put down in the narration needs the inventory op and, for a purchase, a negative stat.add of the catalog price.",
     "- A priced purchase is a whole multiple of the catalog price and inventory.add to the player. Never take less than one unit. Stat keys are the ids in STATE, not the labels.",
+    "- ENGINE NOW is the save. Do not change money, place, or what is carried to match an older figure in the narration.",
     `- If the player asked to go somewhere and was not refused, entity.move them to a place that matches. Create the place first when the world sheet has no such place.${localNote}`,
     "- If clock.advance is longer than one scene, replace it with clock.skip (a reason is required) and keep the move.",
     "- Never invent ops or fields.",
@@ -120,6 +121,7 @@ function buildDeltaRepair(i: RepairInput): BuiltContext {
     { part: "scene", section: sceneSection(i.config, i.state) },
     { part: "world_sheet", section: worldSheetSection(i.config, i.state, budget.state_snapshot) },
     { part: "state_snapshot", section: stateSection(i.config, i.state, i.modules, budget.state_snapshot) },
+    { part: "engine_now", section: engineNowSection(i.config, i.state, i.modules) },
     { part: "entities_in_focus", section: focus.section },
     {
       part: "narration",

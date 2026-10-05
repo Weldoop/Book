@@ -223,6 +223,14 @@ describe("stat display", () => {
     const stats = modules.find((m) => m.id === "stats");
     expect(stats?.snapshot(state, config).join(" ")).toBe("Stats: Gold [gold]: 72.00 doubloons");
   });
+
+  it("repeats the status figures and what is carried as engine truth", () => {
+    const { config, modules, state } = testSetup();
+    const stats = modules.find((m) => m.id === "stats");
+    const inventory = modules.find((m) => m.id === "inventory");
+    expect(stats?.truth?.(state, config)).toEqual(["money: £45.00 | health: 100/100"]);
+    expect(inventory?.truth?.(state, config)).toEqual(["Carrying: Phone"]);
+  });
 });
 
 describe("renderView", () => {

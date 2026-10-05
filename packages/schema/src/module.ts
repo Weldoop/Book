@@ -39,6 +39,11 @@ export interface Module {
   due(state: State, config: Config, from: string, to: string, rng: Rng): DueItem[];
   /** Compact text lines for the state snapshot in the context. */
   snapshot(state: State, config: Config): string[];
+  /**
+   * Lines the narration must not contradict: the same figures the player is shown,
+   * plus what they are carrying. Omitted by modules that have nothing of that kind.
+   */
+  truth?(state: State, config: Config): string[];
   /** Deterministic, player-facing output. */
   render(state: State, config: Config): RenderOutput;
   /**

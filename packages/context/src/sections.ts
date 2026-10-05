@@ -1,3 +1,4 @@
+import { diffMinutes, humanTime } from "@book/engine";
 import type { Config, DueItem, Entity, Fact, Module, State } from "@book/schema";
 import { orderThreads, selectThreads } from "./attention.ts";
 import { MAX_BEATS, MAX_FACTS_PER_ENTITY_IN_CONTEXT, WINDOW_TURNS } from "./budget.ts";
@@ -116,11 +117,17 @@ function factOrder(a: Fact, b: Fact): number {
   return b.importance - a.importance || b.turn - a.turn;
 }
 
+/** A person's memory that has already lapsed stays out of the prompt. */
+function liveFacts(entity: Entity, now: string): Fact[] {
+  return entity.facts.filter((fact) => fact.expires === undefined || diffMinutes(now, fact.expires) < 0);
+}
+
 function focusLine(state: State, entry: FocusEntry): string {
   const e = entry.entity;
   const where = e.location ? ` @ ${nameOf(state, e.location)}` : "";
   const aka = e.aliases.length ? `; aka ${e.aliases.join(", ")}` : "";
-  const facts = entry.facts.length ? `: ${entry.facts.map((f) => f.text).join("; ")}` : "";
+  const remembered = entry.facts.map((f) => f.text).join("; ");
+  const facts = remembered ? (e.type === "person" ? ` remembers: ${remembered}` : `: ${remembered}`) : "";
   return `- ${e.name} [${e.id}] (${e.type}${where}${aka})${facts}`;
 }
 
@@ -135,7 +142,7 @@ export function focusSection(
   for (const id of ids) {
     const entity = state.entities[id];
     if (!entity) continue;
-    const sorted = [...entity.facts].sort(factOrder);
+    const sorted = liveFacts(entity, state.clock.now).sort(factOrder);
     if (sorted.length > MAX_FACTS_PER_ENTITY_IN_CONTEXT) trimmed = true;
     entries.push({ entity, facts: sorted.slice(0, MAX_FACTS_PER_ENTITY_IN_CONTEXT) });
   }
@@ -208,6 +215,39 @@ export function windowSection(state: State, cap: number): Section {
     text: renderSection(header, fit.lines),
     trimmed: fit.trimmed || state.window.length > turns.length,
   };
+}
+
+/**
+ * The save, placed after the verbatim turns so a stale line in that window cannot outrank it.
+ * The status figures are the ones the player is shown. Carrying is included because narration
+ * was leaving items behind that the save still held.
+ */
+export function engineNowSection(config: Config, state: State, modules: Module[]): Section {
+  const lines = [
+    "Factual. This is the save. LAST TURNS may quote an older balance, place, or item. If they disagree, these lines win. Do not narrate a different one.",
+  ];
+  const player = state.entities[config.player_id];
+  const locId = player?.location ?? null;
+  const place = locId ? state.entities[locId] : undefined;
+  lines.push(place ? `Location: ${place.name} [${place.id}]` : "Location: unknown");
+
+  const status: string[] = [];
+  for (const key of config.presentation.status_line) {
+    if (key === "turn") status.push(`Turn ${state.turn}`);
+    else if (key === "time") status.push(humanTime(state.clock.now));
+    else if (key === "location" && place) status.push(place.name);
+  }
+  const carried: string[] = [];
+  for (const m of [...modules].sort((a, b) => a.id.localeCompare(b.id))) {
+    for (const line of m.truth?.(state, config) ?? []) {
+      if (!line.trim()) continue;
+      if (line.startsWith("Carrying:")) carried.push(line);
+      else status.push(line);
+    }
+  }
+  if (status.length > 0) lines.push(status.join(" | "));
+  lines.push(...carried);
+  return { text: renderSection("## ENGINE NOW", lines), trimmed: false };
 }
 
 export function inputSection(input: string, kind: "act" | "continue"): Section {

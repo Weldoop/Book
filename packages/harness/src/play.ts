@@ -130,8 +130,10 @@ export async function runPlay(opts: PlayOptions): Promise<void> {
       io.write(dim(`New game "${opts.saveId}": ${opts.config.meta.title}.`) + "\n");
       last = opened;
       present(opened);
-      const stutter = stutterLine(opened);
-      if (stutter) io.write(dim(stutter) + "\n");
+      if (debug) {
+        const stutter = stutterLine(opened);
+        if (stutter) io.write(dim(stutter) + "\n");
+      }
       io.write(dim(`[${usageLine(opened, performance.now() - tOpen)}]`) + "\n");
     } else {
       io.write(dim(`New game "${opts.saveId}": ${opts.config.meta.title}. Type your first action (for example "Start the game").`) + "\n");
@@ -171,8 +173,10 @@ export async function runPlay(opts: PlayOptions): Promise<void> {
         onReleased: (r) => {
           released = true;
           present(r);
-          const early = stutterLine(r);
-          if (early) io.write(dim(early) + "\n");
+          if (debug) {
+            const early = stutterLine(r);
+            if (early) io.write(dim(early) + "\n");
+          }
         },
       });
     } catch (err) {
@@ -187,8 +191,10 @@ export async function runPlay(opts: PlayOptions): Promise<void> {
     last = result;
     if (!released) {
       present(result);
-      const stutter = stutterLine(result);
-      if (stutter) io.write(dim(stutter) + "\n");
+      if (debug) {
+        const stutter = stutterLine(result);
+        if (stutter) io.write(dim(stutter) + "\n");
+      }
     }
     io.write(dim(`[${usageLine(result, performance.now() - t0)}]`) + "\n");
     if (debug) io.write(dim(debugDump(result)) + "\n");

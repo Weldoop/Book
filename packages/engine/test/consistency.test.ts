@@ -215,6 +215,27 @@ describe("travel and place", () => {
     expect(suggestion.violations).toEqual([]);
   });
 
+  it("stops a trip at the place and leaves the errand out of the destination", () => {
+    const shop = validateDraft(
+      fresh(),
+      config(),
+      modules,
+      draft({ narration: "The bell over the door rings." }),
+      "I walk to the corner shop for a sausage and egg cob",
+    );
+    const shopMessage = shop.violations.find((v) => v.code === "arrived_elsewhere")?.message ?? "";
+    expect(shopMessage).toContain('go to "corner shop"');
+    expect(shopMessage).not.toContain("sausage");
+
+    const errand = validateDraft(fresh(), config(), modules, draft({ narration: "You head for the counter." }), "Walk to the shop to buy milk");
+    const errandMessage = errand.violations.find((v) => v.code === "arrived_elsewhere")?.message ?? "";
+    expect(errandMessage).toContain('go to "shop"');
+    expect(errandMessage).not.toContain("milk");
+
+    const pint = validateDraft(fresh(), config(), modules, draft({ narration: "You stay in." }), "Go for a pint");
+    expect(pint.violations.map((v) => v.code)).not.toContain("arrived_elsewhere");
+  });
+
   it("treats a voyage as a trip only when the book lists those words", () => {
     const plain = config();
     const ignored = validateDraft(fresh(), plain, modules, draft({ narration: "The bay stays grey." }), "Sail to the kitchen");
@@ -238,6 +259,15 @@ describe("travel and place", () => {
       "Set a course for the seafront",
     );
     expect(course.violations.map((v) => v.code)).toContain("arrived_elsewhere");
+    const supplies = validateDraft(
+      fresh(),
+      cfg,
+      modules,
+      draft({ narration: "The bay stays grey." }),
+      "Sail for the harbour for water",
+    );
+    expect(supplies.violations.find((v) => v.code === "arrived_elsewhere")?.message ?? "").toContain('go to "harbour"');
+    expect(supplies.violations.find((v) => v.code === "arrived_elsewhere")?.message ?? "").not.toContain("water");
 
     const rail = validateDraft(
       fresh(),

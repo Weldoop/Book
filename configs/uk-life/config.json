@@ -33,14 +33,14 @@
       "The hidden 'jeopardy' stat is how much trouble the law could cause the player. Raise it with stat.add for anything a court would care about: a little for a shove, a lot for a weapon or a real injury. Never mention it."
     ],
     "interludes": [
-      "The room stutters for a heartbeat. The Game Master rewinds a few seconds, tuts quietly, and tidies the moment.",
-      "Reality shifts, the way a bus shelter does when you blink too slowly. The Game Master straightens the last bit and tries again.",
-      "Something isn't quite right. The Game Master slides the scene back like a dodgy drawer and fixes the runners.",
-      "A crackle, a flicker of the strip light, and the Game Master smooths a crease out of the last minute.",
-      "The world pauses, politely, as if waiting for the kettle. The Game Master rewrites the moment before anyone notices.",
-      "Time hiccups. The Game Master rewinds to just before that went sideways and has another go."
+      "The strip light flickers. For a second the room is the way it was a moment ago.",
+      "A bus sighs at the stop outside, and the last few seconds settle back into place.",
+      "The kettle clicks. The moment straightens itself out.",
+      "Someone's phone buzzes in another room, and the last bit of that comes out differently.",
+      "Rain ticks the window. The scene eases back a step.",
+      "The microwave clock blinks. That last bit happens again, a little differently."
     ],
-    "rollback_note": "The Game Master pauses. That didn't quite work out. Try a different approach?"
+    "rollback_note": "Nothing quite lands. The room is as it was. Try that another way."
   },
   "presentation": {
     "profile": "light",
