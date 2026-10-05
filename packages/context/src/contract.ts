@@ -29,7 +29,7 @@ export function outputFormatText(order: OutputOrder, config?: Config): string {
     '- "beat": one line, at most 20 words, summarising what happened.',
     '- "focus_next": optional array of entity ids likely to matter next turn.',
     '- "need": optional array of ids you lack information on.',
-    '- "check": optional {"what": "what was at stake", "stat": "stat id"} - set this ONLY when you resolved the action with the fate die.',
+    '- "check": optional {"what": "what was at stake", "stat": "stat id from STATE"} - set this ONLY when you resolved the action with the fate die. Omit stat if you have no skill to name.',
     '- "scene_ended": optional true - set this ONLY when the scene has just come to a natural close.',
     '- "at": optional place id. Set it to where the narration stops whenever anyone travels.',
   ];
@@ -105,6 +105,7 @@ export function timeText(config: Config): string {
   const lines = [
     "- Elapsed time goes in delta as clock.advance (minutes).",
     `- For a deliberate stretch of sleeping, travelling or waiting, use clock.skip with a reason, up to ${config.time.max_skip_minutes} minutes in one turn.`,
+    "- clock.advance covers one scene. A longer stretch that fits the skip cap is clock.skip, and the move stays in the same delta.",
   ];
   if (config.time.max_skip_minutes === 0) lines.push("- This character does not skip time. Play the hours through.");
   if (config.time.rest_note) lines.push(`- Rest in this world: ${config.time.rest_note}`);
@@ -154,9 +155,12 @@ export function contractText(config: Config, modules: Module[], order: OutputOrd
     "- Use only ids shown in the context. Never invent ops or fields. Item ids come from the world sheet.",
     "- Other people know only what they have seen, heard, or been told. An intention written only in the player's command is invisible to them until the player acts on it or says it.",
     "- If the player goes somewhere, entity.move the player in that same delta. Create a new place with entity.create before the move. A place someone mentions before the player enters it is created in that turn with the tag \"unvisited\".",
+    "- A voyage is a trip: sail, set a course, weigh anchor, make port. A few steps on the same vessel (the rail, the deck, the helm, the hold, the cabin) are not a new place.",
     "- When anyone travels, set \"at\" to the place id where the narration stops.",
     "- Refuse a trip once, and give the reason. If the player asks to leave again, create the place if it is not on the world sheet and entity.move them. A second refusal is not allowed.",
     "- If the narration buys, orders, eats, drinks, or puts down a catalog item, the same delta must record the inventory change and, for a purchase, the price. Otherwise do not narrate it.",
+    "- A priced purchase charges a whole number of units, at least one, at the catalog price, and puts the item in the player's hands. Do not take a smaller sum. If they cannot afford one unit, narrate the refusal and leave the money where it is.",
+    "- Stat keys are the ids in brackets in STATE, not the labels.",
     "- Do not name a person tagged unmet, and do not treat them as present, until they share the player's location.",
     tabletop
       ? "- Stat numbers and rolls may appear in narration (tabletop profile)."

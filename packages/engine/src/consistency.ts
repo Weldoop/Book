@@ -4,6 +4,13 @@ import { playerLocation } from "./core.ts";
 const TRIP =
   /\b(?:walk|head|go|travel|ride|drive|hurry|set off|leave)\b[^.]{0,40}?\b(?:to|towards|toward|into)\s+(?:the\s+|a\s+|an\s+)?([a-z][a-z' -]{2,40})/gi;
 
+/** "for" belongs here only. "go for a pint" and "leave for" are not voyages. */
+const VOYAGE =
+  /\b(?:sail|set a course|weigh anchor|make port|put in)\b[^.]{0,48}?\b(?:to|towards|toward|into|for)\s+(?:the\s+|a\s+|an\s+)?([a-z][a-z' -]{2,40})/gi;
+
+/** A few steps on the vessel the player is already aboard. Not a new place. */
+const ON_BOARD = new Set(["rail", "rails", "deck", "helm", "hold", "cabin", "mast", "wheel", "quay", "gangway", "capstan"]);
+
 const REFUSAL =
   /\b(?:still in|still at|haven't left|have not left|did not leave|didn't leave|not yet|there is no|there's no|you are still|you're still|can wait|hasn't happened|has not happened|you haven't|you have not)\b|\bno \w+ to leave\b/i;
 
@@ -46,14 +53,23 @@ function cleanDestination(raw: string): string {
   return norm(cut).replace(/^(?:the|a|an)\s+/, "");
 }
 
-/** The last place the player asked to go to, if this input is a trip. */
+function isOnBoard(dest: string): boolean {
+  return ON_BOARD.has(norm(dest));
+}
+
+/** The last place the player asked to go to, if this input is a trip or a voyage. */
 export function tripDestination(input: string): string | null {
-  let last: string | null = null;
-  for (const match of input.toLowerCase().matchAll(new RegExp(TRIP.source, "gi"))) {
-    const dest = cleanDestination(match[1] ?? "");
-    if (dest.length >= 3) last = dest;
-  }
-  return last;
+  const hits: { index: number; dest: string }[] = [];
+  const scan = (pattern: RegExp) => {
+    for (const match of input.toLowerCase().matchAll(pattern)) {
+      const dest = cleanDestination(match[1] ?? "");
+      if (dest.length >= 3 && match.index !== undefined) hits.push({ index: match.index, dest });
+    }
+  };
+  scan(new RegExp(TRIP.source, "gi"));
+  scan(new RegExp(VOYAGE.source, "gi"));
+  hits.sort((a, b) => a.index - b.index);
+  return hits.at(-1)?.dest ?? null;
 }
 
 export function isTravelRefusal(narration: string): boolean {
@@ -102,7 +118,7 @@ function checkAt(after: State, config: Config, draft: TurnDraft): Violation[] {
 
 function checkTravel(before: State, after: State, config: Config, draft: TurnDraft, input: string, applied: Op[]): Violation[] {
   const dest = tripDestination(input);
-  if (!dest) return [];
+  if (!dest || isOnBoard(dest)) return [];
   const end = playerLocation(after, config);
   const endEntity = end ? after.entities[end] : undefined;
   const created = new Set<string>();
@@ -214,13 +230,95 @@ function carrying(state: State, playerId: string, itemId: string): boolean {
   return (inv?.owners?.[playerId]?.[itemId] ?? 0) > 0;
 }
 
+function currencyKey(config: Config): string {
+  return config.stats.find((stat) => stat.type === "currency")?.key ?? "money";
+}
+
 function spentMoney(ops: Op[], config: Config): boolean {
-  const key = config.stats.find((stat) => stat.type === "currency")?.key ?? "money";
+  const key = currencyKey(config);
   return ops.some((op) => op.op === "stat.add" && op.key === key && op.amount < 0);
 }
 
-function addedItem(ops: Op[], itemId: string): boolean {
-  return ops.some((op) => op.op === "inventory.add" && op.item === itemId);
+interface Spend {
+  amount: number;
+  reason: string;
+}
+
+function currencySpends(ops: Op[], config: Config): Spend[] {
+  const key = currencyKey(config);
+  const out: Spend[] = [];
+  for (const op of ops) {
+    if (op.op === "stat.add" && op.key === key && op.amount < 0) out.push({ amount: op.amount, reason: op.reason ?? "" });
+  }
+  return out;
+}
+
+function addedQty(ops: Op[], playerId: string, itemId: string): number {
+  let qty = 0;
+  for (const op of ops) {
+    if (op.op === "inventory.add" && op.owner === playerId && op.item === itemId) qty += op.qty;
+  }
+  return qty;
+}
+
+const QTY_WORD: Record<string, number> = {
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12,
+  dozen: 12,
+  twenty: 20,
+  thirty: 30,
+  forty: 40,
+  fifty: 50,
+  sixty: 60,
+  hundred: 100,
+};
+
+/** The last explicit count in the words just before an item. One, when the player did not say. */
+function wantedQty(window: string): number {
+  let qty = 1;
+  const re =
+    /\b(\d+|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|dozen|twenty|thirty|forty|fifty|sixty|hundred)\b/gi;
+  for (const match of window.matchAll(re)) {
+    const raw = match[0].toLowerCase();
+    const n = /^\d+$/.test(raw) ? Number(raw) : QTY_WORD[raw];
+    if (n && n > 0 && n < 10000) qty = n;
+  }
+  return qty;
+}
+
+const ITEM_SKIP = new Set(["of", "the", "and", "for", "with", "from"]);
+
+function itemNamed(text: string, item: { id: string; name: string }): boolean {
+  const hay = norm(text);
+  if (!hay) return false;
+  if (itemPhrases(item).some((phrase) => hay.includes(phrase))) return true;
+  const words = norm(`${item.name} ${item.id.replace(/[_-]/g, " ")}`)
+    .split(" ")
+    .filter((word) => word.length >= 3 && !ITEM_SKIP.has(word));
+  return words.some((word) => hasWord(hay, word));
+}
+
+interface Buy {
+  id: string;
+  name: string;
+  price: number;
+  wanted: number;
+}
+
+function noteBuy(buys: Map<string, Buy>, item: { id: string; name: string; price?: number }, wanted: number): void {
+  if (item.price === undefined || item.price <= 0) return;
+  const row = buys.get(item.id) ?? { id: item.id, name: item.name, price: item.price, wanted: 1 };
+  row.wanted = Math.max(row.wanted, wanted);
+  buys.set(item.id, row);
 }
 
 function removedItem(ops: Op[], playerId: string, itemId: string): boolean {
@@ -230,26 +328,22 @@ function removedItem(ops: Op[], playerId: string, itemId: string): boolean {
 function checkItems(after: State, config: Config, draft: TurnDraft, applied: Op[]): Violation[] {
   if (config.items.length === 0) return [];
   const text = draft.narration.toLowerCase();
-  const byId = new Map<string, { name: string; pay: boolean; release: boolean }>();
+  const byId = new Map<string, { name: string; pay: boolean; release: boolean; wanted: number }>();
   for (const mention of findMentions(draft.narration, config.items)) {
     const window = text.slice(Math.max(0, mention.start - 60), mention.start);
-    const row = byId.get(mention.id) ?? { name: mention.name, pay: false, release: false };
-    row.pay = row.pay || hasVerb(window, PAY);
+    const row = byId.get(mention.id) ?? { name: mention.name, pay: false, release: false, wanted: 1 };
+    const pay = hasVerb(window, PAY);
+    row.pay = row.pay || pay;
     row.release = row.release || hasVerb(window, RELEASE);
+    if (pay) row.wanted = Math.max(row.wanted, wantedQty(window));
     byId.set(mention.id, row);
   }
   const out: Violation[] = [];
+  const buys = new Map<string, Buy>();
+  const player = config.player_id;
   for (const [id, row] of byId) {
-    if (row.pay && (!spentMoney(applied, config) || !addedItem(applied, id))) {
-      out.push(
-        violation(
-          "fixable",
-          "unpaid_item",
-          `The narration buys or orders "${row.name}" (${id}) without both a payment and an inventory.add. Add a negative stat.add for the catalog price and inventory.add of '${id}', or do not narrate the purchase.`,
-        ),
-      );
-    }
-    if (row.release && carrying(after, config.player_id, id) && !removedItem(applied, config.player_id, id)) {
+    const item = config.items.find((candidate) => candidate.id === id);
+    if (row.release && carrying(after, player, id) && !removedItem(applied, player, id)) {
       out.push(
         violation(
           "fixable",
@@ -258,6 +352,56 @@ function checkItems(after: State, config: Config, draft: TurnDraft, applied: Op[
         ),
       );
     }
+    if (!row.pay || !item) continue;
+    if (item.price === undefined || item.price <= 0) {
+      if (!spentMoney(applied, config) || addedQty(applied, player, id) < 1) {
+        out.push(
+          violation(
+            "fixable",
+            "unpaid_item",
+            `The narration buys or orders "${row.name}" (${id}) without both a payment and an inventory.add to the player. Add a negative stat.add and inventory.add of '${id}' with owner '${player}', or do not narrate the purchase.`,
+          ),
+        );
+      }
+      continue;
+    }
+    noteBuy(buys, item, row.wanted);
+  }
+  for (const spend of currencySpends(applied, config)) {
+    for (const item of config.items) {
+      if (itemNamed(spend.reason, item)) noteBuy(buys, item, 1);
+    }
+  }
+  if (buys.size === 0) return out;
+  const spends = currencySpends(applied, config);
+  const totalSpent = spends.reduce((sum, spend) => sum + -spend.amount, 0);
+  let due = 0;
+  const missing: Buy[] = [];
+  for (const buy of buys.values()) {
+    const added = addedQty(applied, player, buy.id);
+    due += buy.price * Math.max(buy.wanted, added, 1);
+    if (added < 1) missing.push(buy);
+  }
+  const short = totalSpent + 0.001 < due;
+  if (totalSpent > 0 && short) {
+    const names = [...buys.values()].map((buy) => `${buy.name} (${buy.id}, ${buy.price} each)`).join(", ");
+    out.push(
+      violation(
+        "fixable",
+        "underpaid_item",
+        `Spent ${totalSpent} on ${names}, which is not a whole number of catalog units (due ${due}). Charge a whole multiple of the price with stat.add and inventory.add to '${player}', or remove the spend and narrate that they cannot afford it.`,
+      ),
+    );
+    return out;
+  }
+  for (const buy of missing) {
+    out.push(
+      violation(
+        "fixable",
+        "unpaid_item",
+        `The narration buys or orders "${buy.name}" (${buy.id}) without both a payment and an inventory.add to the player. Add a negative stat.add of the catalog price (${buy.price}) and inventory.add of '${buy.id}' with owner '${player}', or do not narrate the purchase.`,
+      ),
+    );
   }
   return out;
 }

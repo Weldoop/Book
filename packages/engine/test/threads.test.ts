@@ -60,7 +60,11 @@ describe("clock.skip", () => {
     const night = { op: "clock.skip", minutes: 540, reason: "slept until morning" };
     const advance = { op: "clock.advance", minutes: 540 };
     expect(processOps(stateWith([]), config, modules, [night]).violations).toEqual([]);
-    expect(processOps(stateWith([]), config, modules, [advance]).violations[0]?.code).toBe("time_jump");
+    const jumped = processOps(stateWith([]), config, modules, [advance]).violations[0];
+    expect(jumped).toMatchObject({ code: "time_jump", severity: "fixable" });
+    expect(jumped?.message).toContain("clock.skip");
+    const month = processOps(stateWith([]), config, modules, [{ op: "clock.advance", minutes: 2000 }]).violations[0];
+    expect(month).toMatchObject({ code: "time_jump", severity: "game_breaking" });
   });
 });
 

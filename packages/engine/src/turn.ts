@@ -12,6 +12,7 @@ import {
 import { consistencyViolations } from "./consistency.ts";
 import { syncPresence } from "./core.ts";
 import { processOps } from "./ops.ts";
+import { resolveStatKey } from "./stat-key.ts";
 import { duplicateOpenThread } from "./threads.ts";
 import { rngFor } from "./rng.ts";
 import { addMinutes, diffMinutes } from "./time.ts";
@@ -79,6 +80,25 @@ export function severityOf(violations: Violation[]): "none" | "fixable" | "game_
   return violations.some((v) => v.severity === "game_breaking") ? "game_breaking" : "fixable";
 }
 
+/** Maps a label written in check.stat onto the real id. An unknown name is fixable. */
+function checkStat(config: Config, draft: TurnDraft): Violation[] {
+  const stat = draft.check?.stat;
+  if (!stat) return [];
+  const key = resolveStatKey(config, stat);
+  if (!key) {
+    const known = config.stats.map((s) => s.key).join(", ");
+    return [
+      {
+        severity: "fixable",
+        code: "unknown_stat",
+        message: `check.stat '${stat}' is not a stat. Omit it, or use one of: ${known}.`,
+      },
+    ];
+  }
+  if (key !== stat && draft.check) draft.check.stat = key;
+  return [];
+}
+
 export function validateDraft(
   state: State,
   config: Config,
@@ -92,7 +112,7 @@ export function validateDraft(
   if (words > config.gm_style.max_words * 2) {
     warnings.push(`narration has ${words} words (limit ${config.gm_style.max_words})`);
   }
-  const violations = [...processed.violations];
+  const violations = [...processed.violations, ...checkStat(config, draft)];
   if (processed.violations.length === 0) {
     violations.push(...consistencyViolations(state, processed.state, config, draft, input, processed.applied));
   }

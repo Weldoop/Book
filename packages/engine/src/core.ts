@@ -44,12 +44,16 @@ export const coreModule: Module = {
     switch (op.op) {
       case "clock.advance":
         if (op.minutes > config.time.max_per_turn) {
+          const cap = config.time.max_skip_minutes;
+          const asSkip = cap > 0 && op.minutes <= cap;
           out.push(
             bad(
               "time_jump",
-              `Op ${index}: clock.advance of ${op.minutes} minutes exceeds the per-turn limit of ${config.time.max_per_turn}.`,
+              asSkip
+                ? `Op ${index}: clock.advance of ${op.minutes} minutes is longer than one scene (${config.time.max_per_turn}). Use clock.skip with a reason instead, at most ${cap} minutes, and keep the move.`
+                : `Op ${index}: clock.advance of ${op.minutes} minutes exceeds the per-turn limit of ${config.time.max_per_turn}.`,
               index,
-              "game_breaking",
+              asSkip ? "fixable" : "game_breaking",
             ),
           );
         }

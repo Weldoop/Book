@@ -862,10 +862,21 @@ engine, and its model-authored status line had already drifted within a single s
     inventory and money ops. A new thread that repeats an open one is dropped. The archivist sees
     engine state and must not copy a live balance or an unused nickname. See ADR 0008.
 
-### Build status (4 Oct 2026)
+### Decided after the pirate playtest (5 Oct 2026)
 
-Phase 0 (contracts) and Phase 1 (core build) are implemented, plus the fixes from the first two live
-sessions and the ADR 0005, 0006, 0007 and 0008 changes; 369 tests pass.
+44. A stat op accepts the id or the label, ignoring case, spaces, and hyphens, and stores the id.
+    The state block shows that id beside the label. An unknown `check.stat` is fixable. Pirate does
+    not ask for a skill. Its d20 bands are percentages (`5, 25, 50, 75, 90`); Uplands is unchanged.
+    A voyage is a trip, and a step to the rail or the deck is not. A priced purchase is a whole
+    number of catalog units added to the player; a smaller sum is fixable. `clock.advance` past one
+    scene but inside the skip cap is fixable and should be `clock.skip`. Pirate may skip a week.
+    A word currency is written after the number. A turn that starts under the cost cap may finish
+    its repair calls; the next turn stops. The validator still does not invent the op. See ADR 0009.
+
+### Build status (5 Oct 2026)
+
+Phase 0 (contracts) and Phase 1 (core build) are implemented, plus the fixes from the live sessions
+and the ADR 0005, 0006, 0007, 0008 and 0009 changes; 378 tests pass.
 
 | Area | State |
 |---|---|
@@ -879,7 +890,8 @@ sessions and the ADR 0005, 0006, 0007 and 0008 changes; 369 tests pass.
 | Scene-aware compaction and the GM's private notes | done; the mock never closes a scene or writes a note, so both need a real model |
 | World sheet, dealt opening, catalog item ids, release-before-archivist (ADR 0007) | done; opening is exercised with the mock, not yet against a real model |
 | Trip, price and thread checks; archivist state block (ADR 0008) | done; exercised with the mock, not yet against a real model |
-| Real-model benchmark (Phase 2) | two short live sessions played; full golden-session benchmark not yet run |
+| Stat ids, pirate die bands, voyages, whole-unit prices, week-long skip (ADR 0009) | done; exercised with the mock, not yet against a real model |
+| Real-model benchmark (Phase 2) | three short live sessions played; full golden-session benchmark not yet run |
 | `need` / attention-miss handling, delta-first experiment results | not yet implemented / not yet measured |
 | Nuxt UI, Supabase, hosted trial, wizard | later phases |
 

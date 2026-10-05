@@ -1,4 +1,5 @@
 import type { Config, LLMUsage, Store, LLMProvider } from "@book/schema";
+import { BudgetExceededError } from "@book/llm";
 import type { RuntimeApi, TurnResultLike } from "./runtime-api.ts";
 
 export interface PlayIO {
@@ -175,6 +176,11 @@ export async function runPlay(opts: PlayOptions): Promise<void> {
         },
       });
     } catch (err) {
+      if (err instanceof BudgetExceededError) {
+        const stop = opts.stopCheck?.() ?? err.message;
+        io.write(dim(`Stopping: ${stop}. Your save is intact; raise the cap and resume with the same --save.`) + "\n");
+        break;
+      }
       io.write(`\nError: ${err instanceof Error ? err.message : String(err)}\n`);
       break;
     }

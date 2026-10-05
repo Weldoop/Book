@@ -139,7 +139,8 @@ describe.each(configNames)("config %s", (name) => {
     expect(dice.labels).toHaveLength(dice.thresholds.length + 1);
     const sorted = [...dice.thresholds].sort((a, b) => a - b);
     expect(dice.thresholds).toEqual(sorted);
-    expect(Math.max(...dice.thresholds)).toBeLessThan(dice.sides);
+    expect(Math.max(...dice.thresholds)).toBeLessThan(100);
+    expect(Math.min(...dice.thresholds)).toBeGreaterThan(0);
   });
 
   it("has enough interludes and a rollback note", () => {
@@ -181,7 +182,14 @@ describe("pirate specifics", () => {
     expect(config.modules).toEqual(["stats", "inventory", "relationships", "events", "dice"]);
     expect(config.presentation.profile).toBe("tabletop");
     expect(config.meta.content_rating).toBe("clean");
-    expect(config.dice?.sides).toBe(20);
+    expect(config.dice).toMatchObject({
+      sides: 20,
+      thresholds: [5, 25, 50, 75, 90],
+      visible: true,
+      stat_modifier: false,
+    });
+    expect(config.time.max_per_turn).toBe(1440);
+    expect(config.time.max_skip_minutes).toBe(10080);
     expect(config.offscreen?.enabled ?? false).toBe(false);
     expect(config.opening).toEqual({});
     const keys = config.stats.map((s) => s.key);

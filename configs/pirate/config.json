@@ -57,7 +57,7 @@
     "start": "1717-05-01T06:00",
     "min_per_action": 5,
     "max_per_turn": 1440,
-    "max_skip_minutes": 2880,
+    "max_skip_minutes": 10080,
     "rest_note": "Watches are four hours; a night's sleep aboard is broken and rarely more than six hours."
   },
   "stats": [
@@ -385,11 +385,11 @@
   "dice": {
     "sides": 20,
     "thresholds": [
-      2,
-      6,
-      11,
-      16,
-      19
+      5,
+      25,
+      50,
+      75,
+      90
     ],
     "labels": [
       "Catastrophe",
@@ -400,7 +400,7 @@
       "Legendary"
     ],
     "visible": true,
-    "stat_modifier": true
+    "stat_modifier": false
   },
   "opening": {},
   "seed": {

@@ -25,12 +25,20 @@ export class BudgetExceededError extends Error {
 
 export type BudgetedProvider = LLMProvider & { spent(): { tokens: number; cost_usd: number } };
 
+/**
+ * Calls that finish a turn which already started under the cap: repair, compaction, the off-screen
+ * pass. Stopping those mid-turn throws the narration away. The next player turn still stops.
+ */
+const TURN_CONTINUATION = new Set(["delta_repair", "rewrite_repair", "format_repair", "compaction", "offscreen"]);
+
 export function withBudget(provider: LLMProvider, caps: BudgetCaps): BudgetedProvider {
   let tokens = 0;
   let cost = 0;
   const spent = (): { tokens: number; cost_usd: number } => ({ tokens, cost_usd: cost });
 
-  const check = (estimatedInput: number): void => {
+  const check = (req: LLMRequest): void => {
+    if (TURN_CONTINUATION.has(req.purpose)) return;
+    const estimatedInput = estimateInput(req);
     const { maxTotalTokens, maxCostUsd } = caps;
     if (maxTotalTokens !== undefined && tokens + estimatedInput > maxTotalTokens) {
       throw new BudgetExceededError("tokens", maxTotalTokens, spent());
@@ -48,7 +56,7 @@ export function withBudget(provider: LLMProvider, caps: BudgetCaps): BudgetedPro
     name: provider.name,
     spent,
     async complete(req: LLMRequest): Promise<LLMResponse> {
-      check(estimateInput(req));
+      check(req);
       const res = await provider.complete(req);
       tokens += res.usage.input_tokens + res.usage.output_tokens;
       cost += res.usage.cost_usd;

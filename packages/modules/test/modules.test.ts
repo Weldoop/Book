@@ -1,6 +1,6 @@
 import { applyDraft, collectDue, processOps, rollFate, validateDraft } from "@book/engine";
 import { describe, expect, it } from "vitest";
-import { getActiveModules, renderView, statsOf, inventoryOf, relationshipValue, eventsOf } from "../src/index.ts";
+import { fateLabel, formatStat, getActiveModules, renderView, statsOf, inventoryOf, relationshipValue, eventsOf } from "../src/index.ts";
 import { testConfig, testSetup } from "./helpers.ts";
 
 const draft = (delta: unknown[], extra: Record<string, unknown> = {}) => ({
@@ -82,8 +82,17 @@ describe("op validation", () => {
 
   it("rejects time jumps beyond the per-turn limit", () => {
     const { config, modules, state } = testSetup();
-    const res = validateDraft(state, config, modules, draft([{ op: "clock.advance", minutes: 300 }, { op: "clock.advance", minutes: 300 }]) as never);
-    expect(res.violations.some((v) => v.code === "time_jump" && v.severity === "game_breaking")).toBe(true);
+    const withinSkip = validateDraft(
+      state,
+      config,
+      modules,
+      draft([{ op: "clock.advance", minutes: 300 }, { op: "clock.advance", minutes: 300 }]) as never,
+    );
+    const hop = withinSkip.violations.find((v) => v.code === "time_jump");
+    expect(hop).toMatchObject({ severity: "fixable" });
+    expect(hop?.message).toContain("clock.skip");
+    const overSkip = validateDraft(state, config, modules, draft([{ op: "clock.advance", minutes: 2000 }]) as never);
+    expect(overSkip.violations.some((v) => v.code === "time_jump" && v.severity === "game_breaking")).toBe(true);
   });
 
   it("rejects ops from inactive modules as fixable", () => {
@@ -174,11 +183,45 @@ describe("fate die", () => {
     expect(a).toBeLessThanOrEqual(100);
   });
 
+  it("spreads a d20 from catastrophe to legendary", () => {
+    const config = testConfig({
+      dice: {
+        sides: 20,
+        thresholds: [5, 25, 50, 75, 90],
+        labels: ["Catastrophe", "Failure", "Setback", "Success", "Strong success", "Legendary"],
+      },
+    });
+    expect(fateLabel(config, 1)).toBe("Catastrophe");
+    expect(fateLabel(config, 4)).toBe("Failure");
+    expect(fateLabel(config, 11)).toBe("Success");
+    expect(fateLabel(config, 19)).toBe("Legendary");
+    expect(fateLabel(config, 20)).toBe("Legendary");
+  });
+
   it("is absent when the dice module config is missing", () => {
     const config = testConfig();
     const { dice: _dice, ...rest } = config;
     const { state } = testSetup();
     expect(rollFate(state, rest as never)).toBeUndefined();
+  });
+});
+
+describe("stat display", () => {
+  it("writes a word currency after the number and keeps pounds as a symbol", () => {
+    const gold = { key: "gold", type: "currency" as const, start: 72, display: "doubloons", hidden: false };
+    const pounds = { key: "money", type: "currency" as const, start: 45, display: "GBP", hidden: false };
+    const symbol = { key: "money", type: "currency" as const, start: 45, display: "£", hidden: false };
+    expect(formatStat(gold, 72)).toBe("72.00 doubloons");
+    expect(formatStat(pounds, 45)).toBe("£45.00");
+    expect(formatStat(symbol, 45)).toBe("£45.00");
+  });
+
+  it("shows the id beside the label in the state snapshot", () => {
+    const { config, modules, state } = testSetup({
+      stats: [{ key: "gold", label: "Gold", type: "currency", start: 72, display: "doubloons" }],
+    });
+    const stats = modules.find((m) => m.id === "stats");
+    expect(stats?.snapshot(state, config).join(" ")).toBe("Stats: Gold [gold]: 72.00 doubloons");
   });
 });
 

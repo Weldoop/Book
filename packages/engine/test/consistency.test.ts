@@ -18,6 +18,7 @@ function config(): Config {
       { id: "oat-milk", name: "Carton of oat milk", price: 1.75 },
       { id: "sausage-egg-cob", name: "Sausage and egg cob", price: 4.2 },
       { id: "business-textbook", name: "Business textbook", price: 28 },
+      { id: "rum-cask", name: "Cask of rum", price: 12 },
     ],
     seed: {
       entities: [
@@ -214,6 +215,29 @@ describe("travel and place", () => {
     expect(suggestion.violations).toEqual([]);
   });
 
+  it("treats a voyage as a trip and a step to the rail as the same deck", () => {
+    const cfg = config();
+    const sail = validateDraft(fresh(), cfg, modules, draft({ narration: "The bay stays grey." }), "Sail to the kitchen");
+    expect(sail.violations.map((v) => v.code)).toContain("arrived_elsewhere");
+    const course = validateDraft(
+      fresh(),
+      cfg,
+      modules,
+      draft({ narration: "The bay stays grey." }),
+      "Set a course for the seafront",
+    );
+    expect(course.violations.map((v) => v.code)).toContain("arrived_elsewhere");
+
+    const rail = validateDraft(
+      fresh(),
+      cfg,
+      modules,
+      draft({ narration: "You watch the wake and do not change course." }),
+      "I go to the rail and watch the wake. I do not change course.",
+    );
+    expect(rail.violations).toEqual([]);
+  });
+
   it("checks at only when the draft sets it", () => {
     const cfg = config();
     const wrong = validateDraft(fresh(), cfg, modules, draft({ at: "kitchen" }), "Look around");
@@ -281,6 +305,53 @@ describe("catalog items", () => {
     expect(
       validateDraft(state, cfg, modules, draft({ narration: "You can't buy a pint with what you have." }), "Look").violations,
     ).toEqual([]);
+  });
+
+  it("rejects a partial payment that does not put the item in the player's hands", () => {
+    const cfg = config();
+    const short = validateDraft(
+      fresh(),
+      cfg,
+      modules,
+      draft({
+        narration: "You buy forty casks of rum and slap down what you have.",
+        delta: [{ op: "stat.add", key: "money", amount: -6, reason: "attempted rum purchase with insufficient funds" }],
+      }),
+      "Buy forty casks of rum",
+    );
+    expect(short.violations.map((v) => v.code)).toEqual(["underpaid_item"]);
+    expect(short.violations[0]?.message).toContain("rum-cask");
+    expect(short.violations[0]?.message).toContain("due 480");
+
+    const paid = validateDraft(
+      fresh(),
+      cfg,
+      modules,
+      draft({
+        narration: "You buy a cask of rum.",
+        delta: [
+          { op: "stat.add", key: "money", amount: -12, reason: "rum" },
+          { op: "inventory.add", owner: "player", item: "rum-cask", qty: 1 },
+        ],
+      }),
+      "Buy a cask of rum",
+    );
+    expect(paid.violations).toEqual([]);
+
+    const elsewhere = validateDraft(
+      fresh(),
+      cfg,
+      modules,
+      draft({
+        narration: "You buy a cask of rum.",
+        delta: [
+          { op: "stat.add", key: "money", amount: -12, reason: "rum" },
+          { op: "inventory.add", owner: "grace", item: "rum-cask", qty: 1 },
+        ],
+      }),
+      "Buy a cask of rum",
+    );
+    expect(elsewhere.violations.map((v) => v.code)).toEqual(["unpaid_item"]);
   });
 });
 

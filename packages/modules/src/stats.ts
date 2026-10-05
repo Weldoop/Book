@@ -21,11 +21,19 @@ export function floorOf(def: StatDef): number | undefined {
 
 export function formatStat(def: StatDef, value: number): string {
   if (def.type === "currency") {
-    const symbol = def.display === "GBP" ? "£" : (def.display ?? "");
-    return `${symbol}${value.toFixed(2)}`;
+    const display = def.display ?? "";
+    if (display === "GBP" || display === "£") return `£${value.toFixed(2)}`;
+    if (display === "" || !/[A-Za-z]/.test(display)) return `${display}${value.toFixed(2)}`;
+    return `${value.toFixed(2)} ${display}`;
   }
   if (def.type === "bounded" && def.max !== undefined) return `${Math.round(value)}/${def.max}`;
   return String(Math.round(value * 100) / 100);
+}
+
+/** The label the model sees, with the id beside it when the two differ. */
+function shownStat(def: StatDef): string {
+  const label = def.label ?? def.key;
+  return label === def.key ? label : `${label} [${def.key}]`;
 }
 
 function clamp(def: StatDef, value: number): number {
@@ -91,7 +99,7 @@ export const statsModule: Module = {
   },
 
   promptFragment: () =>
-    "STATS: The engine owns all numbers. Spend or gain with stat.add (negative amount to spend, include a short reason). Never state a stat value that is not in STATE. A currency stat can never go below zero: if the player cannot afford something, narrate that they cannot.",
+    "STATS: The engine owns all numbers. Spend or gain with stat.add (negative amount to spend, include a short reason). The key is the id in brackets in STATE, never the label. Never state a stat value that is not in STATE. A currency stat can never go below zero: if the player cannot afford one unit, narrate that they cannot and do not take a smaller sum.",
 
   focus: () => [],
 
@@ -99,7 +107,7 @@ export const statsModule: Module = {
 
   snapshot(state, config) {
     const values = statsOf(state).values;
-    const parts = config.stats.map((def) => `${def.label ?? def.key}: ${formatStat(def, values[def.key] ?? def.start)}`);
+    const parts = config.stats.map((def) => `${shownStat(def)}: ${formatStat(def, values[def.key] ?? def.start)}`);
     return parts.length ? [`Stats: ${parts.join(" | ")}`] : [];
   },
 

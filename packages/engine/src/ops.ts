@@ -1,4 +1,5 @@
 import { OpSchema, type Config, type Module, type Op, type State, type Violation } from "@book/schema";
+import { resolveStatKey } from "./stat-key.ts";
 
 export interface ProcessedOps {
   state: State;
@@ -13,6 +14,15 @@ function ownerOf(modules: Module[], op: Op): Module | undefined {
   return modules.find((m) => m.ops.includes(op.op));
 }
 
+/** "Gold" never reaches the stats module: the id schema rejects it first. Map it here. */
+function canonicalizeRaw(config: Config, raw: unknown): unknown {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return raw;
+  const row = raw as Record<string, unknown>;
+  if ((row.op !== "stat.add" && row.op !== "stat.set") || typeof row.key !== "string") return raw;
+  const key = resolveStatKey(config, row.key);
+  return key ? { ...row, key } : raw;
+}
+
 /**
  * Validates and applies ops in order, so later ops see the effects of earlier ones
  * (for example `entity.create` followed by `entity.fact.add`). Ops that produce violations are not applied.
@@ -25,7 +35,7 @@ export function processOps(state: State, config: Config, modules: Module[], rawO
   let skipped = 0;
 
   rawOps.forEach((raw, index) => {
-    const parsed = OpSchema.safeParse(raw);
+    const parsed = OpSchema.safeParse(canonicalizeRaw(config, raw));
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
       const name = typeof raw === "object" && raw !== null && "op" in raw ? String((raw as { op: unknown }).op) : "?";
@@ -60,10 +70,14 @@ export function processOps(state: State, config: Config, modules: Module[], rawO
   });
 
   if (minutes > config.time.max_per_turn) {
+    const cap = config.time.max_skip_minutes;
+    const asSkip = cap > 0 && minutes <= cap;
     violations.push({
-      severity: "game_breaking",
+      severity: asSkip ? "fixable" : "game_breaking",
       code: "time_jump",
-      message: `Total time advanced this turn (${minutes} minutes) exceeds the limit of ${config.time.max_per_turn} minutes. Shorten the scene or end it earlier.`,
+      message: asSkip
+        ? `Total time advanced this turn (${minutes} minutes) is longer than one scene (${config.time.max_per_turn} minutes). Use clock.skip with a reason instead, at most ${cap} minutes, and keep the move.`
+        : `Total time advanced this turn (${minutes} minutes) exceeds the limit of ${config.time.max_per_turn} minutes. Shorten the scene or end it earlier.`,
     });
   }
 

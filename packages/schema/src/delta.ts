@@ -51,10 +51,14 @@ export type OpName = Op["op"];
 
 export const OP_NAMES: OpName[] = OpSchema.options.map((o) => o.shape.op.value);
 
-/** Set by the GM when it resolved a risky action with the supplied fate die. */
+/**
+ * Set by the GM when it resolved a risky action with the supplied fate die.
+ * `stat` is loose on purpose: the model often writes a label ("Crew morale").
+ * The engine maps that to the real id, and rejects one that matches nothing.
+ */
 export const CheckSchema = z.object({
   what: z.string().min(1),
-  stat: IdSchema.optional(),
+  stat: z.string().min(1).max(80).optional(),
 });
 export type Check = z.infer<typeof CheckSchema>;
 
@@ -64,7 +68,8 @@ export const TurnDraftSchema = z.object({
   beat: z.string().min(1),
   focus_next: z.array(IdSchema).optional(),
   need: z.array(IdSchema).optional(),
-  check: CheckSchema.optional(),
+  /** `null` is treated as omitted. Some models emit it when they did not roll. */
+  check: CheckSchema.nullish(),
   /** Set only when the scene has come to a natural close, which is when memory may compact. */
   scene_ended: z.boolean().optional(),
   /**
