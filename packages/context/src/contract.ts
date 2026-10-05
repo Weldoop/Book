@@ -79,6 +79,26 @@ const HARSHNESS: Record<string, string> = {
     "- Consequences are heavy. Mistakes cost money, standing, health or a relationship outright, and they stick.",
 };
 
+/** Travel sentences from this book's own words. A book with no journeys and no local steps adds none. */
+export function travelLines(config: Config): string[] {
+  const lines = [
+    "- If the player goes somewhere, entity.move the player in that same delta. Create a new place with entity.create before the move. A place someone mentions before the player enters it is created in that turn with the tag \"unvisited\".",
+  ];
+  const journeys = config.travel.journeys;
+  const local = config.travel.local;
+  if (journeys.length > 0) {
+    const sample = journeys[0] ?? "leave";
+    lines.push(
+      `- In this book these also count as a trip: ${journeys.join(", ")}. With these, "for" counts as well ("${sample} for").`,
+    );
+  }
+  if (local.length > 0) {
+    lines.push(`- These are a few steps inside the current place, not a new place: ${local.join(", ")}.`);
+  }
+  lines.push("- When anyone travels, set \"at\" to the place id where the narration stops.");
+  return lines;
+}
+
 export function fateText(config: Config): string {
   const lines = [
     "- When a risky or uncertain action needs a result, use the supplied FATE DIE value instead of inventing the outcome. You decide whether an action is risky enough to need it; routine actions just succeed.",
@@ -154,9 +174,7 @@ export function contractText(config: Config, modules: Module[], order: OutputOrd
     "- Declare every new named person or place with entity.create before any op or focus_next refers to it.",
     "- Use only ids shown in the context. Never invent ops or fields. Item ids come from the world sheet.",
     "- Other people know only what they have seen, heard, or been told. An intention written only in the player's command is invisible to them until the player acts on it or says it.",
-    "- If the player goes somewhere, entity.move the player in that same delta. Create a new place with entity.create before the move. A place someone mentions before the player enters it is created in that turn with the tag \"unvisited\".",
-    "- A voyage is a trip: sail, set a course, weigh anchor, make port. A few steps on the same vessel (the rail, the deck, the helm, the hold, the cabin) are not a new place.",
-    "- When anyone travels, set \"at\" to the place id where the narration stops.",
+    ...travelLines(config),
     "- Refuse a trip once, and give the reason. If the player asks to leave again, create the place if it is not on the world sheet and entity.move them. A second refusal is not allowed.",
     "- If the narration buys, orders, eats, drinks, or puts down a catalog item, the same delta must record the inventory change and, for a purchase, the price. Otherwise do not narrate it.",
     "- A priced purchase charges a whole number of units, at least one, at the catalog price, and puts the item in the player's hands. Do not take a smaller sum. If they cannot afford one unit, narrate the refusal and leave the money where it is.",

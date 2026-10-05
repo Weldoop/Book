@@ -32,7 +32,9 @@ const REJECTED_DRAFT_CAP = 1000;
 const NARRATION_CAP = 600;
 const DELTA_FOCUS_LIMIT = 6;
 
-function deltaRepairSystem(modules: Module[]): string {
+function deltaRepairSystem(config: Config, modules: Module[]): string {
+  const local = config.travel.local;
+  const localNote = local.length > 0 ? ` A step to ${local.join(", ")} is not a new place.` : "";
   return [
     "You repair the bookkeeping of one story turn. Code owns the truth; you never write state, you propose `delta` ops.",
     "RULES",
@@ -42,7 +44,7 @@ function deltaRepairSystem(modules: Module[]): string {
     "- Use only ids shown in the context. Item ids must be copied from the world sheet. Move the player with entity.move to a place id.",
     "- A purchase, order, meal, or item put down in the narration needs the inventory op and, for a purchase, a negative stat.add of the catalog price.",
     "- A priced purchase is a whole multiple of the catalog price and inventory.add to the player. Never take less than one unit. Stat keys are the ids in STATE, not the labels.",
-    "- If the player asked to go somewhere and was not refused, entity.move them to a place that matches. Create the place first when the world sheet has no such place. The rail, deck, helm, hold and cabin are not a new place.",
+    `- If the player asked to go somewhere and was not refused, entity.move them to a place that matches. Create the place first when the world sheet has no such place.${localNote}`,
     "- If clock.advance is longer than one scene, replace it with clock.skip (a reason is required) and keep the move.",
     "- Never invent ops or fields.",
     "OPS",
@@ -132,7 +134,7 @@ function buildDeltaRepair(i: RepairInput): BuiltContext {
     },
     { part: "input", section: { text: `## PLAYER INPUT\n${i.input}`, trimmed: false } },
   ];
-  const system = deltaRepairSystem(i.modules);
+  const system = deltaRepairSystem(i.config, i.modules);
   const parts: ContextPart[] = [
     { name: "contract", tokens: tokensOf(system), trimmed: false },
     ...sections.map(({ part, section }) => ({

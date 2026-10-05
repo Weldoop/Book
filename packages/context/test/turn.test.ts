@@ -43,11 +43,27 @@ describe("buildTurnContext structure", () => {
     expect(contract?.text).toContain("involving minors");
     expect(contract?.text).toContain("single JSON object");
     expect(contract?.text).toContain("Refuse a trip once");
+    expect(contract?.text).not.toContain("weigh anchor");
+    expect(contract?.text).not.toContain("airlock");
     expect(contract?.text).toContain('"at"');
     expect(contract?.text).toContain("stat.add{");
     expect(contract?.text).toContain("inventory.remove{");
     expect(frags?.text).toContain("STATS: money is in GBP");
     expect(frags?.text).toContain("INVENTORY:");
+  });
+
+  it("seeds travel words and the premise from the book", () => {
+    const space = makeConfig({
+      meta: { title: "Drift", tone: "cold", premise: "A hauler between the moons." },
+      travel: { journeys: ["jump", "set a course"], local: ["airlock", "bridge"] },
+    });
+    const text =
+      buildTurnContext({ config: space, state: makeState(), modules, input: "look", kind: "act", due: [] }).system[0]?.text ??
+      "";
+    expect(text).toContain("A hauler between the moons.");
+    expect(text).toContain("jump, set a course");
+    expect(text).toContain("airlock, bridge");
+    expect(text).not.toContain("weigh anchor");
   });
 
   it("states the numbers rule differently for tabletop and varies content-rating text", () => {

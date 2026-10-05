@@ -873,10 +873,18 @@ engine, and its model-authored status line had already drifted within a single s
     A word currency is written after the number. A turn that starts under the cost cap may finish
     its repair calls; the next turn stops. The validator still does not invent the op. See ADR 0009.
 
+### Decided with the universal book (5 Oct 2026)
+
+45. The engine and the game master are the same for every book. The book seeds them. `config.travel`
+    names ordinary trips, this world's journeys, and the steps that stay inside the current place.
+    Those lists are empty of ships, deserts and airlocks until the book fills them. The opening
+    names this book's title and premise. Memory, the ops, and the modules stay the engine's. A new
+    mechanic is a module, not a sentence. See ADR 0010.
+
 ### Build status (5 Oct 2026)
 
 Phase 0 (contracts) and Phase 1 (core build) are implemented, plus the fixes from the live sessions
-and the ADR 0005, 0006, 0007, 0008 and 0009 changes; 378 tests pass.
+and the ADR 0005, 0006, 0007, 0008, 0009 and 0010 changes; 379 tests pass.
 
 | Area | State |
 |---|---|
@@ -891,6 +899,7 @@ and the ADR 0005, 0006, 0007, 0008 and 0009 changes; 378 tests pass.
 | World sheet, dealt opening, catalog item ids, release-before-archivist (ADR 0007) | done; opening is exercised with the mock, not yet against a real model |
 | Trip, price and thread checks; archivist state block (ADR 0008) | done; exercised with the mock, not yet against a real model |
 | Stat ids, pirate die bands, voyages, whole-unit prices, week-long skip (ADR 0009) | done; exercised with the mock, not yet against a real model |
+| Travel words and the opening premise come from the book (ADR 0010) | done; exercised with the mock, not yet against a real model |
 | Real-model benchmark (Phase 2) | three short live sessions played; full golden-session benchmark not yet run |
 | `need` / attention-miss handling, delta-first experiment results | not yet implemented / not yet measured |
 | Nuxt UI, Supabase, hosted trial, wizard | later phases |

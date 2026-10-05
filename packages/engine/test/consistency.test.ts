@@ -215,8 +215,19 @@ describe("travel and place", () => {
     expect(suggestion.violations).toEqual([]);
   });
 
-  it("treats a voyage as a trip and a step to the rail as the same deck", () => {
-    const cfg = config();
+  it("treats a voyage as a trip only when the book lists those words", () => {
+    const plain = config();
+    const ignored = validateDraft(fresh(), plain, modules, draft({ narration: "The bay stays grey." }), "Sail to the kitchen");
+    expect(ignored.violations).toEqual([]);
+
+    const cfg: Config = {
+      ...plain,
+      travel: {
+        ...plain.travel,
+        journeys: ["sail", "set a course", "weigh anchor", "make port"],
+        local: ["rail", "deck", "helm", "hold", "cabin"],
+      },
+    };
     const sail = validateDraft(fresh(), cfg, modules, draft({ narration: "The bay stays grey." }), "Sail to the kitchen");
     expect(sail.violations.map((v) => v.code)).toContain("arrived_elsewhere");
     const course = validateDraft(
@@ -236,6 +247,15 @@ describe("travel and place", () => {
       "I go to the rail and watch the wake. I do not change course.",
     );
     expect(rail.violations).toEqual([]);
+
+    const stepped = validateDraft(
+      fresh(),
+      plain,
+      modules,
+      draft({ narration: "You watch the wake and do not change course." }),
+      "I go to the rail and watch the wake.",
+    );
+    expect(stepped.violations.map((v) => v.code)).toContain("arrived_elsewhere");
   });
 
   it("checks at only when the draft sets it", () => {

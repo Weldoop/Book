@@ -190,6 +190,8 @@ describe("pirate specifics", () => {
     });
     expect(config.time.max_per_turn).toBe(1440);
     expect(config.time.max_skip_minutes).toBe(10080);
+    expect(config.travel.journeys).toEqual(expect.arrayContaining(["sail", "set a course", "weigh anchor"]));
+    expect(config.travel.local).toEqual(expect.arrayContaining(["rail", "deck", "hold"]));
     expect(config.offscreen?.enabled ?? false).toBe(false);
     expect(config.opening).toEqual({});
     const keys = config.stats.map((s) => s.key);

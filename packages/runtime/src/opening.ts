@@ -122,7 +122,8 @@ export async function openBook(rt: Runtime, saveId: string): Promise<TurnResult 
 
 function openingInstruction(config: Config): string {
   return [
-    "The book opens. This is the first chapter of a longer life, not the whole story.",
+    `The book opens. This is the first chapter of ${config.meta.title}, not the whole story.`,
+    config.meta.premise ? `The book is this: ${config.meta.premise}` : "",
     "Deal 3 or 4 adults who already belong to this world. Create each with entity.create before anything refers to them.",
     'Tag a person "unmet" when they are not in the player\'s current room. Do not name an unmet person in the narration, and do not treat them as present.',
     'If someone mentions a place the player has not entered, entity.create it in this same delta with the tag "unvisited".',

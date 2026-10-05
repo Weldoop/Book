@@ -216,6 +216,23 @@ export const PresentationSchema = z.object({
 });
 export type Presentation = z.infer<typeof PresentationSchema>;
 
+/** Ordinary ways of going somewhere. A book replaces this when its people move differently. */
+export const DEFAULT_TRAVEL_MEANS = ["walk", "head", "go", "travel", "ride", "drive", "hurry", "set off", "leave"] as const;
+
+/**
+ * How this book talks about going somewhere. The engine detects these words. It does not
+ * know ships, deserts or airlocks until the book lists them.
+ */
+export const TravelConfigSchema = z.object({
+  /** Verbs for a trip. "for" does not count, so "go for a pint" is not travel. */
+  means: z.array(z.string().min(2).max(48)).max(24).default([...DEFAULT_TRAVEL_MEANS]),
+  /** Longer journeys. These also allow "for", as in "set a course for" or "jump for". */
+  journeys: z.array(z.string().min(2).max(48)).max(24).default([]),
+  /** A few steps inside the current place. Not a new destination. */
+  local: z.array(z.string().min(2).max(48)).max(32).default([]),
+});
+export type TravelConfig = z.infer<typeof TravelConfigSchema>;
+
 export const TimeConfigSchema = z.object({
   start: LocalDateTimeSchema,
   min_per_action: z.number().int().min(0).default(1),
@@ -252,6 +269,8 @@ export const ConfigSchema = z
     gm_style: GmStyleSchema,
     presentation: PresentationSchema,
     time: TimeConfigSchema,
+    /** Words this book uses for travel. Defaults are ordinary walking. Journeys and local steps are empty until the book names them. */
+    travel: TravelConfigSchema.default({}),
     threads: ThreadsConfigSchema.default({}),
     scenes: ScenesConfigSchema.default({}),
     notes: NotesConfigSchema.default({}),

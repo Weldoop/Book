@@ -60,6 +60,10 @@
     "max_skip_minutes": 10080,
     "rest_note": "Watches are four hours; a night's sleep aboard is broken and rarely more than six hours."
   },
+  "travel": {
+    "journeys": ["sail", "set a course", "weigh anchor", "make port", "put in"],
+    "local": ["rail", "rails", "deck", "helm", "hold", "cabin", "mast", "wheel", "quay", "gangway", "capstan"]
+  },
   "stats": [
     {
       "key": "gold",

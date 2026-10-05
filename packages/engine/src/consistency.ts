@@ -1,15 +1,7 @@
 import type { Config, Op, State, TurnDraft, Violation } from "@book/schema";
 import { playerLocation } from "./core.ts";
 
-const TRIP =
-  /\b(?:walk|head|go|travel|ride|drive|hurry|set off|leave)\b[^.]{0,40}?\b(?:to|towards|toward|into)\s+(?:the\s+|a\s+|an\s+)?([a-z][a-z' -]{2,40})/gi;
-
-/** "for" belongs here only. "go for a pint" and "leave for" are not voyages. */
-const VOYAGE =
-  /\b(?:sail|set a course|weigh anchor|make port|put in)\b[^.]{0,48}?\b(?:to|towards|toward|into|for)\s+(?:the\s+|a\s+|an\s+)?([a-z][a-z' -]{2,40})/gi;
-
-/** A few steps on the vessel the player is already aboard. Not a new place. */
-const ON_BOARD = new Set(["rail", "rails", "deck", "helm", "hold", "cabin", "mast", "wheel", "quay", "gangway", "capstan"]);
+const DEST = String.raw`(?:the\s+|a\s+|an\s+)?([a-z][a-z' -]{2,40})`;
 
 const REFUSAL =
   /\b(?:still in|still at|haven't left|have not left|did not leave|didn't leave|not yet|there is no|there's no|you are still|you're still|can wait|hasn't happened|has not happened|you haven't|you have not)\b|\bno \w+ to leave\b/i;
@@ -53,21 +45,33 @@ function cleanDestination(raw: string): string {
   return norm(cut).replace(/^(?:the|a|an)\s+/, "");
 }
 
-function isOnBoard(dest: string): boolean {
-  return ON_BOARD.has(norm(dest));
+function isLocalStep(dest: string, local: string[]): boolean {
+  const needle = norm(dest);
+  return local.some((step) => norm(step) === needle);
 }
 
-/** The last place the player asked to go to, if this input is a trip or a voyage. */
-export function tripDestination(input: string): string | null {
+/** Longer phrases first, so "set a course" wins over "set". Words come from the book, so they are escaped. */
+function verbPattern(verbs: string[], prepositions: string, span: number): RegExp | null {
+  const list = verbs.map((verb) => verb.trim().toLowerCase()).filter((verb) => verb.length >= 2);
+  list.sort((a, b) => b.length - a.length);
+  if (list.length === 0) return null;
+  const body = list.map(escapeRegExp).join("|");
+  return new RegExp(`\\b(?:${body})\\b[^.]{0,${span}}?\\b(?:${prepositions})\\s+${DEST}`, "gi");
+}
+
+/** The last place the player asked to go to, using this book's travel words. */
+export function tripDestination(input: string, config: Config): string | null {
   const hits: { index: number; dest: string }[] = [];
-  const scan = (pattern: RegExp) => {
+  const scan = (pattern: RegExp | null) => {
+    if (!pattern) return;
     for (const match of input.toLowerCase().matchAll(pattern)) {
       const dest = cleanDestination(match[1] ?? "");
       if (dest.length >= 3 && match.index !== undefined) hits.push({ index: match.index, dest });
     }
   };
-  scan(new RegExp(TRIP.source, "gi"));
-  scan(new RegExp(VOYAGE.source, "gi"));
+  const travel = config.travel;
+  scan(verbPattern(travel.means, "to|towards|toward|into", 40));
+  scan(verbPattern(travel.journeys, "to|towards|toward|into|for", 48));
   hits.sort((a, b) => a.index - b.index);
   return hits.at(-1)?.dest ?? null;
 }
@@ -117,8 +121,8 @@ function checkAt(after: State, config: Config, draft: TurnDraft): Violation[] {
 }
 
 function checkTravel(before: State, after: State, config: Config, draft: TurnDraft, input: string, applied: Op[]): Violation[] {
-  const dest = tripDestination(input);
-  if (!dest || isOnBoard(dest)) return [];
+  const dest = tripDestination(input, config);
+  if (!dest || isLocalStep(dest, config.travel.local)) return [];
   const end = playerLocation(after, config);
   const endEntity = end ? after.entities[end] : undefined;
   const created = new Set<string>();
@@ -129,7 +133,7 @@ function checkTravel(before: State, after: State, config: Config, draft: TurnDra
   if (end && created.has(end)) return [];
   if (isTravelRefusal(draft.narration)) {
     const prev = before.window.at(-1);
-    if (prev && tripDestination(prev.input) && isTravelRefusal(prev.narration)) {
+    if (prev && tripDestination(prev.input, config) && isTravelRefusal(prev.narration)) {
       return [
         violation(
           "game_breaking",
