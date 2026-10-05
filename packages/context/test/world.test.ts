@@ -19,7 +19,8 @@ describe("world sheet", () => {
       buildTurnContext({ config, state, modules: [], input: "look around", kind: "act", due: [] }).messages[0]?.content ??
       "";
     expect(text).toContain("## WORLD SHEET");
-    expect(text).toContain("- garden-gloves: Garden gloves, £4");
+    expect(text).toContain("Gear is kept.");
+    expect(text).toContain("- garden-gloves: Garden gloves, good, £4");
     expect(text).toContain("cafe: Corner Cafe (not yet visited)");
     expect(text).toContain("do not name them");
     expect(text).toContain("- glenys: Glenys");

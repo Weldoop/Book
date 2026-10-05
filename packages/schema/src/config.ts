@@ -25,6 +25,8 @@ export const ItemDefSchema = z.object({
   id: IdSchema,
   name: z.string(),
   price: z.number().optional(),
+  /** Gear the player keeps. A scene good leaves this unset. */
+  keeps: z.boolean().optional(),
 });
 export type ItemDef = z.infer<typeof ItemDefSchema>;
 

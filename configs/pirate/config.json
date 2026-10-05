@@ -121,22 +121,26 @@
     {
       "id": "cutlass",
       "name": "Cutlass",
-      "price": 15
+      "price": 15,
+      "keeps": true
     },
     {
       "id": "flintlock-pistol",
       "name": "Flintlock pistol",
-      "price": 25
+      "price": 25,
+      "keeps": true
     },
     {
       "id": "spyglass",
       "name": "Brass spyglass",
-      "price": 30
+      "price": 30,
+      "keeps": true
     },
     {
       "id": "sea-chart",
       "name": "Sea chart of the Windward Passage",
-      "price": 40
+      "price": 40,
+      "keeps": true
     },
     {
       "id": "ship-biscuit",
@@ -166,7 +170,8 @@
     {
       "id": "letter-of-marque",
       "name": "Forged letter of marque",
-      "price": 60
+      "price": 60,
+      "keeps": true
     },
     {
       "id": "powder-keg",

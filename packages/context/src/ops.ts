@@ -55,6 +55,12 @@ export const OP_FIELDS: Record<OpName, readonly Field[]> = {
     ["value", "num"],
     ["reason", "str", true],
   ],
+  "item.create": [
+    ["id", "id"],
+    ["name", "str"],
+    ["price", "num", true],
+    ["keeps", "bool", true],
+  ],
   "inventory.add": [
     ["owner", "id"],
     ["item", "item"],

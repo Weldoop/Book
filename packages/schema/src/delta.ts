@@ -49,6 +49,14 @@ export const OpSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("stat.add"), key: IdSchema, amount: z.number(), reason: z.string().optional() }),
   z.object({ op: z.literal("stat.set"), key: IdSchema, value: z.number(), reason: z.string().optional() }),
   // inventory
+  z.object({
+    op: z.literal("item.create"),
+    id: IdSchema,
+    name: z.string().min(1),
+    price: z.number().nonnegative().optional(),
+    /** True when this is gear the player keeps. Omit it for a scene good. */
+    keeps: z.boolean().optional(),
+  }),
   z.object({ op: z.literal("inventory.add"), owner: IdSchema, item: IdSchema, qty: z.number().int().min(1).default(1) }),
   z.object({ op: z.literal("inventory.remove"), owner: IdSchema, item: IdSchema, qty: z.number().int().min(1).default(1) }),
   // relationships

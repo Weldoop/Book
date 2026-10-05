@@ -1,3 +1,4 @@
+import { catalogItems } from "@book/engine";
 import type { Config, State } from "@book/schema";
 import { fitLines, renderSection } from "./text.ts";
 import type { Section } from "./sections.ts";
@@ -17,9 +18,10 @@ function moneyPrefix(config: Config): string {
  */
 export function worldSheetSection(config: Config, state: State, cap: number): Section {
   const mark = moneyPrefix(config);
-  const items = config.items.map((item) => {
+  const itemLines = catalogItems(config, state).map((item) => {
+    const kind = item.keeps ? "gear" : "good";
     const price = item.price !== undefined ? `, ${mark}${item.price}` : "";
-    return `- ${item.id}: ${item.name}${price}`;
+    return `- ${item.id}: ${item.name}, ${kind}${price}`;
   });
   const here = state.entities[config.player_id]?.location ?? null;
   const places = Object.values(state.entities)
@@ -44,7 +46,9 @@ export function worldSheetSection(config: Config, state: State, cap: number): Se
     .map((e) => `- ${e.id}: ${e.name}${e.location ? ` @ ${state.entities[e.location]?.name ?? e.location}` : ""}`);
 
   const lines = [
-    ...items,
+    ...(itemLines.length
+      ? ["Gear is kept. A good is used in the scene. Anything not listed is narration unless this turn creates it.", ...itemLines]
+      : []),
     ...(unmet.length
       ? ["Unmet people (do not name them until they share the player's location):", ...unmet]
       : []),

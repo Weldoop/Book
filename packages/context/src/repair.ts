@@ -43,6 +43,9 @@ function deltaRepairSystem(config: Config, modules: Module[]): string {
     "- Declare every new named person or place with entity.create before any op refers to it.",
     "- Use only ids shown in the context. Item ids must be copied from the world sheet. Move the player with entity.move to a place id.",
     "- A purchase of one catalog item is inventory.add of that item and one negative stat.add of its price. A second item needs its own pair.",
+    modules.some((m) => m.ops.includes("item.create"))
+      ? "- Gear and goods are on the world sheet. A bag, a receipt, or an envelope is narration. A new thing the save must remember is item.create in this delta, then inventory.add. A good that is finished is inventory.remove in this same delta."
+      : "",
     "- A priced purchase is a whole multiple of the catalog price and inventory.add to the player. Never take less than one unit. Stat keys are the ids in STATE, not the labels.",
     "- ENGINE NOW is the save. Carrying there is already owned, including turns that have left the chat. Do not inventory.add or charge an item that line already lists. Do not change money, place, or what is carried to match an older figure in the narration.",
     `- If the player asked to go somewhere and was not refused, entity.move them to a place that matches. Create the place first when the world sheet has no such place.${localNote}`,
@@ -51,7 +54,9 @@ function deltaRepairSystem(config: Config, modules: Module[]): string {
     "OPS",
     describeOps(modules),
     'Return ONLY a JSON object {"delta":[...],"beat":"...","at":"<place id, when the scene stops in a place>"} that corrects the rejected ops. Do not change the narration.',
-  ].join("\n");
+  ]
+    .filter((line) => line.length > 0)
+    .join("\n");
 }
 
 /** Shown again when a repair reply is not JSON. The engine still does not invent the ops. */

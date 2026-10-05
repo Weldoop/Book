@@ -38,6 +38,7 @@ describe("buildTurnContext structure", () => {
     expect(contract?.text).toContain("second person");
     expect(contract?.text).toContain("End on a small hook.");
     expect(contract?.text).toContain("inventory.add of that one catalog item");
+    expect(contract?.text).toContain("A bag, a receipt, or an envelope is narration.");
     expect(contract?.text).toContain("An item on that line is already bought.");
     expect(contract?.text).toContain("Never decide the player's");
     expect(contract?.text).toContain("Tone: grounded, dry");

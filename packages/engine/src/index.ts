@@ -6,3 +6,4 @@ export * from "./ops.ts";
 export * from "./stat-key.ts";
 export * from "./state.ts";
 export * from "./turn.ts";
+export * from "./catalog.ts";

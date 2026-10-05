@@ -951,10 +951,19 @@ engine, and its model-authored status line had already drifted within a single s
     and where the scene stops. A weekday in a thread has to be that weekday, and a matter resolved
     in the last 48 story hours stays closed. A number inside a thread is not the balance. See ADR 0016.
 
+### Decided with gear, goods, and narration (5 Oct 2026)
+
+52. The world sheet marks each catalog item as gear (`keeps`) or a good before the turn. The game
+    master copies the id. A thing the save must remember that is not on the sheet is `item.create`
+    in that turn, then `inventory.add`, and `stat.add` of the price when it is sold. A good that is
+    finished in the scene is `inventory.remove` in that same turn. A bag, a receipt, or an envelope
+    has no operation, so it stays narration. The engine does not classify an object from the prose.
+    Money stays on the currency stats. See ADR 0017.
+
 ### Build status (5 Oct 2026)
 
 Phase 0 (contracts) and Phase 1 (core build) are implemented, plus the fixes from the live sessions
-and the ADR 0005, 0006, 0007, 0008, 0009, 0010, 0011, 0012, 0013, 0014, 0015 and 0016 changes; 405 tests pass.
+and the ADR 0005, 0006, 0007, 0008, 0009, 0010, 0011, 0012, 0013, 0014, 0015, 0016 and 0017 changes; 409 tests pass.
 
 | Area | State |
 |---|---|
@@ -976,6 +985,7 @@ and the ADR 0005, 0006, 0007, 0008, 0009, 0010, 0011, 0012, 0013, 0014, 0015 and
 | Warm means recently dealt with (ADR 0014) | done; exercised with the mock, not yet against a real model |
 | Witnessed facts, and ordinary sentences that stay in the room (ADR 0015) | done; exercised with the mock, not yet against a real model |
 | One purchase, cash and bank, places, repair format, weekday threads (ADR 0016) | done; exercised with the mock, not yet against a real model |
+| Gear, goods, and narration (ADR 0017) | done; exercised with the mock, not yet against a real model |
 | Real-model benchmark (Phase 2) | three short live sessions played; full golden-session benchmark not yet run |
 | `need` / attention-miss handling, delta-first experiment results | not yet implemented / not yet measured |
 | Nuxt UI, Supabase, hosted trial, wizard | later phases |

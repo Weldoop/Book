@@ -118,35 +118,42 @@
   "items": [
     {
       "id": "phone",
-      "name": "Phone (cracked corner)"
+      "name": "Phone (cracked corner)",
+      "keeps": true
     },
     {
       "id": "rucksack",
-      "name": "Rucksack"
+      "name": "Rucksack",
+      "keeps": true
     },
     {
       "id": "wallet",
       "name": "Wallet",
-      "price": 12
+      "price": 12,
+      "keeps": true
     },
     {
       "id": "driving-licence",
-      "name": "Provisional driving licence"
+      "name": "Provisional driving licence",
+      "keeps": true
     },
     {
       "id": "business-textbook",
       "name": "Business textbook",
-      "price": 28
+      "price": 28,
+      "keeps": true
     },
     {
       "id": "garden-gloves",
       "name": "Garden gloves",
-      "price": 4
+      "price": 4,
+      "keeps": true
     },
     {
       "id": "shears",
       "name": "Garden shears",
-      "price": 9
+      "price": 9,
+      "keeps": true
     },
     {
       "id": "bin-bags",

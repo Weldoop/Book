@@ -58,6 +58,75 @@ describe("op validation", () => {
     expect(res.violations[0]).toMatchObject({ severity: "game_breaking", code: "item_not_owned" });
   });
 
+  it("creates gear the save must remember and refuses a second copy", () => {
+    const { config, modules, state } = testSetup();
+    const next = applyDraft(
+      state,
+      config,
+      modules,
+      draft([
+        { op: "item.create", id: "strimmer", name: "Petrol strimmer", keeps: true, price: 40 },
+        { op: "inventory.add", owner: "player", item: "strimmer", qty: 1 },
+        { op: "stat.add", key: "money", amount: -40, reason: "Petrol strimmer" },
+      ]) as never,
+      { input: "buy a strimmer", due: [] },
+    );
+    expect(inventoryOf(next).owners.player?.strimmer).toBe(1);
+    expect(inventoryOf(next).catalog).toEqual([{ id: "strimmer", name: "Petrol strimmer", price: 40, keeps: true }]);
+    const again = validateDraft(next, config, modules, draft([{ op: "inventory.add", owner: "player", item: "strimmer", qty: 1 }]) as never);
+    expect(again.violations[0]?.code).toBe("gear_owned");
+  });
+
+  it("refuses to create an id the sheet already has", () => {
+    const { config, modules, state } = testSetup();
+    const res = validateDraft(state, config, modules, draft([{ op: "item.create", id: "cob", name: "Cob" }]) as never);
+    expect(res.violations[0]).toMatchObject({ severity: "fixable", code: "item_exists" });
+  });
+
+  it("buys a scene good and finishes it in the same turn", () => {
+    const { config, modules, state } = testSetup();
+    const next = applyDraft(
+      state,
+      config,
+      modules,
+      draft(
+        [
+          { op: "item.create", id: "pint", name: "Pint of lager", price: 4.5 },
+          { op: "inventory.add", owner: "player", item: "pint", qty: 1 },
+          { op: "inventory.remove", owner: "player", item: "pint", qty: 1 },
+          { op: "stat.add", key: "money", amount: -4.5, reason: "Pint of lager" },
+        ],
+        { narration: "You buy a pint of lager and drink it." },
+      ) as never,
+      { input: "buy a pint and drink it", due: [] },
+    );
+    expect(inventoryOf(next).owners.player?.pint).toBeUndefined();
+    expect(inventoryOf(next).catalog).toEqual([{ id: "pint", name: "Pint of lager", price: 4.5 }]);
+    expect(statsOf(next).values.money).toBe(40.5);
+    const another = applyDraft(
+      next,
+      config,
+      modules,
+      draft([
+        { op: "inventory.add", owner: "player", item: "pint", qty: 1 },
+        { op: "stat.add", key: "money", amount: -4.5, reason: "Pint of lager" },
+      ]) as never,
+      { input: "another pint", due: [] },
+    );
+    expect(inventoryOf(another).owners.player?.pint).toBe(1);
+  });
+
+  it("leaves a carrier bag in the narration", () => {
+    const { config, modules, state } = testSetup();
+    const res = validateDraft(state, config, modules, {
+      narration: "You hold the carrier bag and the receipt.",
+      delta: [],
+      beat: "A bag.",
+    } as never);
+    expect(res.violations).toEqual([]);
+    expect(inventoryOf(state).catalog ?? []).toEqual([]);
+  });
+
   it("rejects an item id that is not in the catalog", () => {
     const { config, modules, state } = testSetup();
     const res = validateDraft(state, config, modules, draft([{ op: "inventory.add", owner: "player", item: "sword" }]) as never);

@@ -1,4 +1,5 @@
 import type { Config, Op, State, TurnDraft, Violation } from "@book/schema";
+import { catalogItems } from "./catalog.ts";
 import { playerLocation } from "./core.ts";
 
 const DEST = String.raw`(?:the\s+|a\s+|an\s+)?([a-z][a-z' -]{2,40})`;
@@ -448,10 +449,11 @@ function alreadyOwned(name: string, id: string, held: number): Violation {
 }
 
 function checkItems(before: State, after: State, config: Config, draft: TurnDraft, applied: Op[]): Violation[] {
-  if (config.items.length === 0) return [];
+  const catalog = catalogItems(config, after);
+  if (catalog.length === 0) return [];
   const text = draft.narration.toLowerCase();
   const byId = new Map<string, { name: string; pay: boolean; release: boolean; wanted: number; again: boolean }>();
-  for (const mention of findMentions(draft.narration, config.items)) {
+  for (const mention of findMentions(draft.narration, catalog)) {
     const window = text.slice(Math.max(0, mention.start - 60), mention.start);
     const row = byId.get(mention.id) ?? { name: mention.name, pay: false, release: false, wanted: 1, again: false };
     const following = text.slice(mention.end, mention.end + 48);
@@ -468,7 +470,7 @@ function checkItems(before: State, after: State, config: Config, draft: TurnDraf
   const owned = new Set<string>();
   const player = config.player_id;
   for (const [id, row] of byId) {
-    const item = config.items.find((candidate) => candidate.id === id);
+    const item = catalog.find((candidate) => candidate.id === id);
     if (row.release && carrying(after, player, id) && !removedItem(applied, player, id)) {
       out.push(
         violation(
@@ -503,7 +505,7 @@ function checkItems(before: State, after: State, config: Config, draft: TurnDraf
     noteBuy(buys, item, row.wanted);
   }
   for (const spend of currencySpends(applied, config)) {
-    for (const item of itemsInText(spend.reason, config.items)) {
+    for (const item of itemsInText(spend.reason, catalog)) {
       if (item.price === undefined || item.price <= 0) continue;
       const held = heldQty(before, player, item.id);
       if (held >= 1 && !ANOTHER.test(spend.reason)) {

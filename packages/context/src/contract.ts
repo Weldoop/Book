@@ -171,6 +171,7 @@ function workedExamples(config: Config, modules: Module[]): string {
     if (item && item.price !== undefined && item.price > 0 && modules.some((m) => m.ops.includes("stat.add"))) {
       lines.push(`{"op":"inventory.add","owner":"${config.player_id}","item":"${item.id}","qty":1}`);
       lines.push(`{"op":"stat.add","key":"${payKey(config)}","amount":-${item.price},"reason":"${item.name}"}`);
+      lines.push('{"op":"item.create","id":"new-item","name":"Something the save must remember","keeps":true}');
     } else {
       lines.push(
         item
@@ -186,6 +187,10 @@ function purchaseLines(config: Config, modules: Module[]): string[] {
   if (!modules.some((m) => m.ops.includes("inventory.add"))) return [];
   const key = payKey(config);
   return [
+    "- The world sheet marks gear, which the player keeps, and goods, which the scene uses. Copy the id from that sheet.",
+    "- A bag, a receipt, or an envelope is narration. Do not create it and do not add it.",
+    "- A thing the save must remember that is not on the sheet is item.create in this turn, with keeps true for gear and a price when it is sold, then inventory.add. The next turn it is on the sheet.",
+    "- A good that is eaten, drunk, or handed over is inventory.remove in that same turn. Gear stays until it is actually lost.",
     `- A purchase is you telling the engine, in that same delta: inventory.add of that one catalog item to "${config.player_id}", and stat.add of its price as a negative amount on "${key}". The narration does not buy it. A second item needs its own pair of ops.`,
     "- Carrying in ENGINE NOW is the bag from the whole save. It still lists a purchase after that turn has left LAST TURNS. An item on that line is already bought. Leave it unless the player asks for another.",
   ];

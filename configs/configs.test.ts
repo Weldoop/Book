@@ -162,6 +162,8 @@ describe("uk-life specifics", () => {
     });
     expect(config.opening).toEqual({});
     expect(config.stats.find((s) => s.key === "cash")?.start).toBe(15);
+    expect(config.items.find((item) => item.id === "phone")?.keeps).toBe(true);
+    expect(config.items.find((item) => item.id === "pint")?.keeps).toBeUndefined();
     expect(config.stats.find((s) => s.key === "bank")?.start).toBe(30);
     expect(config.dice).toMatchObject({ sides: 100, thresholds: [10, 25, 50, 75, 90] });
     expect(config.offscreen).toMatchObject({ enabled: true, min_skip_hours: 6, max_entities: 4, max_tokens: 600 });
