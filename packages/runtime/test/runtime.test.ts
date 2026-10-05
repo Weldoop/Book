@@ -42,7 +42,8 @@ describe("playTurn", () => {
     const res = await playTurn(rt, "s1", "Look around");
     expect(res.outcome).toBe("ok");
     expect(res.turn).toBe(1);
-    expect(res.status).toContain("£45.00");
+    expect(res.status).toContain("Cash: £15.00");
+    expect(res.status).toContain("Bank: £30.00");
     expect(res.record.usage).toHaveLength(1);
     const state = await store.loadSave("s1");
     expect(state.turn).toBe(1);
@@ -65,9 +66,25 @@ describe("playTurn", () => {
     expect((await store.loadSave("s1")).clock.now).toBe("2026-10-03T09:30");
   });
 
+  it("asks again with the place JSON when a delta repair is not readable", async () => {
+    const llm = scripted({
+      turn: [draft([{ op: "clock.advance", minutes: "ten" }])],
+      delta_repair: ["not json at all", JSON.stringify({ delta: [{ op: "clock.advance", minutes: 10 }], beat: "Fixed." })],
+    });
+    const { rt, store } = await setup(llm);
+    const res = await playTurn(rt, "s1", "Wait a bit");
+    expect(res.outcome).toBe("repaired");
+    expect(llm.calls.map((c) => c.purpose)).toEqual(["turn", "delta_repair", "delta_repair"]);
+    const reminder = llm.calls[2]?.messages.at(-1)?.content ?? "";
+    expect(reminder).toContain("entity.create");
+    expect(reminder).toContain("entity.move");
+    expect(reminder).toContain('"at"');
+    expect((await store.loadSave("s1")).clock.now).toBe("2026-10-03T09:30");
+  });
+
   it("rewrites a game-breaking draft behind a GM interlude and keeps the broken text out of history", async () => {
-    const broken = draft([{ op: "stat.add", key: "money", amount: -500 }], "You buy a yacht.");
-    const good = draft([{ op: "stat.add", key: "money", amount: -2 }], "You buy a bag of crisps.");
+    const broken = draft([{ op: "stat.add", key: "bank", amount: -500 }], "You buy a yacht.");
+    const good = draft([{ op: "stat.add", key: "bank", amount: -2 }], "You buy a bag of crisps.");
     const llm = scripted({ turn: [broken], rewrite_repair: [good] });
     const { rt, store } = await setup(llm);
     const interludes: string[] = [];
@@ -79,7 +96,8 @@ describe("playTurn", () => {
     expect(res.narration).toBe("You buy a bag of crisps.");
 
     const state = await store.loadSave("s1");
-    expect(statsOf(state).values.money).toBe(43);
+    expect(statsOf(state).values.bank).toBe(28);
+    expect(statsOf(state).values.cash).toBe(15);
     expect(JSON.stringify(state)).not.toContain("You buy a yacht");
     expect(state.window[0]?.narration).toBe("You buy a bag of crisps.");
     const records = await store.readTurnRecords("s1");
@@ -111,7 +129,7 @@ describe("playTurn", () => {
   });
 
   it("rolls back with the GM note after two failed repairs and does not advance the turn", async () => {
-    const bad = draft([{ op: "stat.add", key: "money", amount: -500 }], "Yacht.");
+    const bad = draft([{ op: "stat.add", key: "bank", amount: -500 }], "Yacht.");
     const llm = scripted({ turn: [bad], rewrite_repair: [bad, bad] });
     const { rt, store } = await setup(llm);
     const res = await playTurn(rt, "s1", "Buy a yacht");
@@ -121,7 +139,8 @@ describe("playTurn", () => {
     const state = await store.loadSave("s1");
     expect(state.turn).toBe(0);
     expect(state.window).toEqual([]);
-    expect(statsOf(state).values.money).toBe(45);
+    expect(statsOf(state).values.cash).toBe(15);
+    expect(statsOf(state).values.bank).toBe(30);
     expect(llm.calls.filter((c) => c.purpose === "rewrite_repair")).toHaveLength(2);
     const records = await store.readTurnRecords("s1");
     expect(records[0]?.outcome).toBe("rolled_back");
@@ -183,7 +202,8 @@ describe("playTurn", () => {
     expect(outcomes.filter((o) => o === "rewritten")).toHaveLength(4);
     const state = await store.loadSave("s1");
     expect(JSON.stringify(state)).not.toContain("mock fault");
-    expect(statsOf(state).values.money).toBe(45);
+    expect(statsOf(state).values.cash).toBe(15);
+    expect(statsOf(state).values.bank).toBe(30);
   });
 
   it("shows the roll when the config puts the dice on screen, and names what was at stake", async () => {

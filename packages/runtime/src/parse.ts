@@ -55,13 +55,21 @@ export function parseDraftText(text: string): ParsedDraft {
 const DeltaRepairSchema = z.object({
   delta: z.array(z.unknown()),
   beat: z.string().optional(),
+  at: z.string().optional(),
 });
 
-export function parseDeltaRepair(text: string): { ok: true; delta: unknown[]; beat?: string } | { ok: false; error: string } {
+export function parseDeltaRepair(
+  text: string,
+): { ok: true; delta: unknown[]; beat?: string; at?: string } | { ok: false; error: string } {
   try {
     const parsed = DeltaRepairSchema.safeParse(extractJson(text));
     if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "invalid" };
-    return { ok: true, delta: parsed.data.delta, ...(parsed.data.beat ? { beat: parsed.data.beat } : {}) };
+    return {
+      ok: true,
+      delta: parsed.data.delta,
+      ...(parsed.data.beat ? { beat: parsed.data.beat } : {}),
+      ...(parsed.data.at ? { at: parsed.data.at } : {}),
+    };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "invalid JSON" };
   }

@@ -18,6 +18,7 @@ import {
   buildCompactionRequest,
   buildOocContext,
   buildRepairContext,
+  deltaFormatHint,
   buildTurnContext,
   parseCompactionResult,
   shouldCompact,
@@ -309,10 +310,36 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
         violations: current.violations,
         narration: current.draft.narration,
       });
-      const res = await call({ tier: "cheap", purpose: "delta_repair", system: rc.system, messages: rc.messages, max_tokens: 400, json: true });
-      const fixed = parseDeltaRepair(res.text);
+      const askRepair = (hint?: string) =>
+        call({
+          tier: "cheap",
+          purpose: "delta_repair",
+          system: rc.system,
+          messages: hint ? [...rc.messages, { role: "user", content: hint }] : rc.messages,
+          max_tokens: 400,
+          json: true,
+        });
+      let res = await askRepair();
+      let fixed = parseDeltaRepair(res.text);
+      if (!fixed.ok) {
+        const unread = `The delta repair could not be read (${fixed.error}).`;
+        attempts.push({
+          kind: "delta_repair",
+          draft: current.draft,
+          ...rawOf(res.text),
+          violations: [{ severity: "fixable", code: "repair_unreadable", message: unread }],
+          usage: res.usage,
+        });
+        res = await askRepair(deltaFormatHint(config.player_id));
+        fixed = parseDeltaRepair(res.text);
+      }
       if (fixed.ok) {
-        const candidate: TurnDraft = { ...current.draft, delta: fixed.delta, beat: fixed.beat ?? current.draft.beat };
+        const candidate: TurnDraft = {
+          ...current.draft,
+          delta: fixed.delta,
+          beat: fixed.beat ?? current.draft.beat,
+          ...(fixed.at ? { at: fixed.at } : {}),
+        };
         const result = validateDraft(state, config, modules, candidate, input);
         current = { draft: candidate, text: JSON.stringify(candidate), violations: result.violations };
       } else {

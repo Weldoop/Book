@@ -50,7 +50,16 @@ function deltaRepairSystem(config: Config, modules: Module[]): string {
     "- Never invent ops or fields.",
     "OPS",
     describeOps(modules),
-    'Return ONLY a JSON object {"delta":[...],"beat":"..."} that corrects the rejected ops. Do not change the narration.',
+    'Return ONLY a JSON object {"delta":[...],"beat":"...","at":"<place id, when the scene stops in a place>"} that corrects the rejected ops. Do not change the narration.',
+  ].join("\n");
+}
+
+/** Shown again when a repair reply is not JSON. The engine still does not invent the ops. */
+export function deltaFormatHint(playerId: string): string {
+  return [
+    "That reply was not valid JSON. Return one JSON object and nothing else.",
+    `{"delta":[{"op":"entity.create","id":"<place-id>","type":"place","name":"<Place name>"},{"op":"entity.move","id":"${playerId}","location":"<place-id>"}],"at":"<place-id>","beat":"You arrive."}`,
+    "Create the place only when the world sheet does not already have it, then move the player, and set at to that place id. Copy the ids from the violation. Leave out entity.create when the place already exists. Do not add a trip the player did not ask for.",
   ].join("\n");
 }
 

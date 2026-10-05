@@ -32,6 +32,19 @@ describe("op validation", () => {
     expect(statsOf(state).values.money).toBe(45);
   });
 
+  it("rejects a huge stack of one object and points the repair at the balance", () => {
+    const { config, modules, state } = testSetup();
+    const res = validateDraft(
+      state,
+      config,
+      modules,
+      draft([{ op: "inventory.add", owner: "player", item: "cob", qty: 65 }]) as never,
+    );
+    expect(res.violations[0]).toMatchObject({ severity: "fixable", code: "stack_too_large" });
+    expect(res.violations[0]?.message).toContain("stat.add");
+    expect(res.violations[0]?.message).toContain("money");
+  });
+
   it("flags overspending as game breaking", () => {
     const { config, modules, state } = testSetup();
     const res = validateDraft(state, config, modules, draft([{ op: "stat.add", key: "money", amount: -100 }]) as never);

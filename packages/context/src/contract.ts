@@ -95,6 +95,7 @@ export function travelLines(config: Config): string[] {
   if (local.length > 0) {
     lines.push(`- These are a few steps inside the current place, not a new place: ${local.join(", ")}.`);
   }
+  lines.push("- A person is not a destination. Town, outside, upstairs, downstairs, inside, and home are not destinations unless the world sheet names that place.");
   lines.push("- When anyone travels, set \"at\" to the place id where the narration stops.");
   return lines;
 }
@@ -143,7 +144,9 @@ export function threadText(config: Config): string {
     `- A long matter is scale "major". At most ${majors} stay in the lead. Opening or adopting another sets the one the player has left alone back to "minor" and flags it set aside. Write the new line as the one they are living. A line marked set aside stepped back during this scene: mention it once in the world, then leave it. After this scene it stays quiet unless they are in its place, they name it, or the deadline is close. If they keep ignoring it, its deadline still happens. Do not call it major, minor, or set aside. thread.adopt to "minor" sets a long matter back on purpose. A minor that grows out of a major sets parent to that major. Resolving a major leaves its minors open.`,
     "- Thread the player caused and threads the world set matter equally. One action may resolve more than one: list every thread.resolve it earns.",
     "- When resolving a thread opens a new question, open the follow-up with thread.open and set parent to the thread it came from.",
-    "- Do not open a thread that repeats one already open. The same deadline does not need a second thread.",
+    "- Do not open a thread that repeats one already open, or one resolved in the last 48 hours. That matter stays closed for those hours. The same deadline does not need a second thread.",
+    "- If the thread names a weekday, the due date falls on that weekday.",
+    "- A figure written inside a thread is not the balance. ENGINE NOW is.",
     "- Do not nag. Mention a thread only when the scene gives it a reason to come up. If someone knows the thread, a short entity.fact.add on that person is enough.",
   ].join("\n");
 }
@@ -166,6 +169,14 @@ function workedExamples(config: Config, modules: Module[]): string {
   return lines.join("\n");
 }
 
+function balanceLine(config: Config): string {
+  const keys = config.stats.filter((stat) => stat.type === "currency").map((stat) => stat.key);
+  if (keys.includes("cash") && keys.includes("bank")) {
+    return "- Cash and the bank balance are currency stats. The wallet is the object, quantity one. Paying notes is stat.add on cash. Paying by card is stat.add on bank. Never store notes as a pile of objects.";
+  }
+  return "- A currency balance is the currency stat in STATE. Never store money as a pile of objects.";
+}
+
 export function contractText(config: Config, modules: Module[], order: OutputOrder): string {
   const style = config.gm_style;
   const tabletop = config.presentation.profile === "tabletop";
@@ -185,7 +196,10 @@ export function contractText(config: Config, modules: Module[], order: OutputOrd
     ...travelLines(config),
     "- Refuse a trip once, and give the reason. If the player asks to leave again, create the place if it is not on the world sheet and entity.move them. A second refusal is not allowed.",
     "- If the narration buys, orders, eats, drinks, or puts down a catalog item, the same delta must record the inventory change and, for a purchase, the price. Otherwise do not narrate it.",
+    "- One spoken purchase names one catalog item. A shared word such as pint does not buy every item that contains it.",
+    "- Something the player already carries is not bought again. Another, or a count above what they hold, is a new purchase.",
     "- A priced purchase charges a whole number of units, at least one, at the catalog price, and puts the item in the player's hands. Do not take a smaller sum. If they cannot afford one unit, narrate the refusal and leave the money where it is.",
+    balanceLine(config),
     "- Stat keys are the ids in brackets in STATE, not the labels.",
     "- Do not name a person tagged unmet, and do not treat them as present, until they share the player's location.",
     tabletop

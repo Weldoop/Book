@@ -245,7 +245,7 @@ export function applyDraft(state: State, config: Config, modules: Module[], draf
 
   next = structuredClone(next);
   for (const item of ctx.due) {
-    if (item.thread && !duplicateOpenThread(next.threads, item.thread.text)) {
+    if (item.thread && !duplicateOpenThread(next.threads, item.thread.text, undefined, next.clock.now)) {
       next.threads.push({
         id: `t${next.threads.length + 1}`,
         kind: item.thread.kind,

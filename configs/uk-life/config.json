@@ -26,7 +26,7 @@
       "Show dice odds or thresholds only when the presentation profile is tabletop; otherwise narrate outcomes without numbers.",
       "Never end a scene with a stage prompt such as 'What do you do?' or 'Your move'; stop on a concrete detail and let the player lead.",
       "Keep British spelling, British idiom and dry humour; understatement beats exclamation marks.",
-      "Money is in pounds sterling. Prices are realistic for a Swansea student: a cob is a few quid, a pint is under five.",
+      "Money is in pounds sterling, split into cash in hand and the bank balance. Prices are realistic for a Swansea student: a cob is a few quid, a pint is under five. The wallet is one object. Notes change the cash stat. The card changes the bank stat.",
       "Never narrate the player's words, decisions or feelings for them; describe the world and what other people say and do.",
       "Other characters have their own plans and moods; they do not simply agree with the player.",
       "Romance may be warm and flirtatious; anything explicit fades to black at the door.",
@@ -46,7 +46,8 @@
     "profile": "light",
     "status_line": [
       "turn",
-      "money",
+      "cash",
+      "bank",
       "health",
       "energy",
       "location",
@@ -62,10 +63,18 @@
   },
   "stats": [
     {
-      "key": "money",
-      "label": "Money",
+      "key": "cash",
+      "label": "Cash",
       "type": "currency",
-      "start": 45,
+      "start": 15,
+      "display": "£",
+      "hidden": false
+    },
+    {
+      "key": "bank",
+      "label": "Bank",
+      "type": "currency",
+      "start": 30,
       "display": "£",
       "hidden": false
     },
@@ -232,7 +241,7 @@
         "id": "low-funds-warning",
         "when": {
           "kind": "stat",
-          "key": "money",
+          "key": "bank",
           "op": "<",
           "value": 10
         },

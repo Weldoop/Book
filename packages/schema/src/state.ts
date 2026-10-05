@@ -55,6 +55,8 @@ export const ThreadSchema = z.object({
   on_overdue: z.string().optional(),
   opened_turn: z.number().int().min(0),
   resolved_turn: z.number().int().min(0).optional(),
+  /** Clock time when the thread was resolved. Used to keep that matter closed for 48 story hours. */
+  resolved_at: LocalDateTimeSchema.optional(),
 });
 export type Thread = z.infer<typeof ThreadSchema>;
 

@@ -61,6 +61,12 @@ function tripDestination(input: string): string | null {
   return hits.at(-1)?.dest ?? null;
 }
 
+/** A currency stat named in the prompt. Falls back to money for books that still use one pot. */
+function breakingStat(req: LLMRequest): string {
+  const blob = req.messages.map((message) => message.content).join("\n");
+  return /\[(cash|bank|money|gold)\]/.exec(blob)?.[1] ?? "money";
+}
+
 function playerId(req: LLMRequest): string {
   const blob = req.system.map((block) => block.text).join("\n");
   return /player character id is "([^"]+)"/.exec(blob)?.[1] ?? "player";
@@ -233,7 +239,7 @@ export class MockProvider implements LLMProvider {
       ];
     }
     if (fault === "fixable") delta = [{ op: "clock.advance", minutes: "ten" }];
-    if (fault === "game_breaking") delta = [{ op: "stat.add", key: "money", amount: -1000000, reason: "mock fault" }];
+    if (fault === "game_breaking") delta = [{ op: "stat.add", key: breakingStat(req), amount: -1000000, reason: "mock fault" }];
     return JSON.stringify({ narration, delta, beat, ...(place ? { at: place.id } : {}) });
   }
 }

@@ -940,10 +940,19 @@ engine, and its model-authored status line had already drifted within a single s
     item or a different place. A purchase, a meal, a handover, and a real "go to the kitchen" still
     have to be recorded. See ADR 0015.
 
+### Decided after the Haiku week (5 Oct 2026)
+
+51. One spoken purchase names one catalog item. Something already carried is not bought again.
+    Uplands keeps cash and the bank as two balances that still add up to £45, and a pile of more
+    than 12 of one object is not money. A person, and a word such as town or upstairs, is not a
+    destination. A repair that is not JSON is asked again with a short example of create, move,
+    and where the scene stops. A weekday in a thread has to be that weekday, and a matter resolved
+    in the last 48 story hours stays closed. A number inside a thread is not the balance. See ADR 0016.
+
 ### Build status (5 Oct 2026)
 
 Phase 0 (contracts) and Phase 1 (core build) are implemented, plus the fixes from the live sessions
-and the ADR 0005, 0006, 0007, 0008, 0009, 0010, 0011, 0012, 0013, 0014 and 0015 changes; 399 tests pass.
+and the ADR 0005, 0006, 0007, 0008, 0009, 0010, 0011, 0012, 0013, 0014, 0015 and 0016 changes; 405 tests pass.
 
 | Area | State |
 |---|---|
@@ -964,6 +973,7 @@ and the ADR 0005, 0006, 0007, 0008, 0009, 0010, 0011, 0012, 0013, 0014 and 0015 
 | A third major sets the quiet one aside (ADR 0013) | done; exercised with the mock, not yet against a real model |
 | Warm means recently dealt with (ADR 0014) | done; exercised with the mock, not yet against a real model |
 | Witnessed facts, and ordinary sentences that stay in the room (ADR 0015) | done; exercised with the mock, not yet against a real model |
+| One purchase, cash and bank, places, repair format, weekday threads (ADR 0016) | done; exercised with the mock, not yet against a real model |
 | Real-model benchmark (Phase 2) | three short live sessions played; full golden-session benchmark not yet run |
 | `need` / attention-miss handling, delta-first experiment results | not yet implemented / not yet measured |
 | Nuxt UI, Supabase, hosted trial, wizard | later phases |

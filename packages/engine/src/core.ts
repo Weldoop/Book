@@ -1,6 +1,6 @@
 import type { Config, DueItem, Entity, Fact, Module, Op, RenderOutput, State, Violation } from "@book/schema";
 import { memoryExpiry } from "./memory.ts";
-import { duplicateOpenThread } from "./threads.ts";
+import { duplicateOpenThread, weekdayMismatch } from "./threads.ts";
 import { addMinutes, diffMinutes } from "./time.ts";
 
 const MAX_FACT_CHARS = 220;
@@ -146,15 +146,17 @@ export const coreModule: Module = {
           out.push(bad("due_in_past", `Op ${index}: thread due time ${op.due} is already in the past.`, index));
         }
         {
-          const dup = duplicateOpenThread(state.threads, op.text, op.due);
+          const weekday = weekdayMismatch(op.text, op.due);
+          if (weekday) out.push(bad("weekday_mismatch", `Op ${index}: ${weekday}`, index));
+        }
+        {
+          const dup = duplicateOpenThread(state.threads, op.text, op.due, state.clock.now);
           if (dup) {
-            out.push(
-              bad(
-                "duplicate_thread",
-                `Op ${index}: this repeats open thread '${dup.id}'. Do not open a second thread for the same matter.`,
-                index,
-              ),
-            );
+            const why =
+              dup.status === "resolved"
+                ? `this repeats thread '${dup.id}', resolved at ${dup.resolved_at}. Leave that matter closed for 48 hours.`
+                : `this repeats open thread '${dup.id}'. Do not open a second thread for the same matter.`;
+            out.push(bad("duplicate_thread", `Op ${index}: ${why}`, index));
           }
         }
         if (op.parent && !state.threads.some((t) => t.id === op.parent)) {
@@ -274,6 +276,7 @@ export const coreModule: Module = {
         if (t) {
           t.status = "resolved";
           t.resolved_turn = turn;
+          t.resolved_at = s.clock.now;
         }
         break;
       }

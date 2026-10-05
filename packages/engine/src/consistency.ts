@@ -40,6 +40,11 @@ const PURPOSE = new Set([
 
 const NEGATED = /\b(?:can't|cannot|don't|do not|didn't|did not|won't|will not|never|not)\s*$/i;
 
+/** A direction, not a destination, unless the book actually names a place that. */
+const VAGUE_DEST = new Set(["town", "outside", "upstairs", "downstairs", "inside", "home", "outdoors", "indoors"]);
+
+const ANOTHER = /\b(?:another|one more|a second|extra)\b/i;
+
 function norm(text: string): string {
   return text
     .toLowerCase()
@@ -170,9 +175,26 @@ function checkAt(after: State, config: Config, draft: TurnDraft): Violation[] {
   return [];
 }
 
+function knownPlace(state: State, dest: string): boolean {
+  return Object.values(state.entities).some((entity) => entity.type === "place" && placeMatches(entity.name, entity.aliases, entity.id, dest));
+}
+
+function personNotPlace(state: State, dest: string): boolean {
+  if (knownPlace(state, dest)) return false;
+  return Object.values(state.entities).some(
+    (entity) => entity.type === "person" && placeMatches(entity.name, entity.aliases, entity.id, dest),
+  );
+}
+
+/** "Go back out to Connor" and "walk into town" are not trips. "Go to the kitchen" still is. */
+function notADestination(state: State, dest: string): boolean {
+  if (personNotPlace(state, dest)) return true;
+  return VAGUE_DEST.has(norm(dest)) && !knownPlace(state, dest);
+}
+
 function checkTravel(before: State, after: State, config: Config, draft: TurnDraft, input: string, applied: Op[]): Violation[] {
   const dest = tripDestination(input, config);
-  if (!dest || isLocalStep(dest, config.travel.local)) return [];
+  if (!dest || isLocalStep(dest, config.travel.local) || notADestination(before, dest)) return [];
   const end = playerLocation(after, config);
   const endEntity = end ? after.entities[end] : undefined;
   const created = new Set<string>();
@@ -284,13 +306,14 @@ function carrying(state: State, playerId: string, itemId: string): boolean {
   return (inv?.owners?.[playerId]?.[itemId] ?? 0) > 0;
 }
 
-function currencyKey(config: Config): string {
-  return config.stats.find((stat) => stat.type === "currency")?.key ?? "money";
+function currencyKeys(config: Config): string[] {
+  const keys = config.stats.filter((stat) => stat.type === "currency").map((stat) => stat.key);
+  return keys.length > 0 ? keys : ["money"];
 }
 
 function spentMoney(ops: Op[], config: Config): boolean {
-  const key = currencyKey(config);
-  return ops.some((op) => op.op === "stat.add" && op.key === key && op.amount < 0);
+  const keys = new Set(currencyKeys(config));
+  return ops.some((op) => op.op === "stat.add" && keys.has(op.key) && op.amount < 0);
 }
 
 interface Spend {
@@ -299,10 +322,10 @@ interface Spend {
 }
 
 function currencySpends(ops: Op[], config: Config): Spend[] {
-  const key = currencyKey(config);
+  const keys = new Set(currencyKeys(config));
   const out: Spend[] = [];
   for (const op of ops) {
-    if (op.op === "stat.add" && op.key === key && op.amount < 0) out.push({ amount: op.amount, reason: op.reason ?? "" });
+    if (op.op === "stat.add" && keys.has(op.key) && op.amount < 0) out.push({ amount: op.amount, reason: op.reason ?? "" });
   }
   return out;
 }
@@ -351,14 +374,46 @@ function wantedQty(window: string): number {
 
 const ITEM_SKIP = new Set(["of", "the", "and", "for", "with", "from"]);
 
-function itemNamed(text: string, item: { id: string; name: string }): boolean {
-  const hay = norm(text);
-  if (!hay) return false;
-  if (itemPhrases(item).some((phrase) => hay.includes(phrase))) return true;
-  const words = norm(`${item.name} ${item.id.replace(/[_-]/g, " ")}`)
+function contentTokens(item: { id: string; name: string }): string[] {
+  return norm(`${item.name} ${item.id.replace(/[_-]/g, " ")}`)
     .split(" ")
     .filter((word) => word.length >= 3 && !ITEM_SKIP.has(word));
-  return words.some((word) => hasWord(hay, word));
+}
+
+/**
+ * One stretch of text names one item. "Pint of lager" is the lager, not the milk and the four-pack.
+ * A shared word alone picks the item it names exactly, or the one with the fewest leftover words.
+ */
+function itemsInText<T extends { id: string; name: string }>(text: string, items: T[]): T[] {
+  const mentions = findMentions(text, items);
+  if (mentions.length > 0) {
+    const seen = new Set<string>();
+    const out: T[] = [];
+    for (const mention of mentions) {
+      if (seen.has(mention.id)) continue;
+      seen.add(mention.id);
+      const item = items.find((candidate) => candidate.id === mention.id);
+      if (item) out.push(item);
+    }
+    return out;
+  }
+  const hay = norm(text);
+  if (!hay) return [];
+  const scored = items
+    .map((item) => {
+      const tokens = contentTokens(item);
+      const matched = tokens.filter((token) => hasWord(hay, token));
+      return { item, matched: matched.length, unmatched: tokens.length - matched.length, exact: item.id.replace(/[_-]/g, " ") === hay || norm(item.name) === hay };
+    })
+    .filter((row) => row.matched > 0);
+  if (scored.length === 0) return [];
+  scored.sort((a, b) => b.matched - a.matched || a.unmatched - b.unmatched || Number(b.exact) - Number(a.exact));
+  const best = scored[0];
+  if (!best) return [];
+  const tied = scored.filter((row) => row.matched === best.matched && row.unmatched === best.unmatched);
+  const exact = tied.filter((row) => row.exact || hasWord(hay, row.item.id.replace(/[_-]/g, " ")));
+  const winner = exact.length === 1 ? exact[0] : tied[0];
+  return winner ? [winner.item] : [];
 }
 
 interface Buy {
@@ -379,23 +434,38 @@ function removedItem(ops: Op[], playerId: string, itemId: string): boolean {
   return ops.some((op) => op.op === "inventory.remove" && op.owner === playerId && op.item === itemId);
 }
 
-function checkItems(after: State, config: Config, draft: TurnDraft, applied: Op[]): Violation[] {
+function heldQty(state: State, playerId: string, itemId: string): number {
+  const inv = state.modules.inventory as { owners?: Record<string, Record<string, number>> } | undefined;
+  return inv?.owners?.[playerId]?.[itemId] ?? 0;
+}
+
+function alreadyOwned(name: string, id: string, held: number): Violation {
+  return violation(
+    "fixable",
+    "already_owned",
+    `The player already carries ${held} "${name}" (${id}). Mentioning it is not a new purchase. Do not inventory.add or charge it again unless they ask for another, or for more than they hold.`,
+  );
+}
+
+function checkItems(before: State, after: State, config: Config, draft: TurnDraft, applied: Op[]): Violation[] {
   if (config.items.length === 0) return [];
   const text = draft.narration.toLowerCase();
-  const byId = new Map<string, { name: string; pay: boolean; release: boolean; wanted: number }>();
+  const byId = new Map<string, { name: string; pay: boolean; release: boolean; wanted: number; again: boolean }>();
   for (const mention of findMentions(draft.narration, config.items)) {
     const window = text.slice(Math.max(0, mention.start - 60), mention.start);
-    const row = byId.get(mention.id) ?? { name: mention.name, pay: false, release: false, wanted: 1 };
-    const after = text.slice(mention.end, mention.end + 48);
+    const row = byId.get(mention.id) ?? { name: mention.name, pay: false, release: false, wanted: 1, again: false };
+    const following = text.slice(mention.end, mention.end + 48);
     const pay = hasVerb(window, PAY);
-    const parked = PARKED.test(after);
+    const parked = PARKED.test(following);
     row.pay = row.pay || pay;
     row.release = row.release || hasVerb(window, RELEASE) || (hasVerb(window, PUT_OR_LEAVE) && !parked);
+    row.again = row.again || ANOTHER.test(window);
     if (pay) row.wanted = Math.max(row.wanted, wantedQty(window));
     byId.set(mention.id, row);
   }
   const out: Violation[] = [];
   const buys = new Map<string, Buy>();
+  const owned = new Set<string>();
   const player = config.player_id;
   for (const [id, row] of byId) {
     const item = config.items.find((candidate) => candidate.id === id);
@@ -409,6 +479,15 @@ function checkItems(after: State, config: Config, draft: TurnDraft, applied: Op[
       );
     }
     if (!row.pay || !item) continue;
+    const held = heldQty(before, player, id);
+    const fresh = row.again || row.wanted > held;
+    if (!fresh && held >= 1) {
+      if (addedQty(applied, player, id) > 0 && !owned.has(id)) {
+        owned.add(id);
+        out.push(alreadyOwned(row.name, id, held));
+      }
+      continue;
+    }
     if (item.price === undefined || item.price <= 0) {
       if (!spentMoney(applied, config) || addedQty(applied, player, id) < 1) {
         out.push(
@@ -424,8 +503,17 @@ function checkItems(after: State, config: Config, draft: TurnDraft, applied: Op[
     noteBuy(buys, item, row.wanted);
   }
   for (const spend of currencySpends(applied, config)) {
-    for (const item of config.items) {
-      if (itemNamed(spend.reason, item)) noteBuy(buys, item, 1);
+    for (const item of itemsInText(spend.reason, config.items)) {
+      if (item.price === undefined || item.price <= 0) continue;
+      const held = heldQty(before, player, item.id);
+      if (held >= 1 && !ANOTHER.test(spend.reason)) {
+        if (!owned.has(item.id)) {
+          owned.add(item.id);
+          out.push(alreadyOwned(item.name, item.id, held));
+        }
+        continue;
+      }
+      noteBuy(buys, item, 1);
     }
   }
   if (buys.size === 0) return out;
@@ -474,6 +562,6 @@ export function consistencyViolations(
   return [
     ...checkAt(after, config, draft),
     ...checkTravel(before, after, config, draft, input, applied),
-    ...checkItems(after, config, draft, applied),
+    ...checkItems(before, after, config, draft, applied),
   ];
 }

@@ -172,6 +172,24 @@ describe("travel and place", () => {
     expect(kitchen.violations).toEqual([]);
   });
 
+  it("does not treat a person or a vague direction as a trip, and still counts a place the book names", () => {
+    const cfg = config();
+    const state = fresh();
+    const sample = state.entities.player;
+    if (!sample) throw new Error("player missing");
+    state.entities.connor = { ...sample, id: "connor", name: "Connor", aliases: [] };
+    expect(
+      validateDraft(state, cfg, modules, draft({ narration: "Connor is still by the fence." }), "Go back out to Connor").violations,
+    ).toEqual([]);
+    expect(validateDraft(state, cfg, modules, draft({ narration: "The high street is busy." }), "Walk into town").violations).toEqual([]);
+
+    const named = fresh();
+    named.entities.town = { ...sample, id: "town", type: "place", name: "Town", aliases: [], location: null };
+    expect(
+      validateDraft(named, cfg, modules, draft({ narration: "You stay in the room." }), "Walk into town").violations.map((v) => v.code),
+    ).toContain("arrived_elsewhere");
+  });
+
   it("treats going to bed as the bedroom, and only when the player is already there", () => {
     const cfg = config();
     const inBed = fresh();
@@ -351,6 +369,76 @@ describe("catalog items", () => {
     expect(res.violations[0]?.message).toContain("(pint)");
   });
 
+  it("prices one lager as the pint, and leaves the milk and the four-pack out of the till", () => {
+    const cfg: Config = {
+      ...config(),
+      items: [...config().items, { id: "lager-4-pack", name: "Lager 4-pack", price: 5 }],
+    };
+    const paid = validateDraft(
+      fresh(),
+      cfg,
+      modules,
+      draft({
+        narration: "The barman pours one pint of lager.",
+        delta: [
+          { op: "stat.add", key: "money", amount: -4.5, reason: "Bought one pint of lager" },
+          { op: "inventory.add", owner: "player", item: "pint", qty: 1 },
+        ],
+      }),
+      "Order one lager and pay cash",
+    );
+    expect(paid.violations).toEqual([]);
+  });
+
+  it("does not buy an item the player already carries, and still buys another", () => {
+    const cfg: Config = {
+      ...config(),
+      items: [...config().items, { id: "garden-gloves", name: "Garden gloves", price: 4 }],
+    };
+    const state = fresh();
+    const inv = state.modules.inventory as { owners: Record<string, Record<string, number>> };
+    inv.owners.player = { ...inv.owners.player, "garden-gloves": 1 };
+
+    const restated = validateDraft(
+      state,
+      cfg,
+      modules,
+      draft({
+        narration: "The gloves are already in the rucksack.",
+        delta: [
+          { op: "stat.add", key: "money", amount: -4, reason: "Paid for the gloves" },
+          { op: "inventory.add", owner: "player", item: "garden-gloves", qty: 1 },
+        ],
+      }),
+      "The gloves are already paid",
+    );
+    expect(restated.violations.map((v) => v.code)).toEqual(["already_owned"]);
+
+    const quiet = validateDraft(
+      state,
+      cfg,
+      modules,
+      draft({ narration: "You paid for the gloves earlier. You leave the strimmer on the counter." }),
+      "The gloves are already paid",
+    );
+    expect(quiet.violations).toEqual([]);
+
+    const another = validateDraft(
+      state,
+      cfg,
+      modules,
+      draft({
+        narration: "You buy another pair of garden gloves.",
+        delta: [
+          { op: "stat.add", key: "money", amount: -4, reason: "another pair of garden gloves" },
+          { op: "inventory.add", owner: "player", item: "garden-gloves", qty: 1 },
+        ],
+      }),
+      "Buy another pair of gloves",
+    );
+    expect(another.violations).toEqual([]);
+  });
+
   it("requires a remove when the narration puts down something the player still holds", () => {
     const held = validateDraft(
       fresh(),
@@ -457,7 +545,7 @@ describe("catalog items", () => {
 });
 
 describe("duplicate threads", () => {
-  function withThread(text: string, due?: string, status: "open" | "resolved" = "open"): State {
+  function withThread(text: string, due?: string, status: "open" | "resolved" = "open", resolvedAt?: string): State {
     const state = fresh();
     state.threads = [
       {
@@ -474,18 +562,19 @@ describe("duplicate threads", () => {
         reminders: 0,
         last_shown_turn: 0,
         opened_turn: 0,
+        ...(resolvedAt ? { resolved_at: resolvedAt } : {}),
       },
     ];
     return state;
   }
 
   it("rejects a thread.open that repeats an open one", () => {
-    const state = withThread("Sort the mobile plan before the Monday deadline");
+    const state = withThread("Sort the mobile plan before the renewal deadline");
     const res = processOps(state, config(), [coreModule], [
       {
         op: "thread.open",
         kind: "commitment",
-        text: "The mobile plan Monday deadline is still sitting there",
+        text: "The mobile plan renewal deadline is still sitting there",
       },
     ]);
     expect(res.violations[0]).toMatchObject({ code: "duplicate_thread", severity: "fixable" });
@@ -505,17 +594,48 @@ describe("duplicate threads", () => {
     expect(different.violations).toEqual([]);
 
     const resolved = processOps(
-      withThread("Sort the mobile plan before the Monday deadline", undefined, "resolved"),
+      withThread("Sort the mobile plan before the renewal deadline", undefined, "resolved"),
       config(),
       [coreModule],
-      [{ op: "thread.open", kind: "commitment", text: "The mobile plan Monday deadline is still sitting there" }],
+      [{ op: "thread.open", kind: "commitment", text: "The mobile plan renewal deadline is still sitting there" }],
     );
     expect(resolved.violations).toEqual([]);
+
+    const recent = processOps(
+      withThread("Sort the mobile plan before the Monday deadline", undefined, "resolved", "2026-10-03T08:00"),
+      config(),
+      [coreModule],
+      [{ op: "thread.open", kind: "commitment", text: "The mobile plan Monday deadline is still sitting there", due: "2026-10-05T09:00" }],
+    );
+    expect(recent.violations[0]?.code).toBe("duplicate_thread");
+    expect(recent.violations[0]?.message).toContain("48 hours");
+
+    const later = processOps(
+      withThread("Sort the mobile plan before the Monday deadline", undefined, "resolved", "2026-10-01T08:00"),
+      config(),
+      [coreModule],
+      [{ op: "thread.open", kind: "commitment", text: "The mobile plan Monday deadline is still sitting there", due: "2026-10-05T09:00" }],
+    );
+    expect(later.violations.filter((v) => v.code === "duplicate_thread")).toEqual([]);
+  });
+
+  it("requires a named weekday to fall on that weekday", () => {
+    const wednesday = processOps(fresh(), config(), [coreModule], [
+      { op: "thread.open", kind: "commitment", text: "The inspection is on Monday morning", due: "2026-10-07T10:00" },
+    ]);
+    expect(wednesday.violations[0]?.code).toBe("weekday_mismatch");
+    expect(wednesday.violations[0]?.message).toContain("Monday");
+    expect(wednesday.violations[0]?.message).toContain("Wednesday");
+
+    const monday = processOps(fresh(), config(), [coreModule], [
+      { op: "thread.open", kind: "commitment", text: "The inspection is on Monday morning", due: "2026-10-05T10:00" },
+    ]);
+    expect(monday.violations).toEqual([]);
   });
 
   it("does not inject a due-event thread that repeats an open one", () => {
     const cfg = config();
-    const state = withThread("Sort the mobile plan before the Monday deadline");
+    const state = withThread("Sort the mobile plan before the renewal deadline");
     const skipped = applyDraft(state, cfg, [coreModule], draft(), {
       input: "look",
       due: [
@@ -524,7 +644,7 @@ describe("duplicate threads", () => {
           kind: "scheduled",
           text: "The plan runs out tonight.",
           entities: [],
-          thread: { kind: "commitment", text: "The mobile plan Monday deadline is still sitting there" },
+          thread: { kind: "commitment", text: "The mobile plan renewal deadline is still sitting there" },
         },
       ],
     });

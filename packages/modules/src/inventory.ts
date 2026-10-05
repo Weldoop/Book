@@ -12,6 +12,9 @@ export function itemName(config: Config, id: string): string {
   return config.items.find((i) => i.id === id)?.name ?? id.replace(/[_-]/g, " ");
 }
 
+/** One inventory.add above this is a pile, not a purchase. Cash belongs on a currency stat. */
+export const STACK_CAP = 12;
+
 export const inventoryModule: Module = {
   id: "inventory",
   ops: ["inventory.add", "inventory.remove"],
@@ -47,6 +50,22 @@ export const inventoryModule: Module = {
         },
       ];
     }
+    if (op.op === "inventory.add" && op.qty > STACK_CAP) {
+      const balances = config.stats
+        .filter((stat) => stat.type === "currency")
+        .map((stat) => `${stat.label ?? stat.key} [${stat.key}]`);
+      const where = balances.length
+        ? `Balances are ${balances.join(", ")}. Use stat.add on those keys.`
+        : "Money is a currency stat. Use stat.add.";
+      return [
+        {
+          severity: "fixable",
+          code: "stack_too_large",
+          op_index: index,
+          message: `Op ${index}: inventory.add of ${op.qty} '${itemName(config, op.item)}' is more than ${STACK_CAP} of one object. ${where} Do not store notes as a pile of objects.`,
+        },
+      ];
+    }
     if (op.op === "inventory.remove") {
       const have = inventoryOf(state).owners[op.owner]?.[op.item] ?? 0;
       if (have < op.qty) {
@@ -77,7 +96,7 @@ export const inventoryModule: Module = {
   },
 
   promptFragment: () =>
-    "INVENTORY: Items change hands only through inventory.add / inventory.remove, and the item id must be one from the world sheet. Never entity.move an item onto a person. Buying needs both a stat.add for the price and an inventory.add. The player can only use or give away items listed in STATE.",
+    "INVENTORY: Items change hands only through inventory.add / inventory.remove, and the item id must be one from the world sheet. Never entity.move an item onto a person. Buying needs both a stat.add for the price and an inventory.add. The player can only use or give away items listed in STATE. A currency balance is a stat, never a quantity of an object. The wallet is one object. Do not inventory.add a stack of wallets, notes, or coins to store money.",
 
   focus: () => [],
   due: () => [],
