@@ -137,10 +137,10 @@ export function threadText(config: Config): string {
   const majors = config.threads.max_majors;
   return [
     `- A thread's scale is potential, minor or major. Never say those words to the player.`,
-    `- List the people who know about it and the places it belongs to in entities. OPEN THREADS includes a thread only when one of those is in the scene, the player just named them, or the deadline is close. At most ${majors} majors, and at most ${config.threads.max_in_context} threads, not all of them.`,
+    `- List the people who know about it and the places it belongs to in entities. OPEN THREADS includes a thread only when one of those is in the scene, the player just named them, the deadline is close, or it was set aside and is still warm. At most ${majors} majors lead, and at most ${config.threads.max_in_context} threads, not all of them.`,
     `- scale "potential" is an offer. Make the offer in this turn's narration. It is not shown again, and it lapses after ${config.threads.potential_hours} hours if the player does not take it up.`,
     `- When the player takes an offer up, thread.adopt it to "minor". You decide that, and only when their action did. Do not latch a thread they ignored.`,
-    `- A long matter is scale "major". At most ${majors} majors can be open. Adopting a minor to "major" is how a small matter becomes the next long one. A minor that grows out of a major sets parent to that major. Resolving a major leaves its minors open.`,
+    `- A long matter is scale "major". At most ${majors} stay in the lead. Opening or adopting another sets the one the player has left alone back to "minor" and flags it set aside. Write the new line as the one they are living. A line marked set aside was a long matter: mention it in the world so they can pick it up, and do not call it major, minor, or set aside. If they keep ignoring it, its deadline still happens. thread.adopt to "minor" sets a long matter back on purpose. A minor that grows out of a major sets parent to that major. Resolving a major leaves its minors open.`,
     "- Thread the player caused and threads the world set matter equally. One action may resolve more than one: list every thread.resolve it earns.",
     "- When resolving a thread opens a new question, open the follow-up with thread.open and set parent to the thread it came from.",
     "- Do not open a thread that repeats one already open. The same deadline does not need a second thread.",

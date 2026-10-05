@@ -2,6 +2,7 @@ import {
   TurnDraftSchema,
   type Config,
   type DueItem,
+  type Entity,
   type GmNote,
   type Module,
   type State,
@@ -107,7 +108,7 @@ export function validateDraft(
   draft: TurnDraft,
   input = "",
 ): ValidationResult {
-  const processed = processOps(state, config, modules, draft.delta);
+  const processed = processOps(withThreadContact(state, config, input), config, modules, draft.delta);
   const warnings: string[] = [];
   const words = draft.narration.trim().split(/\s+/).length;
   if (words > config.gm_style.max_words * 2) {
@@ -197,9 +198,51 @@ export function openScene(state: State): State {
   return { ...state, scene: { index: state.scene.index + 1, started_turn: state.turn, closed: false } };
 }
 
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Whole-word match. Short labels are skipped so "a" does not touch every thread. */
+function namesEntity(entity: Entity, input: string): boolean {
+  if (input.trim().length === 0) return false;
+  for (const term of [entity.name, ...entity.aliases]) {
+    const t = term.trim();
+    if (t.length < 2) continue;
+    const re = new RegExp(`(?<![\\p{L}\\p{N}_])${escapeRegExp(t)}(?![\\p{L}\\p{N}_])`, "iu");
+    if (re.test(input)) return true;
+  }
+  return false;
+}
+
+/**
+ * The player touched a thread by naming someone or some place on it, or by standing in one of
+ * its places. Sharing a room with a person does not count, and neither does the prompt showing it.
+ */
+export function noteThreadContact(state: State, config: Config, input: string, turn: number): void {
+  const here = state.entities[config.player_id]?.location ?? null;
+  for (const thread of state.threads) {
+    if (thread.status !== "open") continue;
+    let touched = false;
+    for (const id of thread.entities) {
+      if (id === config.player_id) continue;
+      const entity = state.entities[id];
+      if (!entity) continue;
+      if (entity.type === "place" && here === entity.id) touched = true;
+      if (namesEntity(entity, input)) touched = true;
+    }
+    if (touched) thread.last_interacted_turn = Math.max(thread.last_interacted_turn, turn);
+  }
+}
+
+function withThreadContact(state: State, config: Config, input: string): State {
+  const next = structuredClone(state);
+  noteThreadContact(next, config, input, state.turn + 1);
+  return next;
+}
+
 /** Applies a draft that has already passed validation. Pure: returns the next state. */
 export function applyDraft(state: State, config: Config, modules: Module[], draft: TurnDraft, ctx: ApplyContext): State {
-  const processed = processOps(state, config, modules, draft.delta);
+  const processed = processOps(withThreadContact(state, config, ctx.input), config, modules, draft.delta);
   if (processed.violations.length > 0) {
     throw new Error("applyDraft called with a draft that fails validation");
   }
@@ -220,9 +263,11 @@ export function applyDraft(state: State, config: Config, modules: Module[], draf
         status: "open",
         entities: item.entities.filter((id) => next.entities[id]),
         scale: "minor",
+        was_major: false,
         warm: true,
         reminders: 0,
         last_shown_turn: turn,
+        last_interacted_turn: turn,
         opened_turn: turn,
       });
     }

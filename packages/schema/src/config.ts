@@ -156,7 +156,7 @@ export type ThreadSeed = z.infer<typeof ThreadSeedSchema>;
 export const ThreadsConfigSchema = z.object({
   /** Threads shown in the prompt at once. The stored pool is unlimited. */
   max_in_context: z.number().int().positive().default(4),
-  /** Open majors at once, in the save and in the prompt. */
+  /** Majors in the lead. Opening another sets the one left alone back to a minor. */
   max_majors: z.number().int().positive().default(2),
   /** Unprompted reminders a thread gets before it goes cold and leaves the prompt. */
   max_reminders: z.number().int().min(0).default(2),

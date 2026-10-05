@@ -85,8 +85,9 @@ export function threadDebug(state: State): string {
     const parent = t.parent ? ` parent ${t.parent}` : "";
     const due = t.due ? ` due ${t.due}` : "";
     const lapses = t.expires ? ` lapses ${t.expires}` : "";
+    const aside = t.was_major ? (t.scale === "major" ? " was-major" : " set-aside") : "";
     const warmth = t.warm ? "warm" : "cold";
-    lines.push(`  ${t.id} ${t.scale} ${t.kind} ${warmth}${due}${lapses}${parent}${who}: ${t.text}`);
+    lines.push(`  ${t.id} ${t.scale}${aside} ${t.kind} ${warmth} touched ${t.last_interacted_turn}${due}${lapses}${parent}${who}: ${t.text}`);
   }
   return lines.join("\n");
 }

@@ -82,8 +82,9 @@ export function threadsSection(state: State, config: Config, input: string, cap:
   const chosen = selectThreads(state, config, input);
   const lines = chosen.map((t) => {
     const due = t.due ? ` due ${t.due}` : "";
+    const aside = t.scale === "minor" && t.was_major ? " set aside" : "";
     const ents = t.entities.length ? ` (${t.entities.join(", ")})` : "";
-    return `- ${t.id} [${t.kind}/${t.scale}]${due}: ${t.text}${ents}`;
+    return `- ${t.id} [${t.kind}/${t.scale}]${aside}${due}: ${t.text}${ents}`;
   });
   const fit = fitLines("## OPEN THREADS", lines, cap, "end");
   const openCount = state.threads.filter((t) => t.status === "open").length;

@@ -34,6 +34,10 @@ export const ThreadSchema = z.object({
   entities: z.array(IdSchema).default([]),
   /** Offer, a thread the player took up, or a long matter. The player never sees this word. */
   scale: ThreadScaleSchema.default("minor"),
+  /** True once this was a major and then stepped back. Stays true if it is taken up again. */
+  was_major: z.boolean().default(false),
+  /** Turn the player last named it or stood in one of its places. Opening and adopting count. */
+  last_interacted_turn: z.number().int().min(0).default(0),
   /** When an unclaimed offer lapses. Absent on minors and majors. */
   expires: LocalDateTimeSchema.optional(),
   /** False once the thread has used up its unprompted reminders. Cold threads stay in state but leave the prompt. */

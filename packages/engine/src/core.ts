@@ -31,6 +31,33 @@ function openMajorCount(state: State): number {
   return state.threads.filter((t) => t.status === "open" && t.scale === "major").length;
 }
 
+/** The open major the player has left alone the longest. Older opening, then id, breaks a tie. */
+function quietestMajor(state: State): State["threads"][number] | undefined {
+  const majors = state.threads.filter((t) => t.status === "open" && t.scale === "major");
+  majors.sort(
+    (a, b) =>
+      a.last_interacted_turn - b.last_interacted_turn || a.opened_turn - b.opened_turn || a.id.localeCompare(b.id),
+  );
+  return majors[0];
+}
+
+/** A long matter steps back. It stays open, keeps its deadline, and can be offered again. */
+function demoteMajor(thread: State["threads"][number]): void {
+  thread.scale = "minor";
+  thread.was_major = true;
+  thread.warm = true;
+  thread.reminders = 0;
+}
+
+/** Keeps at most `max_majors` in the lead by setting the quietest one aside. */
+function makeRoomForMajor(state: State, config: Config): void {
+  while (openMajorCount(state) >= config.threads.max_majors) {
+    const quiet = quietestMajor(state);
+    if (!quiet) break;
+    demoteMajor(quiet);
+  }
+}
+
 export const coreModule: Module = {
   id: "core",
   ops: [
@@ -134,31 +161,12 @@ export const coreModule: Module = {
         if (op.parent && !state.threads.some((t) => t.id === op.parent)) {
           out.push(bad("unknown_thread", `Op ${index}: parent thread '${op.parent}' does not exist.`, index));
         }
-        if (op.scale === "major" && openMajorCount(state) >= config.threads.max_majors) {
-          out.push(
-            bad(
-              "too_many_majors",
-              `Op ${index}: ${config.threads.max_majors} majors are already open. Keep this as a minor, or resolve a major first.`,
-              index,
-            ),
-          );
-        }
         break;
       case "thread.adopt": {
         const thread = state.threads.find((t) => t.id === op.id);
         if (!thread) out.push(bad("unknown_thread", `Op ${index}: thread '${op.id}' does not exist.`, index));
         else if (thread.status !== "open") {
           out.push(bad("thread_closed", `Op ${index}: thread '${op.id}' is ${thread.status} and cannot be taken up.`, index));
-        } else if (thread.scale === "major" && op.scale === "minor") {
-          out.push(bad("cannot_demote", `Op ${index}: '${op.id}' is a major. Leave it a major, or resolve it.`, index));
-        } else if (op.scale === "major" && thread.scale !== "major" && openMajorCount(state) >= config.threads.max_majors) {
-          out.push(
-            bad(
-              "too_many_majors",
-              `Op ${index}: ${config.threads.max_majors} majors are already open. Leave '${op.id}' as a minor, or resolve a major first.`,
-              index,
-            ),
-          );
         }
         break;
       }
@@ -222,6 +230,7 @@ export const coreModule: Module = {
         break;
       }
       case "thread.open": {
+        if (op.scale === "major") makeRoomForMajor(s, config);
         const id = `t${s.threads.length + 1}`;
         s.threads.push({
           id,
@@ -231,10 +240,12 @@ export const coreModule: Module = {
           status: "open",
           entities: op.entities ?? [],
           scale: op.scale,
+          was_major: false,
           ...(op.scale === "potential" ? { expires: addMinutes(s.clock.now, config.threads.potential_hours * 60) } : {}),
           warm: true,
           reminders: 0,
           last_shown_turn: turn,
+          last_interacted_turn: turn,
           ...(op.parent ? { parent: op.parent } : {}),
           opened_turn: turn,
         });
@@ -247,9 +258,12 @@ export const coreModule: Module = {
       case "thread.adopt": {
         const t = s.threads.find((x) => x.id === op.id);
         if (t && t.status === "open") {
+          if (op.scale === "major" && t.scale !== "major") makeRoomForMajor(s, config);
+          if (t.scale === "major" && op.scale === "minor") demoteMajor(t);
           t.scale = op.scale;
           t.warm = true;
           t.reminders = 0;
+          t.last_interacted_turn = turn;
           delete t.expires;
         }
         break;

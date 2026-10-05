@@ -41,7 +41,7 @@ export const OpSchema = z.discriminatedUnion("op", [
   z.object({
     op: z.literal("thread.adopt"),
     id: z.string(),
-    /** Raise an offer to a minor, or a minor to a major. The player has to have taken it up. */
+    /** Raise an offer to a minor, a minor to a major, or set a major back to a minor. */
     scale: z.enum(["minor", "major"]),
   }),
   z.object({ op: z.literal("thread.resolve"), id: z.string() }),

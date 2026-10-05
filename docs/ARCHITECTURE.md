@@ -326,7 +326,13 @@ pool is the long-term memory and the prompt sees only a few of them:
 
 - A thread reaches the prompt when its deadline is inside `threads.rewarm_hours`, when the player
   just named a person or place on it, or when one of those is in the scene and the thread is still
-  warm. At most `threads.max_majors` of those slots are majors. At most `threads.max_in_context` in all.
+  warm. A major that was set aside is also listed while it is still warm, so it can be offered
+  again. At most `threads.max_majors` of those slots are majors. At most `threads.max_in_context` in all.
+- At most `threads.max_majors` majors stay in the lead. Opening or adopting another sets the one
+  the player has left alone back to a minor, keeps its deadline, and flags it as having been a
+  major. Naming a person or place on it, or standing in one of its places, counts as touching it.
+  Sharing a room with someone does not. If the deadline passes while it is still open, the overdue
+  consequence still fires.
 - Each turn spends one reminder per thread actually shown. After `threads.max_reminders` unprompted
   reminders the thread goes cold and leaves the prompt. It stays in state.
 - A cold thread with a deadline comes back as the deadline approaches.
@@ -900,10 +906,18 @@ engine, and its model-authored status line had already drifted within a single s
     when a person or place on it is in the scene, the player just named them, or the deadline is
     close. The opening deals majors. See ADR 0012.
 
+### Decided with demotion (5 Oct 2026)
+
+48. Two majors still run. A third long matter is not refused. The major the player has left alone
+    (oldest `last_interacted_turn`, then older opening, then id) becomes a minor, keeps its deadline
+    and its consequence, and is flagged `was_major`. The prompt offers it back while it is warm,
+    including off-scene. After those reminders it goes cold like any other minor. Ignoring it past
+    the deadline still fires the overdue consequence. The player never hears the scale. See ADR 0013.
+
 ### Build status (5 Oct 2026)
 
 Phase 0 (contracts) and Phase 1 (core build) are implemented, plus the fixes from the live sessions
-and the ADR 0005, 0006, 0007, 0008, 0009, 0010, 0011 and 0012 changes; 389 tests pass.
+and the ADR 0005, 0006, 0007, 0008, 0009, 0010, 0011, 0012 and 0013 changes; 396 tests pass.
 
 | Area | State |
 |---|---|
@@ -921,6 +935,7 @@ and the ADR 0005, 0006, 0007, 0008, 0009, 0010, 0011 and 0012 changes; 389 tests
 | Travel words and the opening premise come from the book (ADR 0010) | done; exercised with the mock, not yet against a real model |
 | Factual status after the six turns, trip errands, fading NPC memory (ADR 0011) | done; exercised with the mock, not yet against a real model |
 | Major, minor and potential threads (ADR 0012) | done; exercised with the mock, not yet against a real model |
+| A third major sets the quiet one aside (ADR 0013) | done; exercised with the mock, not yet against a real model |
 | Real-model benchmark (Phase 2) | three short live sessions played; full golden-session benchmark not yet run |
 | `need` / attention-miss handling, delta-first experiment results | not yet implemented / not yet measured |
 | Nuxt UI, Supabase, hosted trial, wizard | later phases |

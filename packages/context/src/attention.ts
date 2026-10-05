@@ -56,7 +56,9 @@ function inScene(state: State, config: Config, input: string, id: string): { pre
  * Picks the few threads worth prompt space. An offer is never listed again after the turn it was
  * made. A minor or major is listed when its deadline is close, when the player just named someone
  * or some place on it, or when one of those is in the scene and the thread is still warm.
- * Majors take the first slots, up to `max_majors`. The rest of the budget goes to minors.
+ * A major that stepped back is listed while it is still warm, even off-scene, so it can be offered
+ * again. Majors take the first slots, up to `max_majors`. The rest of the budget goes to minors,
+ * with a set-aside line ahead of an ordinary one.
  */
 export function selectThreads(state: State, config: Config, input = ""): Thread[] {
   const now = state.clock.now;
@@ -65,6 +67,7 @@ export function selectThreads(state: State, config: Config, input = ""): Thread[
   const qualifies = (t: Thread): boolean => {
     if (t.status !== "open" || t.scale === "potential") return false;
     if (near(t)) return true;
+    if (t.was_major && t.scale === "minor" && t.warm) return true;
     let present = false;
     let named = false;
     for (const id of t.entities) {
@@ -77,20 +80,25 @@ export function selectThreads(state: State, config: Config, input = ""): Thread[
   };
 
   const rank = (t: Thread): number => (near(t) ? 0 : 1);
-  const sortThreads = (threads: Thread[]): Thread[] =>
+  const byUrgency = (a: Thread, b: Thread): number => {
+    const ra = rank(a);
+    const rb = rank(b);
+    if (ra !== rb) return ra - rb;
+    if (a.due && b.due && a.due !== b.due) return a.due.localeCompare(b.due);
+    if (a.due !== b.due) return a.due ? -1 : 1;
+    return b.opened_turn - a.opened_turn || a.id.localeCompare(b.id);
+  };
+  const sortMajors = (threads: Thread[]): Thread[] => threads.sort(byUrgency);
+  const sortMinors = (threads: Thread[]): Thread[] =>
     threads.sort((a, b) => {
-      const ra = rank(a);
-      const rb = rank(b);
-      if (ra !== rb) return ra - rb;
-      if (a.due && b.due && a.due !== b.due) return a.due.localeCompare(b.due);
-      if (a.due !== b.due) return a.due ? -1 : 1;
-      return b.opened_turn - a.opened_turn || a.id.localeCompare(b.id);
+      const aside = (a.was_major ? 0 : 1) - (b.was_major ? 0 : 1);
+      return aside || byUrgency(a, b);
     });
 
   const eligible = state.threads.filter(qualifies);
-  const majors = sortThreads(eligible.filter((t) => t.scale === "major")).slice(0, config.threads.max_majors);
+  const majors = sortMajors(eligible.filter((t) => t.scale === "major")).slice(0, config.threads.max_majors);
   const room = Math.max(0, config.threads.max_in_context - majors.length);
-  const minors = sortThreads(eligible.filter((t) => t.scale !== "major")).slice(0, room);
+  const minors = sortMinors(eligible.filter((t) => t.scale !== "major")).slice(0, room);
   return [...majors, ...minors];
 }
 

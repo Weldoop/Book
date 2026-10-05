@@ -109,6 +109,8 @@ export function makeThread(over: Partial<Thread> & { id: string }): Thread {
     status: "open",
     entities: [],
     scale: "minor",
+    was_major: false,
+    last_interacted_turn: 0,
     warm: true,
     reminders: 0,
     last_shown_turn: 1,

@@ -46,6 +46,8 @@ export function createInitialState(config: Config, modules: Module[], saveId: st
       status: "open" as const,
       entities: t.entities,
       scale: t.scale,
+      was_major: false,
+      last_interacted_turn: 0,
       warm: true,
       reminders: 0,
       last_shown_turn: 0,
