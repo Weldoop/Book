@@ -205,13 +205,13 @@ describe("playTurn", () => {
     expect(res.record.check).toEqual({ what: "forcing the drawer" });
   });
 
-  it("counts a reminder against the threads the prompt showed, and cools an ignored one", async () => {
+  it("keeps a thread warm while the player keeps naming it", async () => {
     const { rt, store } = await setup(new MockProvider());
     for (let i = 0; i < 4; i++) await playTurn(rt, "s1", "Stare at the garden");
     const state = await store.loadSave("s1");
     const garden = state.threads.find((t) => t.text.includes("garden"));
-    expect(garden?.reminders).toBeGreaterThan(config.threads.max_reminders);
-    expect(garden?.warm).toBe(false);
+    expect(garden?.warm).toBe(true);
+    expect(garden?.reminders).toBe(0);
     const records = await store.readTurnRecords("s1");
     expect(records[0]?.threads_shown).toContain(garden?.id);
   });

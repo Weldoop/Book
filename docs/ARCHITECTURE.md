@@ -324,18 +324,18 @@ Storing a thread is nearly free; putting it in the prompt is not, and not becaus
 holding ten open threads services none of them and the prose turns into a to-do list. So the thread
 pool is the long-term memory and the prompt sees only a few of them:
 
-- A thread reaches the prompt when its deadline is inside `threads.rewarm_hours`, when the player
-  just named a person or place on it, or when one of those is in the scene and the thread is still
-  warm. A major that was set aside is also listed while it is still warm, so it can be offered
-  again. At most `threads.max_majors` of those slots are majors. At most `threads.max_in_context` in all.
+- A thread is warm for `threads.rewarm_hours` after the player names a person or place on it, or
+  it is opened or adopted. Standing in its place does not refresh that. A warm thread stays in the
+  prompt. A cold one is listed when the player is standing in one of its places, when they just
+  named someone or some place on it, or when the deadline is inside that same window. Someone
+  merely sharing the room does not bring a cold thread in. At most `threads.max_majors` of those
+  slots are majors. At most `threads.max_in_context` in all.
 - At most `threads.max_majors` majors stay in the lead. Opening or adopting another sets the one
   the player has left alone back to a minor, keeps its deadline, and flags it as having been a
-  major. Naming a person or place on it, or standing in one of its places, counts as touching it.
-  Sharing a room with someone does not. If the deadline passes while it is still open, the overdue
-  consequence still fires.
-- Each turn spends one reminder per thread actually shown. After `threads.max_reminders` unprompted
-  reminders the thread goes cold and leaves the prompt. It stays in state.
-- A cold thread with a deadline comes back as the deadline approaches.
+  major. It is listed for the rest of that scene, then goes quiet unless they pick it up or the
+  deadline is close. Naming a person or place on it counts as touching it. Standing in its place
+  does not. If the deadline passes while it is still open, the overdue consequence still fires.
+- A cold thread with a deadline comes back as the deadline approaches. That does not make it warm.
 - An open thread whose deadline passes raises a due event carrying its `on_overdue` text, then is
   marked `failed`. This is what replaces nagging: the garden can be ignored for a hundred turns and
   still lose the inspection.
@@ -914,10 +914,18 @@ engine, and its model-authored status line had already drifted within a single s
     including off-scene. After those reminders it goes cold like any other minor. Ignoring it past
     the deadline still fires the overdue consequence. The player never hears the scale. See ADR 0013.
 
+### Decided with warmth (5 Oct 2026)
+
+49. Warm means the player dealt with the thread in the last `rewarm_hours`. Showing it does not
+    cool it, and standing in its place does not count as dealing with it. A cold thread stays out
+    while a person is merely home. It comes back in its place, when named, or as the deadline
+    nears. A set-aside major is mentioned during the scene it steps back, then left quiet. The
+    deadline still happens. See ADR 0014.
+
 ### Build status (5 Oct 2026)
 
 Phase 0 (contracts) and Phase 1 (core build) are implemented, plus the fixes from the live sessions
-and the ADR 0005, 0006, 0007, 0008, 0009, 0010, 0011, 0012 and 0013 changes; 396 tests pass.
+and the ADR 0005, 0006, 0007, 0008, 0009, 0010, 0011, 0012, 0013 and 0014 changes; 397 tests pass.
 
 | Area | State |
 |---|---|
@@ -936,6 +944,7 @@ and the ADR 0005, 0006, 0007, 0008, 0009, 0010, 0011, 0012 and 0013 changes; 396
 | Factual status after the six turns, trip errands, fading NPC memory (ADR 0011) | done; exercised with the mock, not yet against a real model |
 | Major, minor and potential threads (ADR 0012) | done; exercised with the mock, not yet against a real model |
 | A third major sets the quiet one aside (ADR 0013) | done; exercised with the mock, not yet against a real model |
+| Warm means recently dealt with (ADR 0014) | done; exercised with the mock, not yet against a real model |
 | Real-model benchmark (Phase 2) | three short live sessions played; full golden-session benchmark not yet run |
 | `need` / attention-miss handling, delta-first experiment results | not yet implemented / not yet measured |
 | Nuxt UI, Supabase, hosted trial, wizard | later phases |

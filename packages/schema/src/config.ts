@@ -158,9 +158,9 @@ export const ThreadsConfigSchema = z.object({
   max_in_context: z.number().int().positive().default(4),
   /** Majors in the lead. Opening another sets the one left alone back to a minor. */
   max_majors: z.number().int().positive().default(2),
-  /** Unprompted reminders a thread gets before it goes cold and leaves the prompt. */
+  /** Unused. Kept so older configs still load. Warmth is story time, not a reminder count. */
   max_reminders: z.number().int().min(0).default(2),
-  /** A cold thread with a deadline comes back this many hours before it falls due. */
+  /** Hours after the player deals with a thread that it stays warm, and how early a deadline comes back. */
   rewarm_hours: z.number().min(0).default(12),
   /** Hours an unclaimed offer lasts before it lapses. */
   potential_hours: z.number().int().positive().default(48),

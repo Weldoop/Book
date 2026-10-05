@@ -48,6 +48,7 @@ export function createInitialState(config: Config, modules: Module[], saveId: st
       scale: t.scale,
       was_major: false,
       last_interacted_turn: 0,
+      last_interacted_at: config.time.start,
       warm: true,
       reminders: 0,
       last_shown_turn: 0,

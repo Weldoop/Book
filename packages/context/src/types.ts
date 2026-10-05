@@ -18,7 +18,7 @@ export interface BuiltContext {
   total_tokens: number;
   /** Entity ids actually rendered in FOCUS ENTITIES. */
   focus: string[];
-  /** Thread ids actually rendered in OPEN THREADS, so reminders can be counted. */
+  /** Thread ids actually rendered in OPEN THREADS. */
   threads_shown?: string[];
 }
 

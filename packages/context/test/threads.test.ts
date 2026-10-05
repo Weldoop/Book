@@ -64,13 +64,14 @@ describe("selectThreads", () => {
     expect(selectThreads(state, config, "stare at the wall")).toEqual([]);
   });
 
-  it("puts a near deadline ahead of an on-screen thread, and both ahead of the rest", () => {
+  it("puts a near deadline ahead of a thread the player just dealt with", () => {
     const { config, state } = withThreads([
-      { id: "later", opened_turn: 9 },
-      { id: "onscreen", entities: ["dai"] },
-      { id: "deadline", due: "2026-10-03T16:00" },
+      { id: "later", warm: false, opened_turn: 9 },
+      { id: "recent", last_interacted_at: "2026-10-03T11:00", entities: ["glenys"] },
+      { id: "deadline", due: "2026-10-03T16:00", warm: false },
     ]);
-    expect(selectThreads(state, config, "talk to Dai").map((t) => t.id)).toEqual(["deadline", "onscreen"]);
+    state.entities.glenys = makeEntity({ id: "glenys", name: "Glenys", location: "elsewhere" });
+    expect(selectThreads(state, config, "talk to Dai").map((t) => t.id)).toEqual(["deadline", "recent"]);
   });
 
   it("reserves slots for two majors and leaves an unclaimed offer out", () => {
@@ -87,13 +88,21 @@ describe("selectThreads", () => {
     expect(selectThreads(state, config).map((t) => t.id)).toEqual(["major-c", "major-b", "minor-c", "minor-b"]);
   });
 
-  it("pulls a warm thread when the player is in its place", () => {
-    const { config, state } = withThreads([{ id: "kitchen-job", entities: ["kitchen"] }]);
+  it("pulls a cold thread while the player is in its place, and drops it when they leave", () => {
+    const { config, state } = withThreads([{ id: "kitchen-job", warm: false, entities: ["kitchen"] }]);
     state.entities.kitchen = makeEntity({ id: "kitchen", type: "place", name: "Kitchen" });
     state.entities.player = makeEntity({ id: "player", name: "You", location: "kitchen" });
     expect(selectThreads(state, config, "sit down").map((t) => t.id)).toEqual(["kitchen-job"]);
     state.entities.player = makeEntity({ id: "player", name: "You", location: "room" });
     expect(selectThreads(state, config, "sit down")).toEqual([]);
+  });
+
+  it("keeps a recently dealt-with thread after the player leaves its person", () => {
+    const { config, state } = withThreads([
+      { id: "essay", warm: false, last_interacted_at: "2026-10-03T11:00", entities: ["glenys"] },
+    ]);
+    state.entities.glenys = makeEntity({ id: "glenys", name: "Glenys", location: "elsewhere" });
+    expect(selectThreads(state, config, "make tea").map((t) => t.id)).toEqual(["essay"]);
   });
 
   it("orders competing deadlines soonest first", () => {
@@ -104,14 +113,15 @@ describe("selectThreads", () => {
     expect(selectThreads(state, config).map((t) => t.id)).toEqual(["soon", "late"]);
   });
 
-  it("offers a warm set-aside thread even when its people are elsewhere", () => {
+  it("mentions a set-aside line during the scene it stepped back, then leaves it", () => {
     const { config, state } = withThreads([
-      { id: "aside", scale: "minor", was_major: true, entities: ["glenys"] },
-      { id: "ordinary", entities: ["dai"] },
+      { id: "aside", scale: "minor", was_major: true, warm: false, set_aside_scene: 1, entities: ["glenys"] },
+      { id: "home", warm: false, entities: ["dai"] },
     ]);
     state.entities.glenys = makeEntity({ id: "glenys", name: "Glenys", location: "elsewhere" });
-    state.entities.elsewhere = makeEntity({ id: "elsewhere", type: "place", name: "Elsewhere" });
-    expect(selectThreads(state, config, "make tea").map((t) => t.id)).toEqual(["aside", "ordinary"]);
+    expect(selectThreads(state, config, "make tea").map((t) => t.id)).toEqual(["aside"]);
+    state.scene = { ...state.scene, index: 2 };
+    expect(selectThreads(state, config, "make tea")).toEqual([]);
   });
 
   it("lets a cold set-aside thread stay quiet until it is named or due", () => {
@@ -148,8 +158,10 @@ describe("selectThreads", () => {
 });
 
 describe("threadsSection", () => {
-  it("marks a set-aside thread so the narration can offer it back", () => {
-    const { config, state } = withThreads([{ id: "t1", scale: "minor", was_major: true, text: "Get through the inspection" }]);
+  it("marks a set-aside thread so the narration can mention it once", () => {
+    const { config, state } = withThreads([
+      { id: "t1", scale: "minor", was_major: true, warm: false, set_aside_scene: 1, text: "Get through the inspection" },
+    ]);
     const section = threadsSection(state, config, "", 500);
     expect(section.shown).toEqual(["t1"]);
     expect(section.text).toContain("set aside");

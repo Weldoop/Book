@@ -133,15 +133,24 @@ export function parseDraft(value: unknown): { ok: true; draft: TurnDraft } | { o
 export interface ApplyContext {
   input: string;
   due: DueItem[];
-  /** Threads the prompt actually showed this turn, so reminders can be counted. */
+  /** Threads the prompt actually showed this turn. */
   shown_threads?: string[];
 }
 
 /**
- * Counts the reminders a thread has spent and cools it once it runs out, so an ignored thread
- * stops crowding the prompt. A thread the player touched, or one whose deadline is close,
- * is warm again.
+ * Warm means the player dealt with the thread inside `rewarm_hours`. Showing it, or standing
+ * in its place, does not spend that time. A deadline brings a thread back without making it warm.
  */
+export function ageThreads(state: State, config: Config, shown: string[], turn: number): void {
+  const window = config.threads.rewarm_hours * 60;
+  const shownSet = new Set(shown);
+  for (const t of state.threads) {
+    if (t.status !== "open") continue;
+    if (shownSet.has(t.id)) t.last_shown_turn = turn;
+    t.warm = t.last_interacted_at !== undefined && diffMinutes(state.clock.now, t.last_interacted_at) < window;
+  }
+}
+
 /** An offer nobody took up lapses. It does not become a punishment. */
 export function lapsePotentials(state: State, turn: number): void {
   const now = state.clock.now;
@@ -150,24 +159,6 @@ export function lapsePotentials(state: State, turn: number): void {
     if (diffMinutes(now, thread.expires) < 0) continue;
     thread.status = "failed";
     thread.resolved_turn = turn;
-  }
-}
-
-export function ageThreads(state: State, config: Config, shown: string[], turn: number): void {
-  const { max_reminders, rewarm_hours } = config.threads;
-  const shownSet = new Set(shown);
-  for (const t of state.threads) {
-    if (t.status !== "open") continue;
-    const nearDeadline = t.due !== undefined && diffMinutes(t.due, state.clock.now) <= rewarm_hours * 60;
-    if (nearDeadline) {
-      t.warm = true;
-      t.reminders = 0;
-      continue;
-    }
-    if (!shownSet.has(t.id)) continue;
-    t.last_shown_turn = turn;
-    t.reminders += 1;
-    if (t.reminders > max_reminders) t.warm = false;
   }
 }
 
@@ -215,22 +206,21 @@ function namesEntity(entity: Entity, input: string): boolean {
 }
 
 /**
- * The player touched a thread by naming someone or some place on it, or by standing in one of
- * its places. Sharing a room with a person does not count, and neither does the prompt showing it.
+ * The player dealt with a thread by naming someone or some place on it. Opening and adopting
+ * count too. Standing in its place does not, and neither does someone merely sharing the room.
  */
 export function noteThreadContact(state: State, config: Config, input: string, turn: number): void {
-  const here = state.entities[config.player_id]?.location ?? null;
   for (const thread of state.threads) {
     if (thread.status !== "open") continue;
-    let touched = false;
+    let named = false;
     for (const id of thread.entities) {
       if (id === config.player_id) continue;
       const entity = state.entities[id];
-      if (!entity) continue;
-      if (entity.type === "place" && here === entity.id) touched = true;
-      if (namesEntity(entity, input)) touched = true;
+      if (entity && namesEntity(entity, input)) named = true;
     }
-    if (touched) thread.last_interacted_turn = Math.max(thread.last_interacted_turn, turn);
+    if (!named) continue;
+    thread.last_interacted_turn = Math.max(thread.last_interacted_turn, turn);
+    thread.last_interacted_at = state.clock.now;
   }
 }
 
@@ -268,6 +258,7 @@ export function applyDraft(state: State, config: Config, modules: Module[], draf
         reminders: 0,
         last_shown_turn: turn,
         last_interacted_turn: turn,
+        last_interacted_at: next.clock.now,
         opened_turn: turn,
       });
     }

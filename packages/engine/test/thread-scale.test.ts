@@ -56,6 +56,7 @@ describe("thread scale", () => {
     expect(third.state.threads.find((t) => t.id === "t1")).toMatchObject({
       scale: "minor",
       was_major: true,
+      set_aside_scene: 1,
       status: "open",
       warm: true,
       reminders: 0,
@@ -175,7 +176,7 @@ describe("thread scale", () => {
     });
   });
 
-  it("counts a named person or the place the player is standing in, and ignores someone merely in the room", () => {
+  it("counts a named person or place, and ignores standing in the room or someone merely there", () => {
     const cfg = config();
     cfg.seed.entities.push({ id: "garden", type: "place", name: "Garden", aliases: ["garden"], facts: [], tags: [] });
     const state = createInitialState(cfg, [coreModule], "s");
@@ -209,7 +210,9 @@ describe("thread scale", () => {
     );
     expect(moved.threads.find((t) => t.id === "t2")?.last_interacted_turn).toBe(1);
     const weeding = applyDraft(moved, cfg, [coreModule], draft([]), { input: "pull a weed", due: [] });
-    expect(weeding.threads.find((t) => t.id === "t2")?.last_interacted_turn).toBe(5);
+    expect(weeding.threads.find((t) => t.id === "t2")?.last_interacted_turn).toBe(1);
     expect(weeding.threads.find((t) => t.id === "t1")?.last_interacted_turn).toBe(3);
+    const namedGarden = applyDraft(weeding, cfg, [coreModule], draft([]), { input: "look at the garden", due: [] });
+    expect(namedGarden.threads.find((t) => t.id === "t2")?.last_interacted_turn).toBe(6);
   });
 });

@@ -52,13 +52,26 @@ function inScene(state: State, config: Config, input: string, id: string): { pre
   return { present, named };
 }
 
+/** True when the player named it, opened it, or adopted it inside the warm window. */
+function dealtWithRecently(t: Thread, now: string, hours: number): boolean {
+  if (t.last_interacted_at !== undefined) return diffMinutes(now, t.last_interacted_at) < hours * 60;
+  return t.warm;
+}
+
+/** The player is standing in a place this thread belongs to. */
+function standingIn(state: State, config: Config, thread: Thread): boolean {
+  const here = state.entities[config.player_id]?.location ?? null;
+  if (!here) return false;
+  return thread.entities.some((id) => state.entities[id]?.type === "place" && id === here);
+}
+
 /**
  * Picks the few threads worth prompt space. An offer is never listed again after the turn it was
- * made. A minor or major is listed when its deadline is close, when the player just named someone
- * or some place on it, or when one of those is in the scene and the thread is still warm.
- * A major that stepped back is listed while it is still warm, even off-scene, so it can be offered
- * again. Majors take the first slots, up to `max_majors`. The rest of the budget goes to minors,
- * with a set-aside line ahead of an ordinary one.
+ * made. A thread is listed when the player dealt with it recently, when they are standing in one
+ * of its places, when they just named someone or some place on it, or when its deadline is close.
+ * Someone merely sharing the room does not bring a cold thread in. A major that stepped back is
+ * listed for the rest of that scene. Majors take the first slots, up to `max_majors`. The rest
+ * goes to minors, with a set-aside line ahead of an ordinary one.
  */
 export function selectThreads(state: State, config: Config, input = ""): Thread[] {
   const now = state.clock.now;
@@ -67,16 +80,12 @@ export function selectThreads(state: State, config: Config, input = ""): Thread[
   const qualifies = (t: Thread): boolean => {
     if (t.status !== "open" || t.scale === "potential") return false;
     if (near(t)) return true;
-    if (t.was_major && t.scale === "minor" && t.warm) return true;
-    let present = false;
+    if (dealtWithRecently(t, now, config.threads.rewarm_hours)) return true;
     let named = false;
-    for (const id of t.entities) {
-      const hit = inScene(state, config, input, id);
-      present = present || hit.present;
-      named = named || hit.named;
-    }
+    for (const id of t.entities) named = named || inScene(state, config, input, id).named;
     if (named) return true;
-    return present && t.warm;
+    if (standingIn(state, config, t)) return true;
+    return t.was_major && t.scale === "minor" && t.set_aside_scene === state.scene.index;
   };
 
   const rank = (t: Thread): number => (near(t) ? 0 : 1);

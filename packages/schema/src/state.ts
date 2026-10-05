@@ -36,13 +36,17 @@ export const ThreadSchema = z.object({
   scale: ThreadScaleSchema.default("minor"),
   /** True once this was a major and then stepped back. Stays true if it is taken up again. */
   was_major: z.boolean().default(false),
-  /** Turn the player last named it or stood in one of its places. Opening and adopting count. */
+  /** Scene index when this major stepped back. It is mentioned during that scene only. */
+  set_aside_scene: z.number().int().min(1).optional(),
+  /** Turn the player last named it, or it was opened or adopted. Standing in its place does not count. */
   last_interacted_turn: z.number().int().min(0).default(0),
+  /** Clock time of that same interaction. Warmth lasts `threads.rewarm_hours` from here. */
+  last_interacted_at: LocalDateTimeSchema.optional(),
   /** When an unclaimed offer lapses. Absent on minors and majors. */
   expires: LocalDateTimeSchema.optional(),
-  /** False once the thread has used up its unprompted reminders. Cold threads stay in state but leave the prompt. */
+  /** True when the player dealt with it inside `threads.rewarm_hours`. */
   warm: z.boolean().default(true),
-  /** Unprompted reminders spent so far; see `Config.threads.max_reminders`. */
+  /** Unused. Kept so older saves and configs still load. */
   reminders: z.number().int().min(0).default(0),
   last_shown_turn: z.number().int().min(0).default(0),
   /** Thread this one grew out of, so chains are visible in the logs. */

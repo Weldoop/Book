@@ -41,12 +41,11 @@ function quietestMajor(state: State): State["threads"][number] | undefined {
   return majors[0];
 }
 
-/** A long matter steps back. It stays open, keeps its deadline, and can be offered again. */
-function demoteMajor(thread: State["threads"][number]): void {
+/** A long matter steps back. It stays open, keeps its deadline, and is mentioned for this scene. */
+function demoteMajor(thread: State["threads"][number], sceneIndex: number): void {
   thread.scale = "minor";
   thread.was_major = true;
-  thread.warm = true;
-  thread.reminders = 0;
+  thread.set_aside_scene = sceneIndex;
 }
 
 /** Keeps at most `max_majors` in the lead by setting the quietest one aside. */
@@ -54,7 +53,7 @@ function makeRoomForMajor(state: State, config: Config): void {
   while (openMajorCount(state) >= config.threads.max_majors) {
     const quiet = quietestMajor(state);
     if (!quiet) break;
-    demoteMajor(quiet);
+    demoteMajor(quiet, state.scene.index);
   }
 }
 
@@ -246,6 +245,7 @@ export const coreModule: Module = {
           reminders: 0,
           last_shown_turn: turn,
           last_interacted_turn: turn,
+          last_interacted_at: s.clock.now,
           ...(op.parent ? { parent: op.parent } : {}),
           opened_turn: turn,
         });
@@ -259,11 +259,12 @@ export const coreModule: Module = {
         const t = s.threads.find((x) => x.id === op.id);
         if (t && t.status === "open") {
           if (op.scale === "major" && t.scale !== "major") makeRoomForMajor(s, config);
-          if (t.scale === "major" && op.scale === "minor") demoteMajor(t);
+          if (t.scale === "major" && op.scale === "minor") demoteMajor(t, s.scene.index);
           t.scale = op.scale;
           t.warm = true;
           t.reminders = 0;
           t.last_interacted_turn = turn;
+          t.last_interacted_at = s.clock.now;
           delete t.expires;
         }
         break;
