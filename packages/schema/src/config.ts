@@ -6,6 +6,7 @@ import {
   LocalDateTimeSchema,
   PresentationProfileSchema,
   ThreadKindSchema,
+  ThreadScaleSchema,
 } from "./ids.ts";
 
 export const StatDefSchema = z.object({
@@ -146,6 +147,7 @@ export const ThreadSeedSchema = z.object({
   text: z.string(),
   due: LocalDateTimeSchema.optional(),
   entities: z.array(IdSchema).default([]),
+  scale: ThreadScaleSchema.default("minor"),
   /** Consequence if the deadline passes unresolved. Injected as a due event; the GM narrates the fallout. */
   on_overdue: z.string().optional(),
 });
@@ -154,10 +156,14 @@ export type ThreadSeed = z.infer<typeof ThreadSeedSchema>;
 export const ThreadsConfigSchema = z.object({
   /** Threads shown in the prompt at once. The stored pool is unlimited. */
   max_in_context: z.number().int().positive().default(4),
+  /** Open majors at once, in the save and in the prompt. */
+  max_majors: z.number().int().positive().default(2),
   /** Unprompted reminders a thread gets before it goes cold and leaves the prompt. */
   max_reminders: z.number().int().min(0).default(2),
   /** A cold thread with a deadline comes back this many hours before it falls due. */
   rewarm_hours: z.number().min(0).default(12),
+  /** Hours an unclaimed offer lasts before it lapses. */
+  potential_hours: z.number().int().positive().default(48),
 });
 export type ThreadsConfig = z.infer<typeof ThreadsConfigSchema>;
 

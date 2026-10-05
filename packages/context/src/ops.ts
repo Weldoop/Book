@@ -3,6 +3,7 @@ import type { Module, OpName } from "@book/schema";
 type Field = readonly [name: string, type: string, optional?: boolean];
 
 const KIND = "commitment|goal|debt|mystery|callback";
+const SCALE = "potential|minor|major";
 const ETYPE = "person|place|item|faction|other";
 const WHEN = "YYYY-MM-DDTHH:mm";
 
@@ -37,6 +38,11 @@ export const OP_FIELDS: Record<OpName, readonly Field[]> = {
     ["due", WHEN, true],
     ["entities", "[id]", true],
     ["parent", "thread id", true],
+    ["scale", SCALE, true],
+  ],
+  "thread.adopt": [
+    ["id", "thread id"],
+    ["scale", "minor|major"],
   ],
   "thread.resolve": [["id", "thread id"]],
   "stat.add": [
@@ -72,6 +78,7 @@ export const CORE_OPS: OpName[] = [
   "entity.move",
   "entity.fact.add",
   "thread.open",
+  "thread.adopt",
   "thread.resolve",
 ];
 

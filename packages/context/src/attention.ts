@@ -39,42 +39,59 @@ export function orderThreads(threads: Thread[]): Thread[] {
 }
 
 /**
- * Who is actually in the scene: whoever shares the player's location, plus anyone the player named.
- * Deliberately narrower than `mapAttention`, which falls back to every entity and so cannot
- * tell us whether a thread is live.
+ * A person who is here, or a place the player is standing in. Naming them in the input counts too.
+ * The player's own id never makes a thread relevant.
  */
-function onScreen(state: State, config: Config, input: string): Set<string> {
-  const locationId = state.entities[config.player_id]?.location ?? null;
-  const ids = Object.values(state.entities)
-    .filter((e) => e.id !== config.player_id && ((locationId !== null && e.location === locationId) || mentioned(e, input)))
-    .map((e) => e.id);
-  return new Set(ids);
+function inScene(state: State, config: Config, input: string, id: string): { present: boolean; named: boolean } {
+  const entity = state.entities[id];
+  if (!entity || id === config.player_id) return { present: false, named: false };
+  const here = state.entities[config.player_id]?.location ?? null;
+  const named = mentioned(entity, input);
+  const present =
+    entity.type === "place" ? here === entity.id : here !== null && entity.location === here;
+  return { present, named };
 }
 
 /**
- * Picks the few threads worth prompt space. The stored pool is unlimited; a thread earns a place by
- * having a deadline in view, by involving someone on screen, or by still having reminders left.
- * A cold thread stays in state and bites later through `overdueThreads`.
+ * Picks the few threads worth prompt space. An offer is never listed again after the turn it was
+ * made. A minor or major is listed when its deadline is close, when the player just named someone
+ * or some place on it, or when one of those is in the scene and the thread is still warm.
+ * Majors take the first slots, up to `max_majors`. The rest of the budget goes to minors.
  */
 export function selectThreads(state: State, config: Config, input = ""): Thread[] {
   const now = state.clock.now;
   const window = config.threads.rewarm_hours * 60;
   const near = (t: Thread): boolean => t.due !== undefined && diffMinutes(t.due, now) <= window;
-  const inFocus = (t: Thread): boolean => t.entities.some((id) => onScreen(state, config, input).has(id));
+  const qualifies = (t: Thread): boolean => {
+    if (t.status !== "open" || t.scale === "potential") return false;
+    if (near(t)) return true;
+    let present = false;
+    let named = false;
+    for (const id of t.entities) {
+      const hit = inScene(state, config, input, id);
+      present = present || hit.present;
+      named = named || hit.named;
+    }
+    if (named) return true;
+    return present && t.warm;
+  };
 
-  const rank = (t: Thread): number => (near(t) ? 0 : inFocus(t) ? 1 : 2);
-  const eligible = state.threads.filter((t) => t.status === "open" && (t.warm || near(t) || inFocus(t)));
-
-  return eligible
-    .sort((a, b) => {
+  const rank = (t: Thread): number => (near(t) ? 0 : 1);
+  const sortThreads = (threads: Thread[]): Thread[] =>
+    threads.sort((a, b) => {
       const ra = rank(a);
       const rb = rank(b);
       if (ra !== rb) return ra - rb;
       if (a.due && b.due && a.due !== b.due) return a.due.localeCompare(b.due);
       if (a.due !== b.due) return a.due ? -1 : 1;
       return b.opened_turn - a.opened_turn || a.id.localeCompare(b.id);
-    })
-    .slice(0, config.threads.max_in_context);
+    });
+
+  const eligible = state.threads.filter(qualifies);
+  const majors = sortThreads(eligible.filter((t) => t.scale === "major")).slice(0, config.threads.max_majors);
+  const room = Math.max(0, config.threads.max_in_context - majors.length);
+  const minors = sortThreads(eligible.filter((t) => t.scale !== "major")).slice(0, room);
+  return [...majors, ...minors];
 }
 
 function mentioned(entity: Entity, input: string): boolean {

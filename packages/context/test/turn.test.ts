@@ -145,9 +145,9 @@ describe("buildTurnContext structure", () => {
   it("lists dated threads soonest first, then warm threads", () => {
     const state = makeState({
       threads: [
-        makeThread({ id: "late", text: "later one", due: "2026-10-09T10:00" }),
-        makeThread({ id: "warm", text: "running joke", kind: "callback", opened_turn: 2 }),
-        makeThread({ id: "soon", text: "sooner one", due: "2026-10-04T10:00" }),
+        makeThread({ id: "late", text: "later one", due: "2026-10-09T10:00", entities: ["glenys"] }),
+        makeThread({ id: "warm", text: "running joke", kind: "callback", opened_turn: 2, entities: ["glenys"] }),
+        makeThread({ id: "soon", text: "sooner one", due: "2026-10-04T10:00", entities: ["glenys"] }),
         makeThread({ id: "done", text: "finished", status: "resolved" }),
       ],
     });

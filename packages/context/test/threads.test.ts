@@ -11,9 +11,21 @@ function withThreads(threads: Parameters<typeof makeThread>[0][], over: Record<s
   const state = makeState({
     clock: { now: NOW },
     threads: threads.map((t) => makeThread(t)),
-    entities: { player: makeEntity({ id: "player" }), dai: makeEntity({ id: "dai" }) },
+    entities: {
+      player: makeEntity({ id: "player", name: "You", location: "room" }),
+      room: makeEntity({ id: "room", type: "place", name: "Room" }),
+      dai: makeEntity({ id: "dai", name: "Dai", location: "room" }),
+    },
   });
   return { config, state };
+}
+
+/** Puts Dai on the thread so a warm thread counts as in the scene. */
+function involve(state: ReturnType<typeof withThreads>["state"], ids: string[]): void {
+  for (const id of ids) {
+    const thread = state.threads.find((t) => t.id === id);
+    if (thread) thread.entities = ["dai"];
+  }
 }
 
 describe("selectThreads", () => {
@@ -22,16 +34,18 @@ describe("selectThreads", () => {
       [1, 2, 3, 4, 5, 6].map((n) => ({ id: `t${n}`, opened_turn: n })),
       { threads: { max_in_context: 4, max_reminders: 2, rewarm_hours: 12 } },
     );
+    involve(state, ["t1", "t2", "t3", "t4", "t5", "t6"]);
     expect(selectThreads(state, config)).toHaveLength(4);
     expect(state.threads).toHaveLength(6);
   });
 
-  it("drops a cold thread entirely", () => {
+  it("drops a cold thread even when its person is in the room", () => {
     const { config, state } = withThreads([
       { id: "warm" },
       { id: "cold", warm: false },
     ]);
-    expect(selectThreads(state, config).map((t) => t.id)).toEqual(["warm"]);
+    involve(state, ["warm", "cold"]);
+    expect(selectThreads(state, config, "make tea").map((t) => t.id)).toEqual(["warm"]);
   });
 
   it("brings a cold thread back when its deadline is in view", () => {
@@ -56,7 +70,30 @@ describe("selectThreads", () => {
       { id: "onscreen", entities: ["dai"] },
       { id: "deadline", due: "2026-10-03T16:00" },
     ]);
-    expect(selectThreads(state, config, "talk to Dai").map((t) => t.id)).toEqual(["deadline", "onscreen", "later"]);
+    expect(selectThreads(state, config, "talk to Dai").map((t) => t.id)).toEqual(["deadline", "onscreen"]);
+  });
+
+  it("reserves slots for two majors and leaves an unclaimed offer out", () => {
+    const { config, state } = withThreads([
+      { id: "offer", scale: "potential" },
+      { id: "major-a", scale: "major", opened_turn: 2 },
+      { id: "major-b", scale: "major", opened_turn: 3 },
+      { id: "major-c", scale: "major", opened_turn: 4 },
+      { id: "minor-a", opened_turn: 5 },
+      { id: "minor-b", opened_turn: 6 },
+      { id: "minor-c", opened_turn: 7 },
+    ]);
+    involve(state, ["offer", "major-a", "major-b", "major-c", "minor-a", "minor-b", "minor-c"]);
+    expect(selectThreads(state, config).map((t) => t.id)).toEqual(["major-c", "major-b", "minor-c", "minor-b"]);
+  });
+
+  it("pulls a warm thread when the player is in its place", () => {
+    const { config, state } = withThreads([{ id: "kitchen-job", entities: ["kitchen"] }]);
+    state.entities.kitchen = makeEntity({ id: "kitchen", type: "place", name: "Kitchen" });
+    state.entities.player = makeEntity({ id: "player", name: "You", location: "kitchen" });
+    expect(selectThreads(state, config, "sit down").map((t) => t.id)).toEqual(["kitchen-job"]);
+    state.entities.player = makeEntity({ id: "player", name: "You", location: "room" });
+    expect(selectThreads(state, config, "sit down")).toEqual([]);
   });
 
   it("orders competing deadlines soonest first", () => {
@@ -73,6 +110,7 @@ describe("selectThreads", () => {
       { id: "missed", status: "failed" },
       { id: "live" },
     ]);
+    involve(state, ["live"]);
     expect(selectThreads(state, config).map((t) => t.id)).toEqual(["live"]);
   });
 });
@@ -80,6 +118,7 @@ describe("selectThreads", () => {
 describe("threadsSection", () => {
   it("reports the ids it rendered so reminders can be counted", () => {
     const { config, state } = withThreads([{ id: "t1" }, { id: "t2" }]);
+    involve(state, ["t1", "t2"]);
     const section = threadsSection(state, config, "", 500);
     expect(section.shown).toEqual(["t1", "t2"]);
     expect(section.text).toContain("t1");
@@ -87,6 +126,7 @@ describe("threadsSection", () => {
 
   it("marks itself trimmed when threads were left out of the prompt", () => {
     const { config, state } = withThreads([{ id: "t1" }, { id: "t2", warm: false }]);
+    involve(state, ["t1", "t2"]);
     const section = threadsSection(state, config, "", 500);
     expect(section.shown).toEqual(["t1"]);
     expect(section.trimmed).toBe(true);
@@ -94,6 +134,7 @@ describe("threadsSection", () => {
 
   it("claims no reminder for a thread the budget dropped", () => {
     const { config, state } = withThreads([{ id: "t1" }, { id: "t2" }, { id: "t3" }]);
+    involve(state, ["t1", "t2", "t3"]);
     const section = threadsSection(state, config, "", 12);
     expect(section.shown.length).toBeLessThan(3);
     expect(section.text.split("\n").filter((l) => l.startsWith("- "))).toHaveLength(section.shown.length);

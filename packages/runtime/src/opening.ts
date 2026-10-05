@@ -127,7 +127,7 @@ function openingInstruction(config: Config): string {
     "Deal 3 or 4 adults who already belong to this world. Create each with entity.create before anything refers to them.",
     'Tag a person "unmet" when they are not in the player\'s current room. Do not name an unmet person in the narration, and do not treat them as present.',
     'If someone mentions a place the player has not entered, entity.create it in this same delta with the tag "unvisited".',
-    "Open 1 to 3 threads with thread.open for this chapter. At least one is due in the future. The thread text may name the people you created. Do not make the world's calendar the only goal.",
+    'Open 1 or 2 threads with thread.open and set scale to "major". These are the long matters of the first chapter. Put the people and places each one turns on in entities. At least one is due in the future. Do not make the world\'s calendar the only goal.',
     "The narration is the player's first moment. Do not decide their feelings, words or actions, and do not list the cast.",
     "Other people know only what they have seen, heard, or been told.",
     `The player character id is "${config.player_id}".`,

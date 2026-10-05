@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { EntityTypeSchema, IdSchema, LocalDateTimeSchema, ThreadKindSchema } from "./ids.ts";
+import { EntityTypeSchema, IdSchema, LocalDateTimeSchema, ThreadKindSchema, ThreadScaleSchema } from "./ids.ts";
 
 export const FactSchema = z.object({
   text: z.string(),
@@ -32,6 +32,10 @@ export const ThreadSchema = z.object({
   due: LocalDateTimeSchema.optional(),
   status: z.enum(["open", "resolved", "failed"]).default("open"),
   entities: z.array(IdSchema).default([]),
+  /** Offer, a thread the player took up, or a long matter. The player never sees this word. */
+  scale: ThreadScaleSchema.default("minor"),
+  /** When an unclaimed offer lapses. Absent on minors and majors. */
+  expires: LocalDateTimeSchema.optional(),
   /** False once the thread has used up its unprompted reminders. Cold threads stay in state but leave the prompt. */
   warm: z.boolean().default(true),
   /** Unprompted reminders spent so far; see `Config.threads.max_reminders`. */

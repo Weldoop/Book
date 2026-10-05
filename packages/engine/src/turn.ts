@@ -46,7 +46,7 @@ export const OVERDUE_PREFIX = "overdue:";
  */
 export function overdueThreads(state: State, config: Config): DueItem[] {
   return state.threads
-    .filter((t) => t.status === "open" && t.due !== undefined && diffMinutes(state.clock.now, t.due) >= 0)
+    .filter((t) => t.status === "open" && t.scale !== "potential" && t.due !== undefined && diffMinutes(state.clock.now, t.due) >= 0)
     .map((t) => ({
       id: `${OVERDUE_PREFIX}${t.id}`,
       kind: "scheduled" as const,
@@ -141,6 +141,17 @@ export interface ApplyContext {
  * stops crowding the prompt. A thread the player touched, or one whose deadline is close,
  * is warm again.
  */
+/** An offer nobody took up lapses. It does not become a punishment. */
+export function lapsePotentials(state: State, turn: number): void {
+  const now = state.clock.now;
+  for (const thread of state.threads) {
+    if (thread.status !== "open" || thread.scale !== "potential" || thread.expires === undefined) continue;
+    if (diffMinutes(now, thread.expires) < 0) continue;
+    thread.status = "failed";
+    thread.resolved_turn = turn;
+  }
+}
+
 export function ageThreads(state: State, config: Config, shown: string[], turn: number): void {
   const { max_reminders, rewarm_hours } = config.threads;
   const shownSet = new Set(shown);
@@ -208,6 +219,7 @@ export function applyDraft(state: State, config: Config, modules: Module[], draf
         text: item.thread.text,
         status: "open",
         entities: item.entities.filter((id) => next.entities[id]),
+        scale: "minor",
         warm: true,
         reminders: 0,
         last_shown_turn: turn,
@@ -225,6 +237,7 @@ export function applyDraft(state: State, config: Config, modules: Module[], draf
   }
   ageThreads(next, config, ctx.shown_threads ?? [], turn);
   forgetMemories(next);
+  lapsePotentials(next, turn);
 
   const clockBefore = state.clock.now;
   for (const m of modules) {

@@ -324,8 +324,9 @@ Storing a thread is nearly free; putting it in the prompt is not, and not becaus
 holding ten open threads services none of them and the prose turns into a to-do list. So the thread
 pool is the long-term memory and the prompt sees only a few of them:
 
-- A thread reaches the prompt if its deadline is inside `threads.rewarm_hours`, if it involves
-  someone in the scene, or if it has reminders left. At most `threads.max_in_context`.
+- A thread reaches the prompt when its deadline is inside `threads.rewarm_hours`, when the player
+  just named a person or place on it, or when one of those is in the scene and the thread is still
+  warm. At most `threads.max_majors` of those slots are majors. At most `threads.max_in_context` in all.
 - Each turn spends one reminder per thread actually shown. After `threads.max_reminders` unprompted
   reminders the thread goes cold and leaves the prompt. It stays in state.
 - A cold thread with a deadline comes back as the deadline approaches.
@@ -890,10 +891,19 @@ engine, and its model-authored status line had already drifted within a single s
     facts are their memory: a passing one lapses after a day, an ordinary one after a week, and a
     fight does not lapse. See ADR 0011.
 
+### Decided with major and minor threads (5 Oct 2026)
+
+47. A thread has a scale the player does not see: potential, minor, major. The game master sets it.
+    An offer is made once and lapses if it is not taken up. Taking it up is `thread.adopt` to minor.
+    At most two majors are open. A minor may become the next major when a slot is free, and it can
+    name the major it came from. Resolving a major leaves its minors open. A thread is listed only
+    when a person or place on it is in the scene, the player just named them, or the deadline is
+    close. The opening deals majors. See ADR 0012.
+
 ### Build status (5 Oct 2026)
 
 Phase 0 (contracts) and Phase 1 (core build) are implemented, plus the fixes from the live sessions
-and the ADR 0005, 0006, 0007, 0008, 0009, 0010 and 0011 changes; 384 tests pass.
+and the ADR 0005, 0006, 0007, 0008, 0009, 0010, 0011 and 0012 changes; 389 tests pass.
 
 | Area | State |
 |---|---|
@@ -910,6 +920,7 @@ and the ADR 0005, 0006, 0007, 0008, 0009, 0010 and 0011 changes; 384 tests pass.
 | Stat ids, pirate die bands, voyages, whole-unit prices, week-long skip (ADR 0009) | done; exercised with the mock, not yet against a real model |
 | Travel words and the opening premise come from the book (ADR 0010) | done; exercised with the mock, not yet against a real model |
 | Factual status after the six turns, trip errands, fading NPC memory (ADR 0011) | done; exercised with the mock, not yet against a real model |
+| Major, minor and potential threads (ADR 0012) | done; exercised with the mock, not yet against a real model |
 | Real-model benchmark (Phase 2) | three short live sessions played; full golden-session benchmark not yet run |
 | `need` / attention-miss handling, delta-first experiment results | not yet implemented / not yet measured |
 | Nuxt UI, Supabase, hosted trial, wizard | later phases |

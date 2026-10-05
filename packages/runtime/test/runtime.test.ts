@@ -207,7 +207,7 @@ describe("playTurn", () => {
 
   it("counts a reminder against the threads the prompt showed, and cools an ignored one", async () => {
     const { rt, store } = await setup(new MockProvider());
-    for (let i = 0; i < 4; i++) await playTurn(rt, "s1", "Stare out of the window");
+    for (let i = 0; i < 4; i++) await playTurn(rt, "s1", "Stare at the garden");
     const state = await store.loadSave("s1");
     const garden = state.threads.find((t) => t.text.includes("garden"));
     expect(garden?.reminders).toBeGreaterThan(config.threads.max_reminders);

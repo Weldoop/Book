@@ -25,6 +25,7 @@ function stateWith(threads: Partial<Thread>[], now = config.time.start): State {
       text: `thread ${i + 1}`,
       status: "open" as const,
       entities: [],
+      scale: "minor",
       warm: true,
       reminders: 0,
       last_shown_turn: 0,

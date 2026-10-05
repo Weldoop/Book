@@ -134,12 +134,17 @@ export function timeText(config: Config): string {
 }
 
 export function threadText(config: Config): string {
+  const majors = config.threads.max_majors;
   return [
-    `- OPEN THREADS shows at most ${config.threads.max_in_context} of the live threads, not all of them. Threads the player ignores drop off this list and come back as consequences when their deadline passes.`,
+    `- A thread's scale is potential, minor or major. Never say those words to the player.`,
+    `- List the people who know about it and the places it belongs to in entities. OPEN THREADS includes a thread only when one of those is in the scene, the player just named them, or the deadline is close. At most ${majors} majors, and at most ${config.threads.max_in_context} threads, not all of them.`,
+    `- scale "potential" is an offer. Make the offer in this turn's narration. It is not shown again, and it lapses after ${config.threads.potential_hours} hours if the player does not take it up.`,
+    `- When the player takes an offer up, thread.adopt it to "minor". You decide that, and only when their action did. Do not latch a thread they ignored.`,
+    `- A long matter is scale "major". At most ${majors} majors can be open. Adopting a minor to "major" is how a small matter becomes the next long one. A minor that grows out of a major sets parent to that major. Resolving a major leaves its minors open.`,
     "- Thread the player caused and threads the world set matter equally. One action may resolve more than one: list every thread.resolve it earns.",
     "- When resolving a thread opens a new question, open the follow-up with thread.open and set parent to the thread it came from.",
     "- Do not open a thread that repeats one already open. The same deadline does not need a second thread.",
-    "- Do not nag. Mention a thread only when the scene gives it a reason to come up.",
+    "- Do not nag. Mention a thread only when the scene gives it a reason to come up. If someone knows the thread, a short entity.fact.add on that person is enough.",
   ].join("\n");
 }
 

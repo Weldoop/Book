@@ -416,6 +416,7 @@ describe("duplicate threads", () => {
         ...(due ? { due } : {}),
         status,
         entities: [],
+        scale: "minor",
         warm: true,
         reminders: 0,
         last_shown_turn: 0,

@@ -23,3 +23,7 @@ export type EntityType = z.infer<typeof EntityTypeSchema>;
 
 export const ThreadKindSchema = z.enum(["commitment", "goal", "debt", "mystery", "callback"]);
 export type ThreadKind = z.infer<typeof ThreadKindSchema>;
+
+/** How big a thread is. Hidden from the player. `potential` is an offer, `minor` is taken up, `major` is the long one. */
+export const ThreadScaleSchema = z.enum(["potential", "minor", "major"]);
+export type ThreadScale = z.infer<typeof ThreadScaleSchema>;

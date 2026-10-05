@@ -64,7 +64,7 @@ export function dueSection(config: Config, due: DueItem[], fate: number | undefi
 
 /** Every open thread, for out-of-character recall ("what am I meant to be doing?"). Costs a cheap call only. */
 export function allThreadsSection(state: State, cap: number): Section {
-  const ordered = orderThreads(state.threads);
+  const ordered = orderThreads(state.threads.filter((t) => t.scale !== "potential"));
   const lines = ordered.slice(0, MAX_THREADS).map((t) => {
     const due = t.due ? ` due ${t.due}` : "";
     return `- ${t.id} [${t.kind}]${due}: ${t.text}`;
@@ -83,7 +83,7 @@ export function threadsSection(state: State, config: Config, input: string, cap:
   const lines = chosen.map((t) => {
     const due = t.due ? ` due ${t.due}` : "";
     const ents = t.entities.length ? ` (${t.entities.join(", ")})` : "";
-    return `- ${t.id} [${t.kind}]${due}: ${t.text}${ents}`;
+    return `- ${t.id} [${t.kind}/${t.scale}]${due}: ${t.text}${ents}`;
   });
   const fit = fitLines("## OPEN THREADS", lines, cap, "end");
   const openCount = state.threads.filter((t) => t.status === "open").length;

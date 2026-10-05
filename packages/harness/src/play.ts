@@ -1,4 +1,4 @@
-import type { Config, LLMUsage, Store, LLMProvider } from "@book/schema";
+import type { Config, LLMUsage, State, Store, LLMProvider } from "@book/schema";
 import { BudgetExceededError } from "@book/llm";
 import type { RuntimeApi, TurnResultLike } from "./runtime-api.ts";
 
@@ -73,6 +73,22 @@ export function usageLine(result: TurnResultLike, wallMs: number): string {
   const sum = (pick: (x: LLMUsage) => number): number => u.reduce((n, x) => n + pick(x), 0);
   const secs = (wallMs / 1000).toFixed(1);
   return `in ${sum((x) => x.input_tokens)}  out ${sum((x) => x.output_tokens)}  cached ${sum((x) => x.cached_input_tokens)}  $${sum((x) => x.cost_usd).toFixed(4)}  ${secs}s  ${result.outcome}`;
+}
+
+/** Open threads with their scale. Debug only: the player's page never uses these words. */
+export function threadDebug(state: State): string {
+  const open = state.threads.filter((t) => t.status === "open");
+  if (open.length === 0) return "threads: none open";
+  const lines = ["threads:"];
+  for (const t of open) {
+    const who = t.entities.length > 0 ? ` [${t.entities.join(", ")}]` : "";
+    const parent = t.parent ? ` parent ${t.parent}` : "";
+    const due = t.due ? ` due ${t.due}` : "";
+    const lapses = t.expires ? ` lapses ${t.expires}` : "";
+    const warmth = t.warm ? "warm" : "cold";
+    lines.push(`  ${t.id} ${t.scale} ${t.kind} ${warmth}${due}${lapses}${parent}${who}: ${t.text}`);
+  }
+  return lines.join("\n");
 }
 
 export function debugDump(result: TurnResultLike): string {
@@ -154,7 +170,10 @@ export async function runPlay(opts: PlayOptions): Promise<void> {
     if (text === "/debug") {
       debug = !debug;
       io.write(dim(`debug ${debug ? "on" : "off"}`) + "\n");
-      if (debug && last) io.write(dim(debugDump(last)) + "\n");
+      if (debug && last) {
+        io.write(dim(debugDump(last)) + "\n");
+        io.write(dim(threadDebug(await opts.store.loadSave(opts.saveId))) + "\n");
+      }
       continue;
     }
 
@@ -197,6 +216,9 @@ export async function runPlay(opts: PlayOptions): Promise<void> {
       }
     }
     io.write(dim(`[${usageLine(result, performance.now() - t0)}]`) + "\n");
-    if (debug) io.write(dim(debugDump(result)) + "\n");
+    if (debug) {
+      io.write(dim(debugDump(result)) + "\n");
+      io.write(dim(threadDebug(await opts.store.loadSave(opts.saveId))) + "\n");
+    }
   }
 }

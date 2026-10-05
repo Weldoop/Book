@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { EntityTypeSchema, IdSchema, LocalDateTimeSchema, ThreadKindSchema } from "./ids.ts";
+import { EntityTypeSchema, IdSchema, LocalDateTimeSchema, ThreadKindSchema, ThreadScaleSchema } from "./ids.ts";
 
 /** Closed, versioned set of state-change operations. Each op is owned by one module. */
 export const DELTA_VERSION = 1 as const;
@@ -35,6 +35,14 @@ export const OpSchema = z.discriminatedUnion("op", [
     entities: z.array(IdSchema).optional(),
     /** Set when this thread grows out of one the player just resolved, so chains are traceable. */
     parent: z.string().optional(),
+    /** Defaults to a minor. The opening uses major. An offer is potential. */
+    scale: ThreadScaleSchema.default("minor"),
+  }),
+  z.object({
+    op: z.literal("thread.adopt"),
+    id: z.string(),
+    /** Raise an offer to a minor, or a minor to a major. The player has to have taken it up. */
+    scale: z.enum(["minor", "major"]),
   }),
   z.object({ op: z.literal("thread.resolve"), id: z.string() }),
   // stats
