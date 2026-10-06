@@ -230,11 +230,14 @@ export function noteThreadContact(state: State, config: Config, input: string, t
   }
 }
 
-/** Paying for the matter a thread is about settles it: "Budget plan switch" closes the mobile plan thread. */
+/**
+ * Money changing hands for the matter a thread is about settles it: "Budget plan switch" closes
+ * the mobile plan thread, and "Corner shop shift wages" closes the shift.
+ */
 export function settlePaidThreads(state: State, config: Config, applied: Op[], turn: number): void {
   const keys = new Set(config.stats.filter((stat) => stat.type === "currency").map((stat) => stat.key));
   for (const op of applied) {
-    if (op.op !== "stat.add" || !keys.has(op.key) || op.amount >= 0 || !op.reason) continue;
+    if (op.op !== "stat.add" || !keys.has(op.key) || op.amount === 0 || !op.reason) continue;
     for (const thread of state.threads) {
       if (thread.status !== "open" || sharedContentWords(op.reason, thread.text) < 2) continue;
       thread.status = "resolved";
@@ -326,9 +329,23 @@ export function applyDraft(state: State, config: Config, modules: Module[], draf
   return syncPresence(next, config);
 }
 
-/** Warnings the engine prints itself, so a missed narration cannot hide them. */
-export function playerNotices(due: DueItem[]): string[] {
-  return due.filter((d) => d.kind === "conditional" || d.id.startsWith(OVERDUE_PREFIX)).map((d) => d.text);
+/**
+ * Warnings the engine prints itself, so a missed narration cannot hide them. An overdue thread is
+ * named in the player's words, and one the turn resolved is not a warning.
+ */
+export function playerNotices(due: DueItem[], state?: State): string[] {
+  const out: string[] = [];
+  for (const d of due) {
+    if (d.kind === "conditional") {
+      out.push(d.text);
+      continue;
+    }
+    if (!d.id.startsWith(OVERDUE_PREFIX)) continue;
+    const thread = state?.threads.find((t) => t.id === d.id.slice(OVERDUE_PREFIX.length));
+    if (thread?.status === "resolved") continue;
+    out.push(thread ? `The deadline has passed on "${thread.text}".` : d.text);
+  }
+  return out;
 }
 
 export function pickInterlude(state: State, config: Config): string {

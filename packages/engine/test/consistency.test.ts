@@ -586,6 +586,37 @@ describe("travel and place", () => {
     expect(asked.violations.map((v) => v.code)).toContain("arrived_elsewhere");
   });
 
+  it("keeps the trip inside one action and reads an errand after to as the errand", () => {
+    const cfg = config();
+    const gift = validateDraft(
+      fresh(),
+      cfg,
+      modules,
+      draft({ narration: "You hand Aisha the notes in the living room. She counts them.", at: "shared-house" }),
+      "Walk home and give Aisha forty quid cash towards my sixty for the bills",
+    );
+    expect(gift.violations).toEqual([]);
+    const look = validateDraft(
+      fresh(),
+      cfg,
+      modules,
+      draft({ narration: "You rinse the mug and step out. The garden sprawls untidy.", at: "back-garden", delta: [] }),
+      "Wash up my mug and plate, then go out the back to have a look at the garden",
+    );
+    expect(look.violations.filter((v) => v.code === "arrived_elsewhere")).toEqual([]);
+  });
+
+  it("lets the narration name the time the turn began", () => {
+    const res = validateDraft(
+      fresh(),
+      config(),
+      modules,
+      draft({ narration: "Your phone shows 09:00 when you wake. You shower and dress.", delta: [{ op: "clock.advance", minutes: 45 }] }),
+      "Get up and shower",
+    );
+    expect(res.violations.filter((v) => v.code === "clock_mismatch")).toEqual([]);
+  });
+
   it("does not treat a person still at a table as a refused trip", () => {
     const cfg = config();
     const narration = "You step back inside. Cerys is still at the table, tea cooling in front of her.";
@@ -871,6 +902,39 @@ describe("catalog items", () => {
       "Buy a cask of rum",
     );
     expect(elsewhere.violations.map((v) => v.code)).toEqual(["unpaid_item"]);
+  });
+});
+
+describe("charges the narration never stated", () => {
+  it("rejects a charge for a catalog item the narration only uses", () => {
+    const res = validateDraft(
+      fresh(),
+      config(),
+      modules,
+      draft({
+        narration: "The milk pours pale into a mug, Owen's pint, as promised. You sit with Leah.",
+        delta: [
+          { op: "inventory.add", owner: "player", item: "milk", qty: 1 },
+          { op: "stat.add", key: "money", amount: -1.3, reason: "Pint of milk" },
+        ],
+      }),
+      "Make toast and a tea with Owen's milk",
+    );
+    expect(res.violations.map((v) => v.code)).toEqual(["unstated_charge"]);
+    const bought = validateDraft(
+      fresh(),
+      config(),
+      modules,
+      draft({
+        narration: "You pay for a pint of milk at the till and head back.",
+        delta: [
+          { op: "inventory.add", owner: "player", item: "milk", qty: 1 },
+          { op: "stat.add", key: "money", amount: -1.3, reason: "Pint of milk" },
+        ],
+      }),
+      "Nip to the shop for milk",
+    );
+    expect(bought.violations).toEqual([]);
   });
 });
 

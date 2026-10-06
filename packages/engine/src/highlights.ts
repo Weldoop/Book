@@ -155,7 +155,7 @@ export function selectHighlights(narration: string, requested: string[] | undefi
     const clean = bareName(phrase.trim().replace(/\s+/g, " "));
     if (clean.length < 3 || clean.length > 40) return;
     if (!appearsAsName(narration, clean, requested)) return;
-    if (clean.split(" ").every((word) => STOP.has(word.toLowerCase()))) return;
+    if (clean.split(" ").every((word) => STOP.has(word.toLowerCase()) || STOP.has(word.toLowerCase().replace(/s$/, "")))) return;
     if (isKnown(clean, known)) return;
     if (out.some((item) => norm(item) === norm(clean) || norm(item).includes(norm(clean)) || norm(clean).includes(norm(item)))) return;
     out.push(clean);

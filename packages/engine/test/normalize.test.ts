@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ConfigSchema, type Config, type Module, type Op, type State, type TurnDraft } from "@book/schema";
-import { applyDraft, coreModule, createInitialState, selectHighlights, settlePaidThreads, validateDraft } from "../src/index.ts";
+import { applyDraft, coreModule, createInitialState, playerNotices, selectHighlights, settlePaidThreads, validateDraft } from "../src/index.ts";
 import { driftStats } from "../src/drift.ts";
 import { inferAt, normalizeDraft, resolveEntityId } from "../src/normalize.ts";
 
@@ -32,6 +32,7 @@ function config(): Config {
         { id: "living-room", type: "place", name: "The living room", location: "shared-house" },
         { id: "pub", type: "place", name: "The pub" },
         { id: "bay-cafe", type: "place", name: "The bay cafe" },
+        { id: "corner-shop", type: "place", name: "The corner shop" },
       ],
     },
   });
@@ -165,20 +166,30 @@ describe("threads the model wrote loosely", () => {
     untouched.threads.push({ ...state.threads[0]!, status: "open" });
     settlePaidThreads(untouched, config(), [{ op: "stat.add", key: "cash", amount: -3, reason: "Chips" }], 3);
     expect(untouched.threads[0]?.status).toBe("open");
+    const wages = fresh();
+    wages.threads.push({ ...state.threads[0]!, status: "open", text: "Corner shop shift tomorrow at 16:00 for three hours. Derek will cash you out." });
+    settlePaidThreads(wages, config(), [{ op: "stat.add", key: "cash", amount: 43, reason: "Corner shop shift, 3h 45m" }], 3);
+    expect(wages.threads[0]?.status).toBe("resolved");
   });
 });
 
 describe("the place the sentence sits in", () => {
-  it("fills at from one place named after in, to, or at", () => {
-    const d = draft({ narration: "You head downstairs. The house is quiet except for the kettle clicking off in the kitchen. Owen glances up as you enter." });
+  it("fills at from one place the player is put in after in, to, or at", () => {
+    const d = draft({ narration: "You head downstairs. You find Owen at the table in the kitchen, nursing a mug." });
     inferAt(fresh(), config(), d);
     expect(d.at).toBe("kitchen");
+    const moved = draft({ narration: "You head downstairs to the kitchen. Tomos is still prowling in the living room." });
+    inferAt(fresh(), config(), moved);
+    expect(moved.at).toBe("kitchen");
   });
 
-  it("leaves at alone when two places are named, when the GM set it, or when a place is only talked about", () => {
-    const two = draft({ narration: "You head downstairs to the kitchen. Tomos is still prowling in the living room." });
-    inferAt(fresh(), config(), two);
-    expect(two.at).toBeUndefined();
+  it("leaves at alone when the sentence is not about the player, when the GM set it, or when a place is only talked about", () => {
+    const scenery = draft({ narration: "You head downstairs. The house is quiet except for the kettle clicking off in the kitchen." });
+    inferAt(fresh(), config(), scenery);
+    expect(scenery.at).toBeUndefined();
+    const listing = draft({ narration: "You open the job apps. There's a shift listed at the corner shop starting tomorrow at 16:00. You sip your tea." });
+    inferAt(fresh(), config(), listing);
+    expect(listing.at).toBeUndefined();
     const set = draft({ narration: "You walk into the kitchen.", at: "living-room" });
     inferAt(fresh(), config(), set);
     expect(set.at).toBe("living-room");
@@ -226,12 +237,29 @@ describe("stats that move with the clock", () => {
   });
 });
 
+describe("notices", () => {
+  it("names an overdue thread in the player's words and drops one the turn resolved", () => {
+    const state = fresh();
+    state.threads.push(
+      { id: "t1", kind: "commitment", text: "Shift at the corner shop at 16:00.", status: "resolved", entities: [], scale: "minor", was_major: false, warm: true, reminders: 0, last_shown_turn: 0, last_interacted_turn: 0, opened_turn: 0 },
+      { id: "t2", kind: "commitment", text: "Return the mower by four.", status: "open", entities: [], scale: "minor", was_major: false, warm: true, reminders: 0, last_shown_turn: 0, last_interacted_turn: 0, opened_turn: 0 },
+    );
+    const due = [
+      { id: "overdue:t1", kind: "scheduled" as const, text: "gm text one", entities: [] },
+      { id: "overdue:t2", kind: "scheduled" as const, text: "gm text two", entities: [] },
+      { id: "broke", kind: "conditional" as const, text: "You are nearly broke.", entities: [] },
+    ];
+    expect(playerNotices(due, state)).toEqual(['The deadline has passed on "Return the mower by four.".', "You are nearly broke."]);
+  });
+});
+
 describe("highlights", () => {
   it("marks a new name and skips words that only open a quotation, a dash clause, or a sentence", () => {
     const narration =
       "'Alright,' Tomos says. '—I'm knackered.' You ask about work. 'Residential place out toward Sketty,' Aisha says. 'Three days a week.' Owen's mug is on the side. Priya replies within a minute.";
     const picked = selectHighlights(narration, ["Alright", "I'm", "Three", "Sketty", "Owen's", "Tomos", "Residential"], fresh(), config());
     expect(picked).toEqual(["Sketty", "Owen"]);
+    expect(selectHighlights("Derek says the students come in Thursdays.", ["Thursdays"], fresh(), config())).toEqual([]);
   });
 
   it("keeps a listed name that opens a plain sentence", () => {

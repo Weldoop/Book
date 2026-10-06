@@ -196,7 +196,7 @@ export class AnthropicProvider implements LLMProvider {
         input_tokens: input,
         output_tokens: output,
         cached_input_tokens: cacheRead,
-        cost_usd: computeCost(priceFromEnv(req.tier, this.env), input, output, cacheRead, cacheWrite),
+        cost_usd: computeCost(priceFromEnv(req.tier, this.env, model), input, output, cacheRead, cacheWrite),
         latency_ms: Math.round(performance.now() - started),
         purpose: req.purpose,
       },

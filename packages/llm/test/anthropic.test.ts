@@ -98,6 +98,19 @@ describe("AnthropicProvider", () => {
     expect(calls[1]!.body.model).toBe("claude-sonnet-4-6");
   });
 
+  it("costs a call at the price of the model the tier resolves to", async () => {
+    const haiku = make([OK], { BOOK_MODEL_STRONG: "claude-haiku-4-5-20251001" });
+    const sonnet = make([OK]);
+    const a = await haiku.p.complete(req({ tier: "strong" }));
+    const b = await sonnet.p.complete(req({ tier: "strong" }));
+    // 100 fresh in at $1, 400 cached at $0.10, 50 out at $5 per million.
+    expect(a.usage.cost_usd).toBeCloseTo((100 * 1 + 400 * 0.1 + 50 * 5) / 1_000_000, 9);
+    expect(b.usage.cost_usd).toBeCloseTo((100 * 3 + 400 * 0.3 + 50 * 15) / 1_000_000, 9);
+    const pinned = make([OK], { BOOK_MODEL_STRONG: "claude-haiku-4-5-20251001", BOOK_PRICE_STRONG_IN: "2" });
+    const c = await pinned.p.complete(req({ tier: "strong" }));
+    expect(c.usage.cost_usd).toBeCloseTo((100 * 2 + 400 * 0.1 + 50 * 5) / 1_000_000, 9);
+  });
+
   it("prefills an open brace for json requests and restores it in the reply", async () => {
     const { p, calls } = make([
       { status: 200, body: { ...OK.body, content: [{ type: "text", text: '"narration":"Rain."}' }] } },

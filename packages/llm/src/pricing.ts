@@ -25,14 +25,27 @@ function num(raw: string | undefined, fallback: number): number {
   return Number.isFinite(n) && n >= 0 ? n : fallback;
 }
 
-/** Reads BOOK_PRICE_{STRONG|CHEAP}_{IN|OUT|CACHED_IN}. */
-export function priceFromEnv(tier: LLMTier, env: Env): Price {
+/** Published list prices by model family, so a tier pointed at another model is costed at that model's rate. */
+const MODEL_PRICES: [RegExp, Price][] = [
+  [/haiku-4/, { in: 1, out: 5, cached_in: 0.1 }],
+  [/haiku/, { in: 0.8, out: 4, cached_in: 0.08 }],
+  [/opus/, { in: 15, out: 75, cached_in: 1.5 }],
+  [/sonnet/, { in: 3, out: 15, cached_in: 0.3 }],
+];
+
+export function priceForModel(model: string): Price | undefined {
+  const id = model.toLowerCase();
+  return MODEL_PRICES.find(([re]) => re.test(id))?.[1];
+}
+
+/** Reads BOOK_PRICE_{STRONG|CHEAP}_{IN|OUT|CACHED_IN}; otherwise the price of the model the tier resolves to. */
+export function priceFromEnv(tier: LLMTier, env: Env, model?: string): Price {
   const t = tier.toUpperCase();
-  const d = DEFAULT_PRICES[tier];
+  const base = (model ? priceForModel(model) : undefined) ?? DEFAULT_PRICES[tier];
   return {
-    in: num(env[`BOOK_PRICE_${t}_IN`], d.in),
-    out: num(env[`BOOK_PRICE_${t}_OUT`], d.out),
-    cached_in: num(env[`BOOK_PRICE_${t}_CACHED_IN`], d.cached_in),
+    in: num(env[`BOOK_PRICE_${t}_IN`], base.in),
+    out: num(env[`BOOK_PRICE_${t}_OUT`], base.out),
+    cached_in: num(env[`BOOK_PRICE_${t}_CACHED_IN`], base.cached_in),
   };
 }
 

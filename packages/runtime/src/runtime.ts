@@ -465,7 +465,7 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
     narration: current.draft.narration,
     ...view(rt, next),
     outcome,
-    notices: playerNotices(due),
+    notices: playerNotices(due, next),
     ...(interlude ? { interlude } : {}),
     ...(next.scene.closed
       ? { scene_ended: true, ...(next.scene.title ? { chapter_title: next.scene.title } : {}), chapter_index: next.scene.index }

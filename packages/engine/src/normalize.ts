@@ -169,11 +169,23 @@ function softenItems(state: State, config: Config, draft: TurnDraft): void {
 
 const LOCATIVE = String.raw`\b(?:in|into|inside|at|to|through to|down to|up to|back to|out to|over to|across to|round to)\s+(?:the\s+|your\s+|my\s+|his\s+|her\s+|their\s+|our\s+)?`;
 
+/** A sentence about a plan, a listing, or a message is not where the player stands. */
+const ELSEWHERE = /\b(?:tomorrow|tonight|later|next|last|yesterday|shift|job|listed|advert|text|message|about|remember|used to|mention|plan|booked|interview)\b/i;
+
+/**
+ * The sentence has the player in it ("you head", "you find Owen in the kitchen") and is not
+ * about another time or a listing. "A shift listed at the corner shop" names a place without
+ * anyone going there.
+ */
 function placeNamed(narration: string, place: Entity): boolean {
   const names = [place.name, ...place.aliases, place.id.replace(/[_-]+/g, " ")]
     .map((name) => name.replace(/^(?:the|your|my)\s+/i, "").trim())
     .filter((name) => name.length >= 3);
-  return names.some((name) => new RegExp(`${LOCATIVE}${escapeRegExp(name).replace(/\s+/g, "\\s+")}\\b`, "i").test(narration));
+  const sentences = narration.split(/(?<=[.!?])\s+|\n+/);
+  return sentences.some((sentence) => {
+    if (!/\byou\b/i.test(sentence) || ELSEWHERE.test(sentence)) return false;
+    return names.some((name) => new RegExp(`${LOCATIVE}${escapeRegExp(name).replace(/\s+/g, "\\s+")}\\b`, "i").test(sentence));
+  });
 }
 
 function ancestors(state: State, id: string | null): Set<string> {

@@ -19,6 +19,9 @@ const REFUSAL =
 const PAY =
   /\b(buy|bought|pay|paid|order|ordered|purchase|purchased|spend|spent)\b/gi;
 
+/** Money changing hands without a pay verb: "hands over a tenner", "taps your card", "the till beeps". */
+const SETTLES = /\b(?:hand(?:s|ed)? over|tap(?:s|ped)? (?:your|the|a) card|till|cashier|checkout|rings? (?:it|them|that|you) up|your change)\b/i;
+
 const RELEASE =
   /\b(eat|ate|drink|drank|finish|finished|hand|handed|give|gave|given|return|returned|replace|replaced)\b/gi;
 
@@ -36,19 +39,48 @@ const PURPOSE = new Set([
   "buy",
   "call",
   "charge",
+  "chat",
   "check",
+  "clean",
+  "clear",
+  "collect",
+  "cut",
+  "do",
+  "drop",
+  "eat",
   "find",
+  "finish",
+  "fix",
   "get",
+  "give",
   "grab",
+  "hand",
+  "have",
+  "help",
   "look",
+  "make",
   "meet",
+  "pay",
   "pick",
+  "put",
   "read",
   "say",
   "see",
+  "show",
+  "sit",
+  "sort",
+  "speak",
+  "start",
+  "take",
+  "talk",
   "tell",
   "text",
+  "tidy",
+  "try",
+  "wait",
+  "wash",
   "watch",
+  "work",
 ]);
 
 /** "Go to sleep" is rest, not a destination. "Go to bed" still is, once a bed exists. */
@@ -137,7 +169,9 @@ function verbPattern(verbs: string[], prepositions: string, span: number): RegEx
   list.sort((a, b) => b.length - a.length);
   if (list.length === 0) return null;
   const body = list.map(escapeRegExp).join("|");
-  return new RegExp(`\\b(?:${body})\\b[^.]{0,${span}}?\\b(?:${prepositions})\\s+${DEST}`, "gi");
+  // The stretch from the verb to the preposition stays inside one action: "walk home and give Aisha
+  // forty quid towards my sixty" is a walk, then a gift, so "and" and a comma end the stretch.
+  return new RegExp(`\\b(?:${body})\\b(?:(?!\\b(?:and|then)\\b)[^.,;]){0,${span}}?\\b(?:${prepositions})\\s+${DEST}`, "gi");
 }
 
 interface DestHit {
@@ -650,7 +684,7 @@ function alreadyOwned(name: string, id: string, held: number): Violation {
   );
 }
 
-function checkItems(before: State, after: State, config: Config, draft: TurnDraft, applied: Op[]): Violation[] {
+function checkItems(before: State, after: State, config: Config, draft: TurnDraft, applied: Op[], input = ""): Violation[] {
   const catalog = catalogItems(config, after);
   if (catalog.length === 0) return [];
   const text = draft.narration.toLowerCase();
@@ -726,6 +760,18 @@ function checkItems(before: State, after: State, config: Config, draft: TurnDraf
   for (const spend of currencySpends(applied, config)) {
     for (const item of itemsInText(spend.reason, catalog)) {
       if (item.price === undefined || item.price <= 0) continue;
+      const row = byId.get(item.id);
+      // Pouring Owen's milk is not buying milk: a charge needs a purchase somewhere in the turn, or the figure.
+      if (!row?.pay && !hasVerb(text, PAY) && !SETTLES.test(text) && !hasVerb(input.toLowerCase(), PAY) && !mentionsAmount(draft.narration, spend.amount)) {
+        out.push(
+          violation(
+            "fixable",
+            "unstated_charge",
+            `The delta charges ${-spend.amount} for "${item.name}" (${item.id}) but the narration never buys, pays for, or orders it. Remove that stat.add and any inventory.add of '${item.id}', or narrate the purchase.`,
+          ),
+        );
+        continue;
+      }
       const held = heldQty(before, player, item.id);
       if (held >= 1 && !ANOTHER.test(spend.reason)) {
         if (!owned.has(item.id)) {
@@ -907,8 +953,11 @@ function pad(n: number): string {
 function checkClock(before: State, after: State, config: Config, draft: TurnDraft): Violation[] {
   const stated = statedClock(draft.narration, before.clock.now);
   const landed = clockFace(after.clock.now);
+  const began = clockFace(before.clock.now);
   if (!stated || !landed) return [];
   if (stated.hours === landed.hours && stated.minutes === landed.minutes) return [];
+  // "Your phone shows 08:00 when you wake" describes the start of the turn; the minutes after it are the delta's.
+  if (began && stated.hours === began.hours && stated.minutes === began.minutes) return [];
   const label = `${pad(stated.hours)}:${pad(stated.minutes)}`;
   const now = `${pad(landed.hours)}:${pad(landed.minutes)}`;
   const mins = minutesUntil(before.clock.now, stated.hours, stated.minutes);
@@ -1011,6 +1060,6 @@ export function consistencyViolations(
     ...checkTravel(before, after, config, draft, input, applied),
     ...checkClock(before, after, config, draft),
     ...checkNarratedCharge(config, draft, applied),
-    ...checkItems(before, after, config, draft, applied),
+    ...checkItems(before, after, config, draft, applied, input),
   ];
 }
