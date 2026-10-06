@@ -52,10 +52,25 @@ describe("op validation", () => {
     expect(res.violations[0]).toMatchObject({ severity: "game_breaking", code: "insufficient_funds" });
   });
 
-  it("flags removing an unowned item as game breaking", () => {
+  it("flags removing gear the player never had as game breaking, and lets a good the bag never held pass as narration", () => {
     const { config, modules, state } = testSetup();
-    const res = validateDraft(state, config, modules, draft([{ op: "inventory.remove", owner: "player", item: "spare" }]) as never);
-    expect(res.violations[0]).toMatchObject({ severity: "game_breaking", code: "item_not_owned" });
+    const gear = validateDraft(state, config, modules, draft([{ op: "inventory.remove", owner: "player", item: "torch" }]) as never);
+    expect(gear.violations[0]).toMatchObject({ severity: "game_breaking", code: "item_not_owned" });
+    const good = draft([{ op: "inventory.remove", owner: "player", item: "spare" }]) as never as { delta: unknown[] };
+    const res = validateDraft(state, config, modules, good as never);
+    expect(res.ok).toBe(true);
+    expect(good.delta).toEqual([]);
+  });
+
+  it("keeps the charge and drops the bag op when a bought good is not on the sheet", () => {
+    const { config, modules, state } = testSetup();
+    const d = draft([
+      { op: "stat.add", key: "money", amount: -2.3, reason: "Milk and a loaf" },
+      { op: "inventory.add", owner: "player", item: "loaf" },
+    ]) as never as { delta: unknown[] };
+    const res = validateDraft(state, config, modules, d as never);
+    expect(res.ok).toBe(true);
+    expect(d.delta).toEqual([{ op: "stat.add", key: "money", amount: -2.3, reason: "Milk and a loaf" }]);
   });
 
   it("creates gear the save must remember and refuses a second copy", () => {
@@ -206,7 +221,7 @@ describe("turn application", () => {
     const { config, modules, state } = testSetup();
     const next = applyDraft(state, config, modules, draft([]) as never, { input: "look", due: [] });
     expect(next.clock.now).toBe("2026-10-03T09:21");
-    expect(next.beats).toEqual([{ turn: 1, text: "Did the thing." }]);
+    expect(next.beats).toEqual([{ turn: 1, text: "Did the thing.", clock: "2026-10-03T09:21" }]);
     expect(next.window[0]).toMatchObject({ turn: 1, input: "look" });
   });
 

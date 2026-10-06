@@ -192,6 +192,11 @@ function sharedCount(a: Set<string>, b: Set<string>): number {
   return n;
 }
 
+/** Content words two texts have in common, after stop words and plurals. */
+export function sharedContentWords(a: string, b: string): number {
+  return sharedCount(contentWords(a), contentWords(b));
+}
+
 function recentlyResolved(thread: ThreadOverlap, now: string | undefined): boolean {
   if (thread.status !== "resolved" || !now || !thread.resolved_at) return false;
   const age = diffMinutes(now, thread.resolved_at);

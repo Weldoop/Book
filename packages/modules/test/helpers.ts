@@ -19,6 +19,7 @@ export function testConfig(overrides: Record<string, unknown> = {}): Config {
       { id: "phone", name: "Phone" },
       { id: "cob", name: "Cob", price: 4.2 },
       { id: "spare", name: "Spare" },
+      { id: "torch", name: "Torch", keeps: true },
     ],
     dice: { sides: 100, thresholds: [10, 25, 50, 75, 90], labels: ["a", "b", "c", "d", "e", "f"] },
     events: {

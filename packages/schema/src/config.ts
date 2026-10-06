@@ -18,6 +18,10 @@ export const StatDefSchema = z.object({
   start: z.number(),
   display: z.string().optional(),
   hidden: z.boolean().default(false),
+  /** Change per story hour of clock.advance, for a bounded stat that moves with time awake. */
+  per_hour: z.number().optional(),
+  /** Change per story hour of clock.skip, for a bounded stat that rest brings back. */
+  per_skip_hour: z.number().optional(),
 });
 export type StatDef = z.infer<typeof StatDefSchema>;
 

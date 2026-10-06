@@ -5,18 +5,21 @@ import {
   type Entity,
   type GmNote,
   type Module,
+  type Op,
   type State,
   type TurnDraft,
   type TurnKind,
   type Violation,
 } from "@book/schema";
 import { consistencyViolations, materializeAt } from "./consistency.ts";
+import { driftStats } from "./drift.ts";
 import { selectHighlights } from "./highlights.ts";
 import { syncPresence } from "./core.ts";
 import { forgetMemories } from "./memory.ts";
+import { normalizeDraft } from "./normalize.ts";
 import { processOps } from "./ops.ts";
 import { resolveStatKey } from "./stat-key.ts";
-import { duplicateOpenThread } from "./threads.ts";
+import { duplicateOpenThread, sharedContentWords } from "./threads.ts";
 import { rngFor } from "./rng.ts";
 import { addMinutes, diffMinutes } from "./time.ts";
 
@@ -54,7 +57,7 @@ export function overdueThreads(state: State, config: Config): DueItem[] {
       kind: "scheduled" as const,
       text:
         t.on_overdue ??
-        `The deadline has passed on "${t.text}" and it was never dealt with. Play the consequences now.`,
+        `The deadline has passed on "${t.text}". If the story already settled it, thread.resolve ${t.id}. Otherwise play the consequences now.`,
       entities: t.entities.filter((id) => state.entities[id]),
     }));
 }
@@ -109,6 +112,7 @@ export function validateDraft(
   draft: TurnDraft,
   input = "",
 ): ValidationResult {
+  normalizeDraft(state, config, draft);
   materializeAt(state, config, draft);
   const processed = processOps(withThreadContact(state, config, input), config, modules, draft.delta);
   const warnings: string[] = [];
@@ -226,6 +230,20 @@ export function noteThreadContact(state: State, config: Config, input: string, t
   }
 }
 
+/** Paying for the matter a thread is about settles it: "Budget plan switch" closes the mobile plan thread. */
+export function settlePaidThreads(state: State, config: Config, applied: Op[], turn: number): void {
+  const keys = new Set(config.stats.filter((stat) => stat.type === "currency").map((stat) => stat.key));
+  for (const op of applied) {
+    if (op.op !== "stat.add" || !keys.has(op.key) || op.amount >= 0 || !op.reason) continue;
+    for (const thread of state.threads) {
+      if (thread.status !== "open" || sharedContentWords(op.reason, thread.text) < 2) continue;
+      thread.status = "resolved";
+      thread.resolved_turn = turn;
+      thread.resolved_at = state.clock.now;
+    }
+  }
+}
+
 function withThreadContact(state: State, config: Config, input: string): State {
   const next = structuredClone(state);
   noteThreadContact(next, config, input, state.turn + 1);
@@ -234,6 +252,7 @@ function withThreadContact(state: State, config: Config, input: string): State {
 
 /** Applies a draft that has already passed validation. Pure: returns the next state. */
 export function applyDraft(state: State, config: Config, modules: Module[], draft: TurnDraft, ctx: ApplyContext): State {
+  normalizeDraft(state, config, draft);
   materializeAt(state, config, draft);
   const processed = processOps(withThreadContact(state, config, ctx.input), config, modules, draft.delta);
   if (processed.violations.length > 0) {
@@ -247,6 +266,8 @@ export function applyDraft(state: State, config: Config, modules: Module[], draf
   }
 
   next = structuredClone(next);
+  driftStats(next, config, processed);
+  settlePaidThreads(next, config, processed.applied, turn);
   for (const item of ctx.due) {
     if (item.thread && !duplicateOpenThread(next.threads, item.thread.text, undefined, next.clock.now)) {
       next.threads.push({
@@ -266,6 +287,7 @@ export function applyDraft(state: State, config: Config, modules: Module[], draf
       });
     }
     // An overdue thread has now had its consequence narrated, so it stops asking for one.
+    // One the GM resolved this turn was already settled, so it is not a failure.
     if (item.id.startsWith(OVERDUE_PREFIX)) {
       const t = next.threads.find((x) => x.id === item.id.slice(OVERDUE_PREFIX.length));
       if (t && t.status === "open") {
@@ -289,7 +311,7 @@ export function applyDraft(state: State, config: Config, modules: Module[], draf
     next.scene = { ...next.scene, closed: true, ...(title ? { title } : {}) };
   }
   next.notes = collectNotes(next, config, draft, turn);
-  next.beats.push({ turn, text: draft.beat });
+  next.beats.push({ turn, text: draft.beat, clock: next.clock.now });
   if (next.beats.length > BEATS_CAP) next.beats = next.beats.slice(-BEATS_CAP);
   const highlights = selectHighlights(draft.narration, draft.highlights, next, config);
   next.window.push({

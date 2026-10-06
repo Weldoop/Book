@@ -60,7 +60,7 @@ export const ThreadSchema = z.object({
 });
 export type Thread = z.infer<typeof ThreadSchema>;
 
-export const BeatSchema = z.object({ turn: z.number().int().min(0), text: z.string() });
+export const BeatSchema = z.object({ turn: z.number().int().min(0), text: z.string(), clock: LocalDateTimeSchema.optional() });
 export type Beat = z.infer<typeof BeatSchema>;
 
 export const TranscriptTurnSchema = z.object({

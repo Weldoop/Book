@@ -92,7 +92,9 @@
       "min": 0,
       "max": 100,
       "start": 80,
-      "hidden": false
+      "hidden": false,
+      "per_hour": -4,
+      "per_skip_hour": 12
     },
     {
       "key": "stress",
