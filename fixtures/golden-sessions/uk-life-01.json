@@ -1,0 +1,512 @@
+{
+  "id": "uk-life-01",
+  "config_id": "uk-life",
+  "description": "Player-side inputs of a real 125-turn UK student life session played on a plain chat setup. Use as a token benchmark and recall checklist. Model replies on replay will differ from the original.",
+  "baseline": {
+    "approx_full_context_tokens_at_end": 35000,
+    "approx_conversation_tokens": 13375,
+    "turns": 125
+  },
+  "inputs": [
+    {
+      "turn": 1,
+      "text": "Start the game"
+    },
+    {
+      "turn": 2,
+      "text": "Its weldo, dai\nWhat time is he coming\nInspect my room"
+    },
+    {
+      "turn": 3,
+      "text": "Put my phone on charge, check the notifications\nCheck out the window"
+    },
+    {
+      "turn": 4,
+      "text": "Reply in the whatsapp group thanking dai, tell everyone ill be sorting the garden out does anyone want to help me"
+    },
+    {
+      "turn": 5,
+      "text": "React to dais message with 🤑"
+    },
+    {
+      "turn": 6,
+      "text": "Have a shower and get dressed making me look good then leave the room, where am I"
+    },
+    {
+      "turn": 7,
+      "text": "Follow the smell of toast"
+    },
+    {
+      "turn": 8,
+      "text": "Aye it was, garden looks like it needs shaping up\nAsk if she's a jam or just a butter gal\nAsk if she wants a brew doing"
+    },
+    {
+      "turn": 9,
+      "text": "Make the tea but check her out"
+    },
+    {
+      "turn": 10,
+      "text": "Ask her what she is studying again and make myself a coffee"
+    },
+    {
+      "turn": 11,
+      "text": "You know how my brain works then and then get the sugar to add one tea spoon in, stir and add more milk\nAsk her if we have any garden gloves"
+    },
+    {
+      "turn": 12,
+      "text": "Dm"
+    },
+    {
+      "turn": 13,
+      "text": "OOC: thought that was the message for the dungeon master to give me more info"
+    },
+    {
+      "turn": 14,
+      "text": "..."
+    },
+    {
+      "turn": 15,
+      "text": "Thumb up to him and go inspect the cupboard"
+    },
+    {
+      "turn": 16,
+      "text": "Text marcus to say no problem pal, deffo a 2 man job I'll source us a mower, ask dai if the gloves are his"
+    },
+    {
+      "turn": 17,
+      "text": "Go out side and inspect the road before going to knock on mrs pughs door"
+    },
+    {
+      "turn": 18,
+      "text": "Good morning mrs pugh, how are you today I say in an upbeat but professional tone"
+    },
+    {
+      "turn": 19,
+      "text": "That's disgusting from them not to worry with us, dai has already said hes doing the bins tomorrow\nIve told the group mrs pugh I'll be tidying up the back garden but being students we dont have a mower. Looking at your fine front garden do you have the mower I could borrow or know a gardener that I can borrow from. Also I'll be respectful of the cat too, you have my word"
+    },
+    {
+      "turn": 20,
+      "text": "Appreciate that mrs pugh. My names nathan mrs pugh"
+    },
+    {
+      "turn": 21,
+      "text": "..."
+    },
+    {
+      "turn": 22,
+      "text": "Inspect the shed subtly as I take the mower. Four o'clock then Glenys no problem"
+    },
+    {
+      "turn": 23,
+      "text": "Take the mower to the garden, see if i can store it somewhere protected from the rain"
+    },
+    {
+      "turn": 24,
+      "text": "Go in the house to check my phone"
+    },
+    {
+      "turn": 25,
+      "text": "Text the group chat telling everyone im going to the shop ask if anyone wants anything grabbing"
+    },
+    {
+      "turn": 26,
+      "text": "Check my books to see what im at uni for, grab my phone and go to the shops"
+    },
+    {
+      "turn": 27,
+      "text": "Investigate the local neighbourhood on the eay to the shop"
+    },
+    {
+      "turn": 28,
+      "text": "Go to the cafe for a cob"
+    },
+    {
+      "turn": 29,
+      "text": "Sausage and egg please love"
+    },
+    {
+      "turn": 30,
+      "text": "Both? Red please boss"
+    },
+    {
+      "turn": 31,
+      "text": "Ping the card reader with my phone\nAsk him he's had a busy shift"
+    },
+    {
+      "turn": 32,
+      "text": "Swat him the 80p loose change i have in my pocket in the jar\nAn extra egg on the cob would be nice too boss, nod to him an sit down at the table"
+    },
+    {
+      "turn": 33,
+      "text": "Polish it off and go to coop as I leave say to the lad sorry I didn't catch you name"
+    },
+    {
+      "turn": 34,
+      "text": "Get the milk for cerys and get a four pack of beer"
+    },
+    {
+      "turn": 35,
+      "text": "..."
+    },
+    {
+      "turn": 36,
+      "text": "Hand her my driving licence, check her out as she checks the license"
+    },
+    {
+      "turn": 37,
+      "text": "Ping the phone on the contactless and give her a wink as I leave"
+    },
+    {
+      "turn": 38,
+      "text": "Get home and put cerys milk in the fridge"
+    },
+    {
+      "turn": 39,
+      "text": "Put the beer in the fridge and get the garden stuff prepped for outside"
+    },
+    {
+      "turn": 40,
+      "text": "Get the gloves on and clear the brambles"
+    },
+    {
+      "turn": 41,
+      "text": "Do as much as I can until 10 to 2"
+    },
+    {
+      "turn": 42,
+      "text": "Put the bags in the outhouse for the moment and go upstairs to the kitchen"
+    },
+    {
+      "turn": 43,
+      "text": "Have a minute on the sofa and inspect the room"
+    },
+    {
+      "turn": 44,
+      "text": "Pencil weldo and Marcus on today for the garden and inspect the agents letter"
+    },
+    {
+      "turn": 45,
+      "text": "Pin the letter on the calendar and knock on Marcus door"
+    },
+    {
+      "turn": 46,
+      "text": "Aye brambles, how do you take your coffee? Ill sort you pal"
+    },
+    {
+      "turn": 47,
+      "text": "Make the brews and check my phone and my social media"
+    },
+    {
+      "turn": 48,
+      "text": "Snap jake with the coffee and scratches with the caption bright as a daisy but the brambles can do one"
+    },
+    {
+      "turn": 49,
+      "text": "No idea why I picked a Welsh uni but I'll be back for sure not sure when though"
+    },
+    {
+      "turn": 50,
+      "text": "Wait exactly 20 mins and knock on Marcus door telling ill be outside"
+    },
+    {
+      "turn": 51,
+      "text": "Ask Marcus how we should tackle it and let him know of the bags of brambles"
+    },
+    {
+      "turn": 52,
+      "text": "Aye, she wants it clean as a whistle, it was her late fellas pride and joy and best not piss the neighbour off ey"
+    },
+    {
+      "turn": 53,
+      "text": "Crack on with the garden until 4 and drop the mower back next door..."
+    },
+    {
+      "turn": 54,
+      "text": "What are loppers"
+    },
+    {
+      "turn": 55,
+      "text": "Say cheers and introduce Marcus to her, mention if she needs anything just shout up, but say it in a way that nothings free"
+    },
+    {
+      "turn": 56,
+      "text": "A tenner, im not sure its worth our time especially with studying glenys but I'll keep it in mind"
+    },
+    {
+      "turn": 57,
+      "text": "Nod to the cat and speak with Marcus if he think the garden will pass the inspection"
+    },
+    {
+      "turn": 58,
+      "text": "We'll do the tip but we are not responsible for the fence and the bench, ill talk our way out of that one\nGo back inside to the kitchen"
+    },
+    {
+      "turn": 59,
+      "text": "Dont worry about it, its only a couple of quid\nBut you do owe me a coffee i Jokingly but seriously say"
+    },
+    {
+      "turn": 60,
+      "text": "Ill take that deal. What are you working on"
+    },
+    {
+      "turn": 61,
+      "text": "Nice youll smash that over the weekend, let me know if you want me to proof read it. And no note yet will do it after the tip tomorrow"
+    },
+    {
+      "turn": 62,
+      "text": "Well here's the problem im yet to solve\nIm not sure if youve seen the calendar in the room\nWe have an inspection around then, me and Marcus have done the garden and it just so happens there is a cleaning charge if the common rooms and garden is not tidy\nThe panels and bench aren't passable but they are not our problem right? I know the assessors are tricky customers and I dont want us to be stung"
+    },
+    {
+      "turn": 63,
+      "text": "Was you here on your first year? Do you have the install photos"
+    },
+    {
+      "turn": 64,
+      "text": "Tell me its all good"
+    },
+    {
+      "turn": 65,
+      "text": "Appreciate you checking\nJust the common rooms then, who else lives here"
+    },
+    {
+      "turn": 66,
+      "text": "Let's all tidy as we go then. Im off for a shower now... give her a cheeky little smile... as I go slightly glance back.. to check if she's looking at me"
+    },
+    {
+      "turn": 67,
+      "text": "Go check what clothes I can wear for tonight, stylish for a night out but utility if I need it"
+    },
+    {
+      "turn": 68,
+      "text": "Text the group chat ask what is everyone on tonight"
+    },
+    {
+      "turn": 69,
+      "text": "Aye I fancy a beer too\nGo to the shower and get changed"
+    },
+    {
+      "turn": 70,
+      "text": "Go to the kitchen and grab a can of beer"
+    },
+    {
+      "turn": 71,
+      "text": "Big grafter Marcus, where is it that you work?"
+    },
+    {
+      "turn": 72,
+      "text": "Distribution for what?"
+    },
+    {
+      "turn": 73,
+      "text": "Put my name in the hat for any part time work bro, have a good shift\nLet Marcus know about the monday inspection and I've marked our names on the calendar"
+    },
+    {
+      "turn": 74,
+      "text": "Check snap"
+    },
+    {
+      "turn": 75,
+      "text": "Snap jake, too brassic to come over but im with you lads in spirit and take a photo of the can\nSnap ellie saying cheers for the add with the beer can too"
+    },
+    {
+      "turn": 76,
+      "text": "Only planning one with a few friends at the local but could be tempted"
+    },
+    {
+      "turn": 77,
+      "text": "Uplands tavern at 8 with a couple of my flatmates"
+    },
+    {
+      "turn": 78,
+      "text": "Eye emoji back and do a quick inspection of the common rooms for the inspection monday"
+    },
+    {
+      "turn": 79,
+      "text": "Grab the business book and have a quick pre read for Mondays lecture"
+    },
+    {
+      "turn": 80,
+      "text": "..."
+    },
+    {
+      "turn": 81,
+      "text": "Aye but I dont think the common rooms will pass\nBut yeah common rooms at 8, let him know a couple of business course people are coming and give him a wink, ask if he doesn't mind"
+    },
+    {
+      "turn": 82,
+      "text": "..."
+    },
+    {
+      "turn": 83,
+      "text": "You both are looking dapper, let's head out"
+    },
+    {
+      "turn": 84,
+      "text": "That's sound, what you having cerys"
+    },
+    {
+      "turn": 85,
+      "text": "..."
+    },
+    {
+      "turn": 86,
+      "text": "Engage with the small take and introduce everyone, scan the room and pub"
+    },
+    {
+      "turn": 87,
+      "text": "Ask ellie about the monday lecture if she's going and let dai know I'll play pool"
+    },
+    {
+      "turn": 88,
+      "text": "Yeah ill be going, I do need to sort the inspection out but I'll sort with the guys"
+    },
+    {
+      "turn": 89,
+      "text": "Get up to watch the shot but stay silent so they can focus"
+    },
+    {
+      "turn": 90,
+      "text": "Comment unlucky with the miss, I thought you had him"
+    },
+    {
+      "turn": 91,
+      "text": "Tell dai he feels sorry as I've only planned to come out for one and hes buying the next round"
+    },
+    {
+      "turn": 92,
+      "text": "Tails always"
+    },
+    {
+      "turn": 93,
+      "text": "OOC wait is this a doubles game or just me vs dai"
+    },
+    {
+      "turn": 94,
+      "text": "Inspect the table, look if I can mop up the table for solids"
+    },
+    {
+      "turn": 95,
+      "text": "Pot 3 and 6 and line up for a shot on 5 using ball control"
+    },
+    {
+      "turn": 96,
+      "text": "Attempt for 5 but look for the white ball to break up the solid cluster, then re asses"
+    },
+    {
+      "turn": 97,
+      "text": "Smash the 2 ball with heavy back spin to tap 1 off the side cushion. Then re tip the cue"
+    },
+    {
+      "turn": 98,
+      "text": "Aim for the 1 and try for the whute to hit 15 or 12 away"
+    },
+    {
+      "turn": 99,
+      "text": "Nod to my table clocking eyes with cerys"
+    },
+    {
+      "turn": 100,
+      "text": "Hit the 7 miss on purpose but dont make it obvious, let the white Hit the 15"
+    },
+    {
+      "turn": 101,
+      "text": "Show me what youve got lads, still a few stripes there"
+    },
+    {
+      "turn": 102,
+      "text": "Go on dai take the glory son"
+    },
+    {
+      "turn": 103,
+      "text": "Shake the rugby lads hands and say ill have Guinness gents"
+    },
+    {
+      "turn": 104,
+      "text": "..."
+    },
+    {
+      "turn": 105,
+      "text": "Sarcastically say I dont know what your on about cerys"
+    },
+    {
+      "turn": 106,
+      "text": "Who can say no to a free drink right, and making dai the king, everyone's a winner, the rugby lads will be drinking all night anyway"
+    },
+    {
+      "turn": 107,
+      "text": "Ask the rugby lads what they study"
+    },
+    {
+      "turn": 108,
+      "text": "Ask dai, joke i live with him and but I dont know what he studies"
+    },
+    {
+      "turn": 109,
+      "text": "Sound so you can sort us out with free busses then, joking around"
+    },
+    {
+      "turn": 110,
+      "text": "Pub quiz Wednesday, looking at the board\nWho's up for it"
+    },
+    {
+      "turn": 111,
+      "text": "Joke the rhys say what like at pool"
+    },
+    {
+      "turn": 112,
+      "text": "Clock eyes with rhys and confirm the deal, shake he hand in front of everyone"
+    },
+    {
+      "turn": 113,
+      "text": "..."
+    },
+    {
+      "turn": 114,
+      "text": "Yeah ill walk back"
+    },
+    {
+      "turn": 115,
+      "text": "Ask if she's alright and brush her cheek"
+    },
+    {
+      "turn": 116,
+      "text": "Say good and hold the silence"
+    },
+    {
+      "turn": 117,
+      "text": "Lean in but whisper in her ear, we do and I want to go inside"
+    },
+    {
+      "turn": 118,
+      "text": "Ask if she wants a beer from the fridge and mention the common rooms are messy"
+    },
+    {
+      "turn": 119,
+      "text": "Put your hand over her hand standing behind her\nTell her to leave it for the morning, lock eyes again"
+    },
+    {
+      "turn": 120,
+      "text": "Kiss back and say well im not staying in the kitchen, im going back to one of our rooms"
+    },
+    {
+      "turn": 121,
+      "text": "Sneak into my room then the shower"
+    },
+    {
+      "turn": 122,
+      "text": "Check with dai in the kitchen"
+    },
+    {
+      "turn": 123,
+      "text": "Tell him I was on business and ask if he had a good night"
+    },
+    {
+      "turn": 124,
+      "text": "We and go, clean up"
+    },
+    {
+      "turn": 125,
+      "text": "Text the group chat saying only the bathroom to do, who's doing it and list who's done what"
+    }
+  ]
+}

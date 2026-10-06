@@ -1,0 +1,82 @@
+[
+  {
+    "after_turn": 8,
+    "question": "What nickname do my housemates and I use for me in the group chat?",
+    "expect_any": ["weldo", "weldoh", "weldow"]
+  },
+  {
+    "after_turn": 23,
+    "question": "What time did I promise to return the borrowed mower?",
+    "expect_any": ["four", "4pm", "4 pm", "4:00", "4.00", "16:00", "4 o'clock", "4 o’clock", "4oclock"]
+  },
+  {
+    "after_turn": 28,
+    "question": "Who said they were doing the bins?",
+    "expect_any": ["dai"]
+  },
+  {
+    "after_turn": 40,
+    "question": "What did I order at the cafe?",
+    "expect_any": ["cob", "sausage", "egg"]
+  },
+  {
+    "after_turn": 47,
+    "question": "What did I buy at the Co-op for Cerys?",
+    "expect_any": ["milk"]
+  },
+  {
+    "after_turn": 62,
+    "question": "Which two garden items did I say we are not responsible for?",
+    "expect_any": ["fence", "bench", "panel"]
+  },
+  {
+    "after_turn": 74,
+    "question": "Which day is the letting agent's inspection?",
+    "expect_any": ["monday", "mon "]
+  },
+  {
+    "after_turn": 85,
+    "question": "Where and when are we going out tonight?",
+    "expect_any": ["uplands tavern", "tavern", "8pm", "8 pm", "8:00", "eight", "at 8"]
+  },
+  {
+    "after_turn": 95,
+    "question": "Who am I playing pool against?",
+    "expect_any": ["dai"]
+  },
+  {
+    "after_turn": 100,
+    "question": "Who helped me clear the brambles in the garden?",
+    "expect_any": ["marcus", "marcos", "marcuss"]
+  },
+  {
+    "after_turn": 105,
+    "question": "Whose mower did I borrow?",
+    "expect_any": ["pugh", "glenys", "neighbour", "neighbor", "next door", "next-door"]
+  },
+  {
+    "after_turn": 112,
+    "question": "Who owes me a coffee?",
+    "expect_any": ["cerys", "kerys", "cerries"]
+  },
+  {
+    "after_turn": 115,
+    "question": "Which day is the pub quiz?",
+    "expect_any": ["wednesday", "wed "]
+  },
+  {
+    "after_turn": 118,
+    "question": "What drink did I ask the rugby lads for?",
+    "expect_any": ["guinness", "guiness", "guinnes"]
+  },
+  {
+    "after_turn": 122,
+    "question": "What name did I give Mrs Pugh when we first spoke?",
+    "expect_any": ["nathan", "nath"]
+  },
+  {
+    "after_turn": 124,
+    "question": "Who did I shake hands with on the deal in front of everyone?",
+    "expect_any": ["rhys", "rys", "riss", "rees"]
+  }
+]
