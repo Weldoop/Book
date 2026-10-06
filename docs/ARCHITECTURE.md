@@ -998,10 +998,18 @@ engine, and its model-authored status line had already drifted within a single s
     keep a charge. Uplands people are slots `1` to `4`; each new story gives them new names, and
     events keep the slot id. A pinned person keeps the book's name. See ADR 0021.
 
+57. A destination ends where the company, the time, or the errand starts, and a suggested trip is
+    not a trip. A clock time in a quotation, a message stamp, or a sentence about a plan is not the
+    clock; "six o'clock" and "half seven" are. A deterministic pass before validation maps a name
+    written for someone already in the save, fills a thread default, drops a bag op about an
+    untracked good, and reads one named place as `at`. Paying for a thread's matter resolves it.
+    Beats carry the clock and chapter summaries carry their date range. A bounded stat may drain
+    with hours awake and recover with sleep. Highlights are names, marked once. See ADR 0022.
+
 ### Build status (6 Oct 2026)
 
 Phase 0 (contracts) and Phase 1 (core build) are implemented, plus the fixes from the live sessions
-and the ADR 0005, 0006, 0007, 0008, 0009, 0010, 0011, 0012, 0013, 0014, 0015, 0016, 0017, 0018, 0019, 0020 and 0021 changes; 426 tests pass.
+and the ADR 0005, 0006, 0007, 0008, 0009, 0010, 0011, 0012, 0013, 0014, 0015, 0016, 0017, 0018, 0019, 0020, 0021 and 0022 changes; 446 tests pass.
 
 | Area | State |
 |---|---|
@@ -1027,7 +1035,8 @@ and the ADR 0005, 0006, 0007, 0008, 0009, 0010, 0011, 0012, 0013, 0014, 0015, 00
 | Shorter contract, room matches the sentence (ADR 0018) | done; exercised with the mock, not yet against a real model |
 | Missing beat filled in code, truer place and item checks (ADR 0019) | done; exercised with the mock, not yet against a real model |
 | Place, clock, repair charges, opening scene, chapter title, bold names (ADR 0020) | done; exercised with the mock, not yet against a real model |
-| Place from `at`, a clock that can go back, no charge when it cost nothing, cast slots (ADR 0021) | done; exercised with the mock, not yet against a real model |
+| Place from `at`, a clock that can go back, no charge when it cost nothing, cast slots (ADR 0021) | done; played live for 69 turns on Haiku 4.5 |
+| Validators that read less prose, the normalize pass, dated memory, energy drift, name-only highlights (ADR 0022) | done; mock-tested, live run pending |
 | Real-model benchmark (Phase 2) | three short live sessions played; full golden-session benchmark not yet run |
 | `need` / attention-miss handling, delta-first experiment results | not yet implemented / not yet measured |
 | Nuxt UI, Supabase, hosted trial, wizard | later phases |
