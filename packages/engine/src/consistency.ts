@@ -4,8 +4,12 @@ import { playerLocation } from "./core.ts";
 
 const DEST = String.raw`(?:the\s+|a\s+|an\s+)?([a-z][a-z' -]{2,40})`;
 
+/**
+ * A refused trip says the player has not left. "Cerys is still at the table" is not that:
+ * the word "still" there is about a person, and it must not hide a missing entity.move.
+ */
 const REFUSAL =
-  /\b(?:still in|still at|haven't left|have not left|did not leave|didn't leave|not yet|there is no|there's no|you are still|you're still|can wait|hasn't happened|has not happened|you haven't|you have not)\b|\bno \w+ to leave\b/i;
+  /\b(?:haven't left|have not left|did not leave|didn't leave|not yet|there is no|there's no|you are still|you're still|can wait|hasn't happened|has not happened|you haven't|you have not)\b|\bno \w+ to leave\b/i;
 
 const PAY =
   /\b(buy|bought|pay|paid|order|ordered|purchase|purchased|spend|spent)\b/gi;
@@ -15,6 +19,9 @@ const RELEASE =
 
 /** "put" and "leave" set an item down. Plugging a phone in, or leaving it on the side, does not. */
 const PUT_OR_LEAVE = /\b(put|leave|left)\b/gi;
+
+/** "Set down the cob" is the good leaving the hands. Gear set down in the room stays. */
+const SET_DOWN = /\bset down\b/gi;
 
 const PARKED = /\b(?:on(?:to)?\s+charge|to\s+charge|on\s+the\s+side|on\s+the\s+bedside)\b/i;
 
@@ -263,11 +270,32 @@ interface Mention {
   phrase: string;
 }
 
+/** The last word of a name, when no other item ends with it. "Cob" is the sausage cob. "Milk" is shared, so it is not. */
+function uniqueNameTails(items: { id: string; name: string }[]): Map<string, string> {
+  const owner = new Map<string, string>();
+  const shared = new Set<string>();
+  for (const item of items) {
+    const tail = norm(item.name).split(" ").at(-1) ?? "";
+    if (tail.length < 3) continue;
+    if (shared.has(tail) || owner.has(tail)) {
+      owner.delete(tail);
+      shared.add(tail);
+      continue;
+    }
+    owner.set(tail, item.id);
+  }
+  return owner;
+}
+
 function findMentions(narration: string, items: { id: string; name: string }[]): Mention[] {
   const text = narration.toLowerCase();
   const hits: Mention[] = [];
+  const tails = uniqueNameTails(items);
   for (const item of items) {
-    for (const phrase of itemPhrases(item)) {
+    const phrases = new Set(itemPhrases(item));
+    const tail = norm(item.name).split(" ").at(-1) ?? "";
+    if (tails.get(tail) === item.id) phrases.add(tail);
+    for (const phrase of phrases) {
       const re = new RegExp(`\\b${escapeRegExp(phrase)}\\b`, "g");
       for (const match of text.matchAll(re)) {
         if (match.index === undefined) continue;
@@ -452,15 +480,30 @@ function checkItems(before: State, after: State, config: Config, draft: TurnDraf
   const catalog = catalogItems(config, after);
   if (catalog.length === 0) return [];
   const text = draft.narration.toLowerCase();
-  const byId = new Map<string, { name: string; pay: boolean; release: boolean; wanted: number; again: boolean }>();
+  const byId = new Map<string, { name: string; pay: boolean; release: boolean; wanted: number; again: boolean; consume: boolean; put: boolean; setDown: boolean }>();
   for (const mention of findMentions(draft.narration, catalog)) {
     const window = text.slice(Math.max(0, mention.start - 60), mention.start);
-    const row = byId.get(mention.id) ?? { name: mention.name, pay: false, release: false, wanted: 1, again: false };
+    const row = byId.get(mention.id) ?? {
+      name: mention.name,
+      pay: false,
+      release: false,
+      wanted: 1,
+      again: false,
+      consume: false,
+      put: false,
+      setDown: false,
+    };
     const following = text.slice(mention.end, mention.end + 48);
     const pay = hasVerb(window, PAY);
     const parked = PARKED.test(following);
+    const consume = hasVerb(window, RELEASE);
+    const put = hasVerb(window, PUT_OR_LEAVE) && !parked;
+    const setDown = hasVerb(window, SET_DOWN) && !parked;
     row.pay = row.pay || pay;
-    row.release = row.release || hasVerb(window, RELEASE) || (hasVerb(window, PUT_OR_LEAVE) && !parked);
+    row.consume = row.consume || consume;
+    row.put = row.put || put;
+    row.setDown = row.setDown || setDown;
+    row.release = row.release || consume || put || setDown;
     row.again = row.again || ANOTHER.test(window);
     if (pay) row.wanted = Math.max(row.wanted, wantedQty(window));
     byId.set(mention.id, row);
@@ -471,7 +514,8 @@ function checkItems(before: State, after: State, config: Config, draft: TurnDraf
   const player = config.player_id;
   for (const [id, row] of byId) {
     const item = catalog.find((candidate) => candidate.id === id);
-    if (row.release && carrying(after, player, id) && !removedItem(applied, player, id)) {
+    const gearSetDown = item?.keeps === true && row.setDown && !row.consume && !row.put;
+    if (row.release && !gearSetDown && carrying(after, player, id) && !removedItem(applied, player, id)) {
       out.push(
         violation(
           "fixable",

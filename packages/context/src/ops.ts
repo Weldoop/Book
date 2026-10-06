@@ -112,7 +112,7 @@ export function activeOpNames(modules: Module[]): string[] {
 export function describeOps(modules: Module[]): string {
   const lines = activeOpNames(modules).map((n) => `- ${signature(n)}`);
   return [
-    'Each delta item is {"op":"<name>", ...fields}. "?" marks optional fields. id = lowercase slug [a-z0-9_.-].',
+    '{"op":"<name>", ...fields}. "?" is optional. id matches [a-z0-9_.-].',
     ...lines,
   ].join("\n");
 }

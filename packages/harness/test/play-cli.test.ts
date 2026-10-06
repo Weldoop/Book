@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { MockProvider } from "@book/llm";
 import { MemoryStore } from "@book/store";
-import { endingLines, runCli, runPlay, sceneLine } from "../src/index.ts";
+import { endingLines, runCli, runPlay, sceneLine, suggestionLine } from "../src/index.ts";
 import type { PlayIO } from "../src/index.ts";
 import { fakeRuntimeApi, makeConfig } from "./helpers.ts";
 import { writeFile } from "node:fs/promises";
@@ -148,6 +148,19 @@ describe("sceneLine", () => {
   it("stays quiet when an ending is already doing the talking", () => {
     const ended = { ...(base as object), scene_ended: true, ending: { id: "e", title: "T", text: "x" } };
     expect(sceneLine(ended as never)).toBeNull();
+  });
+});
+
+describe("suggestionLine", () => {
+  const base = { turn: 1, kind: "act", narration: "n", status: null, panel: [], outcome: "ok", record: {} } as never;
+
+  it("is absent when the turn offered nothing", () => {
+    expect(suggestionLine(base)).toBeNull();
+  });
+
+  it("prints up to the offers the turn returned", () => {
+    const line = suggestionLine({ ...(base as object), suggestions: ["Make tea", "Go to the kitchen"] } as never);
+    expect(line).toBe("[ Make tea ]  [ Go to the kitchen ]");
   });
 });
 

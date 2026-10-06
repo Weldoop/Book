@@ -42,6 +42,26 @@ export function modelFromEnv(tier: LLMTier, env: Env): string {
 }
 
 /**
+ * Ids that 404 on the current API. They resolve to the tier default before the request,
+ * so a saved config that still says `claude-sonnet-4-5` does not reach the player as an error.
+ */
+const RETIRED_MODELS: Record<string, string> = {
+  "claude-sonnet-4-5": DEFAULT_MODELS.strong,
+  "claude-sonnet-4-5-20250929": DEFAULT_MODELS.strong,
+  "claude-3-5-sonnet-latest": DEFAULT_MODELS.strong,
+  "claude-3-5-sonnet-20241022": DEFAULT_MODELS.strong,
+  "claude-3-7-sonnet-latest": DEFAULT_MODELS.strong,
+  "claude-3-7-sonnet-20250219": DEFAULT_MODELS.strong,
+  "claude-3-5-haiku-latest": DEFAULT_MODELS.cheap,
+  "claude-3-5-haiku-20241022": DEFAULT_MODELS.cheap,
+};
+
+export function resolveModel(tier: LLMTier, env: Env): string {
+  const requested = modelFromEnv(tier, env);
+  return RETIRED_MODELS[requested] ?? requested;
+}
+
+/**
  * `inputTokens` is the total input including cached reads; `cachedInputTokens` is the cached subset.
  * `cacheWriteTokens` are billed at 1.25x the normal input price (Anthropic ephemeral cache).
  */

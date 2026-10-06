@@ -259,7 +259,7 @@ The context builder fills a fixed budget in priority order and trims from the bo
 
 | Priority | Part | Target tokens | Cacheable |
 |---|---|---|---|
-| 1 | Engine contract, GM style, output schema | ~700 | yes |
+| 1 | Engine contract, GM style, output schema | ~1,800 | yes |
 | 2 | Active module prompt fragments only | ~500 | yes (per config) |
 | 3 | Player input | ~50 | no |
 | 4 | State snapshot (stats, clock, location, inventory) | ~600 | no |
@@ -271,7 +271,10 @@ The context builder fills a fixed budget in priority order and trims from the bo
 | 8 | Last 6 turns verbatim (more while a scene is still running, trimmed to the budget) | ~800 | no |
 | 9 | Beats since last compaction (max ~20) | ~400 | no |
 | 10 | Story-so-far summary (capped) | ~500 | no |
-| | **Total** | **~4.9k** | |
+| | **Total** | **~6.0k** | |
+
+The contract row is measured: the Uplands contract is about 1,788 tokens (ADR 0018). The ~700 figure
+was the early target. The other rows are still targets. The static prefix is cacheable and is not padded.
 
 Rules:
 - Hard cap per part; over-budget parts are trimmed by importance, then recency.
@@ -960,10 +963,21 @@ engine, and its model-authored status line had already drifted within a single s
     has no operation, so it stays narration. The engine does not classify an object from the prose.
     Money stays on the currency stats. See ADR 0017.
 
-### Build status (5 Oct 2026)
+### Decided with a shorter contract (6 Oct 2026)
+
+53. The system contract stays on every call and stays under 1,800 tokens (Uplands measures about
+    1,788). It is the cacheable prefix. The save is sent after it, and the prefix is not padded.
+    A retired model id is sent as the current default, and an unknown model is tried once on that
+    default. The player sees a plain sentence if the storyteller is still unavailable. "Still at the
+    table" is not a refused trip, so a real "go back into the kitchen" has to `entity.move`. A unique
+    last word such as cob names that good, and setting it down removes it. Gear set down in the room
+    stays. A turn may offer three short actions. The fate die and an energy spend stay the game
+    master's operations. The scene ends when the game master says so. See ADR 0018.
+
+### Build status (6 Oct 2026)
 
 Phase 0 (contracts) and Phase 1 (core build) are implemented, plus the fixes from the live sessions
-and the ADR 0005, 0006, 0007, 0008, 0009, 0010, 0011, 0012, 0013, 0014, 0015, 0016 and 0017 changes; 409 tests pass.
+and the ADR 0005, 0006, 0007, 0008, 0009, 0010, 0011, 0012, 0013, 0014, 0015, 0016, 0017 and 0018 changes; 417 tests pass.
 
 | Area | State |
 |---|---|
@@ -986,6 +1000,7 @@ and the ADR 0005, 0006, 0007, 0008, 0009, 0010, 0011, 0012, 0013, 0014, 0015, 00
 | Witnessed facts, and ordinary sentences that stay in the room (ADR 0015) | done; exercised with the mock, not yet against a real model |
 | One purchase, cash and bank, places, repair format, weekday threads (ADR 0016) | done; exercised with the mock, not yet against a real model |
 | Gear, goods, and narration (ADR 0017) | done; exercised with the mock, not yet against a real model |
+| Shorter contract, room matches the sentence (ADR 0018) | done; exercised with the mock, not yet against a real model |
 | Real-model benchmark (Phase 2) | three short live sessions played; full golden-session benchmark not yet run |
 | `need` / attention-miss handling, delta-first experiment results | not yet implemented / not yet measured |
 | Nuxt UI, Supabase, hosted trial, wizard | later phases |

@@ -21,6 +21,8 @@ export interface TurnResultLike {
   scene_ended?: boolean;
   /** Engine-printed warnings under the narration. Absent on older stand-ins. */
   notices?: string[];
+  /** Short offers for the next line. Absent when the turn gave none. */
+  suggestions?: string[];
   record: TurnRecord;
 }
 

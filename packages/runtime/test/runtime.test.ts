@@ -49,6 +49,24 @@ describe("playTurn", () => {
     expect(state.turn).toBe(1);
     expect(state.window).toHaveLength(1);
     expect(state.beats).toHaveLength(1);
+    expect(res.suggestions).toBeUndefined();
+  });
+
+  it("returns three suggested actions and drops a fourth", async () => {
+    const llm = scripted({
+      turn: [
+        JSON.stringify({
+          narration: "Rain taps the window.",
+          delta: [],
+          beat: "Rain.",
+          suggested_actions: ["Look around", "Make tea", "Go to the kitchen", "extra"],
+        }),
+      ],
+    });
+    const { rt } = await setup(llm);
+    const res = await playTurn(rt, "s1", "Look around");
+    expect(res.outcome).toBe("ok");
+    expect(res.suggestions).toEqual(["Look around", "Make tea", "Go to the kitchen"]);
   });
 
   it("repairs a fixable draft with a small delta call and never shows the interlude", async () => {

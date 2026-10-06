@@ -1,5 +1,5 @@
 import type { LLMProvider, LLMRequest, LLMResponse } from "@book/schema";
-import { computeCost, modelFromEnv, priceFromEnv } from "./pricing.ts";
+import { computeCost, DEFAULT_MODELS, priceFromEnv, resolveModel } from "./pricing.ts";
 
 type Env = Record<string, string | undefined>;
 type FetchFn = (url: string, init: { method: string; headers: Record<string, string>; body: string }) => Promise<{
@@ -35,6 +35,13 @@ interface ApiUsage {
   output_tokens?: number;
   cache_read_input_tokens?: number;
   cache_creation_input_tokens?: number;
+}
+
+const STORYTELLER_DOWN = "The storyteller is unavailable right now. Try again in a moment.";
+
+function modelMissing(status: number, raw: string): boolean {
+  if (status === 404) return true;
+  return status === 400 && /model/i.test(raw) && /not found|does not exist|unknown model/i.test(raw);
 }
 
 function errorDetail(raw: string): string {
@@ -75,7 +82,8 @@ export class AnthropicProvider implements LLMProvider {
 
   async complete(req: LLMRequest): Promise<LLMResponse> {
     if (req.messages.length === 0) throw new LLMError("LLM request has no messages");
-    const model = modelFromEnv(req.tier, this.env);
+    let model = resolveModel(req.tier, this.env);
+    let modelRetried = false;
     const body: Record<string, unknown> = {
       model,
       max_tokens: req.max_tokens,
@@ -145,6 +153,17 @@ export class AnthropicProvider implements LLMProvider {
         this.prefillUnsupported = true;
         payload = JSON.stringify(body);
         continue;
+      }
+      if (modelMissing(res.status, raw)) {
+        const fallback = DEFAULT_MODELS[req.tier];
+        if (!modelRetried && fallback !== model) {
+          modelRetried = true;
+          model = fallback;
+          body.model = model;
+          payload = JSON.stringify(body);
+          continue;
+        }
+        throw new LLMError(STORYTELLER_DOWN, res.status);
       }
       if (res.status === 401 || res.status === 403) {
         throw new LLMError(`Anthropic rejected the API key (HTTP ${res.status}). Check ANTHROPIC_API_KEY.`, res.status);

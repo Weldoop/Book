@@ -67,6 +67,29 @@ describe("AnthropicProvider", () => {
     expect(c.body.messages).toEqual([{ role: "user", content: expect.any(String) }]);
   });
 
+  it("sends a retired model id as the current default", async () => {
+    const { p, calls } = make([OK], { BOOK_MODEL_STRONG: "claude-sonnet-4-5" });
+    await p.complete(req());
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.body.model).toBe("claude-sonnet-4-6");
+  });
+
+  it("retries a missing model once on the tier default, and hides the raw error", async () => {
+    const missing = { status: 404, body: { error: { type: "not_found_error", message: "model: claude-sonnet-9 not found" } } };
+    const swapped = make([missing, OK], { BOOK_MODEL_STRONG: "claude-sonnet-9" });
+    const r = await swapped.p.complete(req());
+    expect(r.text).toBe("hello world");
+    expect(swapped.calls.map((c) => c.body.model)).toEqual(["claude-sonnet-9", "claude-sonnet-4-6"]);
+
+    const down = make([missing]);
+    const err = await down.p.complete(req()).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(LLMError);
+    expect((err as Error).message).toBe("The storyteller is unavailable right now. Try again in a moment.");
+    expect((err as Error).message).not.toContain("not_found");
+    expect((err as Error).message).not.toContain("sk-test-secret");
+    expect(down.calls).toHaveLength(1);
+  });
+
   it("maps cheap tier to the cheap model and honours env overrides", async () => {
     const { p, calls } = make([OK, OK], { BOOK_MODEL_CHEAP: "my-cheap" });
     await p.complete(req({ tier: "cheap" }));

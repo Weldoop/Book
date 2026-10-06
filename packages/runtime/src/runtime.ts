@@ -78,6 +78,8 @@ export interface TurnResult {
   roll?: { value: number; band: string; what: string; stat?: string };
   /** Engine-printed warnings (low money, a broken promise). The narration may also mention them. */
   notices: string[];
+  /** Up to three short offers for what the player might type next. Absent when the draft gave none. */
+  suggestions?: string[];
   record: TurnRecord;
 }
 
@@ -479,6 +481,7 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
           },
         }
       : {}),
+    ...(current.draft.suggested_actions?.length ? { suggestions: current.draft.suggested_actions } : {}),
     record: partial,
   };
 

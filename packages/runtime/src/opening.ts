@@ -116,6 +116,7 @@ export async function openBook(rt: Runtime, saveId: string): Promise<TurnResult 
     outcome,
     notices: [],
     ...(next.scene.closed ? { scene_ended: true } : {}),
+    ...(draft.suggested_actions?.length ? { suggestions: draft.suggested_actions } : {}),
     record,
   };
 }

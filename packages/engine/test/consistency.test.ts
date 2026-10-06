@@ -354,6 +354,23 @@ describe("travel and place", () => {
 
     expect(validateDraft(fresh(), cfg, modules, draft(), "Look around").violations).toEqual([]);
   });
+
+  it("does not treat a person still at a table as a refused trip", () => {
+    const cfg = config();
+    const narration = "You step back inside. Cerys is still at the table, tea cooling in front of her.";
+    const input = "I go back into the kitchen and ask Cerys what the inspection checks";
+    const missed = validateDraft(fresh(), cfg, modules, draft({ narration }), input);
+    expect(missed.violations.map((v) => v.code)).toContain("arrived_elsewhere");
+
+    const arrived = validateDraft(
+      fresh(),
+      cfg,
+      modules,
+      draft({ narration, delta: [{ op: "entity.move", id: "player", location: "kitchen" }] }),
+      input,
+    );
+    expect(arrived.violations).toEqual([]);
+  });
 });
 
 describe("catalog items", () => {
@@ -437,6 +454,25 @@ describe("catalog items", () => {
       "Buy another pair of gloves",
     );
     expect(another.violations).toEqual([]);
+  });
+
+  it("treats setting a cob down as letting a good go, and leaves gear that is only set down", () => {
+    const down = validateDraft(
+      fresh(),
+      config(),
+      modules,
+      draft({ narration: "You set down the cob and wipe your fingers." }),
+      "Finish the cob",
+    );
+    expect(down.violations.map((v) => v.code)).toEqual(["item_still_held"]);
+
+    const cfg: Config = { ...config(), items: [...config().items, { id: "shears", name: "Garden shears", keeps: true }] };
+    const state = fresh();
+    const inv = state.modules.inventory as { owners: Record<string, Record<string, number>> };
+    inv.owners.player = { ...inv.owners.player, shears: 1 };
+    expect(
+      validateDraft(state, cfg, modules, draft({ narration: "You set down the shears." }), "Set the shears down").violations,
+    ).toEqual([]);
   });
 
   it("requires a remove when the narration puts down something the player still holds", () => {

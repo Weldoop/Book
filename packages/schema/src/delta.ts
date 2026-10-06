@@ -95,6 +95,20 @@ export const TurnDraftSchema = z.object({
   at: IdSchema.optional(),
   /** Short private notes for the GM's own use over the next few turns. Never shown to the player. */
   notes: z.array(z.string()).optional(),
+  /**
+   * Up to three short things the player might type next. Offers only.
+   * Extra entries are dropped. A missing list is the same as none.
+   */
+  suggested_actions: z.preprocess((value) => {
+    if (!Array.isArray(value)) return undefined;
+    const out = value
+      .filter((item): item is string => typeof item === "string")
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0)
+      .slice(0, 3)
+      .map((item) => item.slice(0, 80));
+    return out.length > 0 ? out : undefined;
+  }, z.array(z.string().min(1).max(80)).max(3).optional()),
 });
 /** Raw model draft. `delta` is parsed op-by-op by the validator so one bad op can be reported precisely. */
 export type TurnDraft = z.infer<typeof TurnDraftSchema>;

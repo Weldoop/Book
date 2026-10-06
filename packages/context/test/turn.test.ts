@@ -1,4 +1,7 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { ConfigSchema, estimateTokens, type Module, type Op, type State } from "@book/schema";
+import { contractText } from "../src/contract.ts";
 import { buildTurnContext, DEFAULT_BUDGET } from "../src/index.ts";
 import { inventoryModule, makeBigState, makeConfig, makeState, makeThread, statsModule } from "./fixtures.ts";
 
@@ -367,5 +370,30 @@ describe("budget", () => {
     const ctx = build({ budget: { module_fragments: 20 } });
     expect(part(ctx, "module_fragments").trimmed).toBe(true);
     expect(part(ctx, "module_fragments").tokens).toBeLessThanOrEqual(20);
+  });
+});
+
+describe("Uplands contract size", () => {
+  it("stays under 1800 tokens with the book's own rules", () => {
+    const book = ConfigSchema.parse(JSON.parse(readFileSync(new URL("../../../configs/uk-life/config.json", import.meta.url), "utf8")));
+    const quiet = (id: string, ops: Module["ops"]): Module => ({
+      id,
+      ops,
+      initState: () => ({}),
+      validateOp: () => [],
+      applyOp: (_op: Op, state: State) => state,
+      promptFragment: () => "",
+      focus: () => [],
+      due: () => [],
+      snapshot: () => [],
+      render: () => ({}),
+    });
+    const modules = [
+      quiet("core", ["clock.advance", "clock.skip", "entity.create", "entity.move", "entity.fact.add", "thread.open", "thread.adopt", "thread.resolve"]),
+      quiet("inventory", ["item.create", "inventory.add", "inventory.remove"]),
+      quiet("relationships", ["relationship.add"]),
+      quiet("stats", ["stat.add", "stat.set"]),
+    ];
+    expect(estimateTokens(contractText(book, modules, "narration_first"))).toBeLessThan(1800);
   });
 });

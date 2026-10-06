@@ -43,6 +43,13 @@ export function endingLines(result: TurnResultLike): string[] {
   return lines;
 }
 
+/** Dimmed offers under the status line. They do not choose the player's action. */
+export function suggestionLine(result: TurnResultLike): string | null {
+  const lines = result.suggestions?.map((item) => item.trim()).filter((item) => item.length > 0) ?? [];
+  if (lines.length === 0) return null;
+  return lines.map((item) => `[ ${item} ]`).join("  ");
+}
+
 /**
  * Offered only when the GM says the scene has closed, which is the console's version of a "move to
  * the next scene" button: the prompt to move on never lands in the middle of something.
@@ -128,6 +135,8 @@ export async function runPlay(opts: PlayOptions): Promise<void> {
     }
     const scene = sceneLine(result);
     if (scene) io.write(`\n${dim(scene)}\n`);
+    const chips = suggestionLine(result);
+    if (chips) io.write(`\n${dim(chips)}\n`);
     const ending = endingLines(result);
     if (ending.length > 0) io.write(`\n${ending.join("\n\n")}\n`);
   };
