@@ -4,7 +4,7 @@
   "meta": {
     "title": "Black Water Reckoning",
     "tone": "adventurous, brisk, swashbuckling, a little mechanical",
-    "premise": "The Caribbean, 1717. You command the sloop Marigold with a loyal but hungry crew, thin pockets and a Crown that would very much like you hanged. Trade, raid, scheme or run; the tide waits for no one.",
+    "premise": "The Caribbean, 1717. You command the sloop Marigold with a hungry crew, thin pockets and a Crown that would very much like you hanged. Trade, raid, scheme or run. The first trouble of this voyage is dealt when the book opens; the tide waits for no one.",
     "content_rating": "clean",
     "violence": "adventure",
     "harshness": "unforgiving"
@@ -30,14 +30,14 @@
       "Violence is cinematic and brief; no gore."
     ],
     "interludes": [
-      "The tide turns. The Game Master hauls the chart back across the table and redraws the last stretch of coast.",
-      "A sudden hush on the wind. The Game Master calls 'Belay that!' and rewinds the glass a few grains.",
-      "The sea shimmers like a mirage and the Game Master steadies the helm, then takes the moment from the top.",
-      "A gull screams, the lantern gutters, and the Game Master quietly corrects the ship's log.",
-      "The horizon folds like old parchment. The Game Master smooths the creases and tries the passage again.",
-      "Thunder somewhere far off. The Game Master rewinds the sand glass and sets the scene afresh."
+      "The tide turns, and the last stretch of coast draws itself again.",
+      "A sudden hush on the wind. The sand glass sits a few grains back.",
+      "The sea shimmers like a mirage, and the moment is taken from the top.",
+      "A gull screams, the lantern gutters, and the ship's log is corrected.",
+      "The horizon folds like old parchment, then lies flat.",
+      "Thunder somewhere far off. The last minute sets itself afresh."
     ],
-    "rollback_note": "The Game Master shakes their head. That course won't hold. Choose another heading, Captain?"
+    "rollback_note": "The wind dies in the sails. That course won't hold. Choose another heading, Captain."
   },
   "presentation": {
     "profile": "tabletop",
@@ -57,8 +57,12 @@
     "start": "1717-05-01T06:00",
     "min_per_action": 5,
     "max_per_turn": 1440,
-    "max_skip_minutes": 2880,
+    "max_skip_minutes": 10080,
     "rest_note": "Watches are four hours; a night's sleep aboard is broken and rarely more than six hours."
+  },
+  "travel": {
+    "journeys": ["sail", "set a course", "weigh anchor", "make port", "put in"],
+    "local": ["rail", "rails", "deck", "helm", "hold", "cabin", "mast", "wheel", "quay", "gangway", "capstan"]
   },
   "stats": [
     {
@@ -117,22 +121,26 @@
     {
       "id": "cutlass",
       "name": "Cutlass",
-      "price": 15
+      "price": 15,
+      "keeps": true
     },
     {
       "id": "flintlock-pistol",
       "name": "Flintlock pistol",
-      "price": 25
+      "price": 25,
+      "keeps": true
     },
     {
       "id": "spyglass",
       "name": "Brass spyglass",
-      "price": 30
+      "price": 30,
+      "keeps": true
     },
     {
       "id": "sea-chart",
       "name": "Sea chart of the Windward Passage",
-      "price": 40
+      "price": 40,
+      "keeps": true
     },
     {
       "id": "ship-biscuit",
@@ -162,7 +170,8 @@
     {
       "id": "letter-of-marque",
       "name": "Forged letter of marque",
-      "price": 60
+      "price": 60,
+      "keeps": true
     },
     {
       "id": "powder-keg",
@@ -385,11 +394,11 @@
   "dice": {
     "sides": 20,
     "thresholds": [
-      2,
-      6,
-      11,
-      16,
-      19
+      5,
+      25,
+      50,
+      75,
+      90
     ],
     "labels": [
       "Catastrophe",
@@ -400,8 +409,9 @@
       "Legendary"
     ],
     "visible": true,
-    "stat_modifier": true
+    "stat_modifier": false
   },
+  "opening": {},
   "seed": {
     "entities": [
       {

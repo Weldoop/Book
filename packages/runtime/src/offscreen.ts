@@ -61,7 +61,7 @@ export async function runOffscreen(args: {
     json: true,
     system: [
       {
-        text: `You simulate what background characters did while the player was elsewhere. Tone: ${config.meta.tone}. Return ONLY JSON: {"changes":[{"id":"<character id>","fact":"<one short sentence of what they did or what changed for them>","importance":1|2|3}]}. At most one change per character, only when something plausible and interesting happened. Never involve the player directly.`,
+        text: `You simulate what background characters did while the player was elsewhere. Tone: ${config.meta.tone}. Return ONLY JSON: {"changes":[{"id":"<character id>","fact":"<one short sentence of what they did or what changed for them>","importance":1|2|3}]}. importance 1 is a passing thing, 3 is something they will not forget. At most one change per character, only when something plausible and interesting happened. Never involve the player directly.`,
         cache: true,
       },
     ],

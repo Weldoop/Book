@@ -63,7 +63,7 @@ export function applyContinuation(state: State, config: Config, ending: Ending):
 
   if (cont.clear_inventory) {
     const inv = inventoryOf(s);
-    s.modules.inventory = { owners: { ...inv.owners, [config.player_id]: {} } };
+    s.modules.inventory = { owners: { ...inv.owners, [config.player_id]: {} }, catalog: inv.catalog ?? [] };
   }
 
   s.ending = null;

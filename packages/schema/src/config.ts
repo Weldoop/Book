@@ -6,6 +6,7 @@ import {
   LocalDateTimeSchema,
   PresentationProfileSchema,
   ThreadKindSchema,
+  ThreadScaleSchema,
 } from "./ids.ts";
 
 export const StatDefSchema = z.object({
@@ -17,6 +18,10 @@ export const StatDefSchema = z.object({
   start: z.number(),
   display: z.string().optional(),
   hidden: z.boolean().default(false),
+  /** Change per story hour of clock.advance, for a bounded stat that moves with time awake. */
+  per_hour: z.number().optional(),
+  /** Change per story hour of clock.skip, for a bounded stat that rest brings back. */
+  per_skip_hour: z.number().optional(),
 });
 export type StatDef = z.infer<typeof StatDefSchema>;
 
@@ -24,6 +29,8 @@ export const ItemDefSchema = z.object({
   id: IdSchema,
   name: z.string(),
   price: z.number().optional(),
+  /** Gear the player keeps. A scene good leaves this unset. */
+  keeps: z.boolean().optional(),
 });
 export type ItemDef = z.infer<typeof ItemDefSchema>;
 
@@ -146,6 +153,7 @@ export const ThreadSeedSchema = z.object({
   text: z.string(),
   due: LocalDateTimeSchema.optional(),
   entities: z.array(IdSchema).default([]),
+  scale: ThreadScaleSchema.default("minor"),
   /** Consequence if the deadline passes unresolved. Injected as a due event; the GM narrates the fallout. */
   on_overdue: z.string().optional(),
 });
@@ -154,10 +162,14 @@ export type ThreadSeed = z.infer<typeof ThreadSeedSchema>;
 export const ThreadsConfigSchema = z.object({
   /** Threads shown in the prompt at once. The stored pool is unlimited. */
   max_in_context: z.number().int().positive().default(4),
-  /** Unprompted reminders a thread gets before it goes cold and leaves the prompt. */
+  /** Majors in the lead. Opening another sets the one left alone back to a minor. */
+  max_majors: z.number().int().positive().default(2),
+  /** Unused. Kept so older configs still load. Warmth is story time, not a reminder count. */
   max_reminders: z.number().int().min(0).default(2),
-  /** A cold thread with a deadline comes back this many hours before it falls due. */
+  /** Hours after the player deals with a thread that it stays warm, and how early a deadline comes back. */
   rewarm_hours: z.number().min(0).default(12),
+  /** Hours an unclaimed offer lasts before it lapses. */
+  potential_hours: z.number().int().positive().default(48),
 });
 export type ThreadsConfig = z.infer<typeof ThreadsConfigSchema>;
 
@@ -191,6 +203,31 @@ export const NotesConfigSchema = z.object({
 });
 export type NotesConfig = z.infer<typeof NotesConfigSchema>;
 
+/**
+ * Each new save deals its own first chapter. `dealt_by` is reserved for a future card.
+ * While it is absent, the Game Master deals the cast and the opening threads.
+ */
+export const OpeningCastSchema = z.object({
+  id: IdSchema,
+  name: z.string().min(1),
+  facts: z.array(z.string()).default([]),
+});
+export type OpeningCast = z.infer<typeof OpeningCastSchema>;
+
+export const OpeningConfigSchema = z.object({
+  dealt_by: z.enum(["gm"]).optional(),
+  /**
+   * People the book requires. A new game keeps them. Everyone else in the seed is replaced
+   * by the cast the opening deals.
+   */
+  pinned: z.array(IdSchema).optional(),
+  /**
+   * Used only when the model opening cannot be accepted. A save picks three, so two games differ.
+   */
+  cast: z.array(OpeningCastSchema).optional(),
+});
+export type OpeningConfig = z.infer<typeof OpeningConfigSchema>;
+
 export const GmStyleSchema = z.object({
   max_words: z.number().int().positive().default(90),
   person: z.enum(["first", "second", "third"]).default("second"),
@@ -206,6 +243,23 @@ export const PresentationSchema = z.object({
   status_line: z.array(z.string()).default([]),
 });
 export type Presentation = z.infer<typeof PresentationSchema>;
+
+/** Ordinary ways of going somewhere. A book replaces this when its people move differently. */
+export const DEFAULT_TRAVEL_MEANS = ["walk", "head", "go", "travel", "ride", "drive", "hurry", "set off", "leave"] as const;
+
+/**
+ * How this book talks about going somewhere. The engine detects these words. It does not
+ * know ships, deserts or airlocks until the book lists them.
+ */
+export const TravelConfigSchema = z.object({
+  /** Verbs for a trip. "for" does not count, so "go for a pint" is not travel. */
+  means: z.array(z.string().min(2).max(48)).max(24).default([...DEFAULT_TRAVEL_MEANS]),
+  /** Longer journeys. These also allow "for", as in "set a course for" or "jump for". */
+  journeys: z.array(z.string().min(2).max(48)).max(24).default([]),
+  /** A few steps inside the current place. Not a new destination. */
+  local: z.array(z.string().min(2).max(48)).max(32).default([]),
+});
+export type TravelConfig = z.infer<typeof TravelConfigSchema>;
 
 export const TimeConfigSchema = z.object({
   start: LocalDateTimeSchema,
@@ -243,6 +297,8 @@ export const ConfigSchema = z
     gm_style: GmStyleSchema,
     presentation: PresentationSchema,
     time: TimeConfigSchema,
+    /** Words this book uses for travel. Defaults are ordinary walking. Journeys and local steps are empty until the book names them. */
+    travel: TravelConfigSchema.default({}),
     threads: ThreadsConfigSchema.default({}),
     scenes: ScenesConfigSchema.default({}),
     notes: NotesConfigSchema.default({}),
@@ -253,6 +309,8 @@ export const ConfigSchema = z
     endings: z.array(EndingSchema).default([]),
     dice: DiceConfigSchema.optional(),
     offscreen: OffscreenConfigSchema.optional(),
+    /** When set, a new save deals a fresh cast and opening threads before the player types. */
+    opening: OpeningConfigSchema.optional(),
     seed: z
       .object({
         entities: z.array(EntitySeedSchema).default([]),

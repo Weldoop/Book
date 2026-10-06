@@ -114,7 +114,7 @@ describe("scene boundaries through a turn", () => {
 
     const closing = await playTurn(rt, "s1", "Go up to bed");
     expect(closing.scene_ended).toBe(true);
-    expect((await store.loadSave("s1")).scene).toEqual({ index: 1, started_turn: 0, closed: true });
+    expect((await store.loadSave("s1")).scene).toEqual({ index: 1, started_turn: 0, closed: true, title: "Made tea" });
 
     const next = await playTurn(rt, "s1", "Get up and make tea");
     expect(next.scene_ended).toBeUndefined();
@@ -145,6 +145,6 @@ describe("scene boundaries through a turn", () => {
 
     await playTurn(rt, "s1", "Go up to bed");
     expect(llm.calls.some((c) => c.purpose === "compaction")).toBe(true);
-    expect((await store.loadSave("s1")).summaries.chapters).toEqual(["Tea was made."]);
+    expect((await store.loadSave("s1")).summaries.chapters).toEqual(["Sat 3 Oct 2026, 09:21 to Sat 3 Oct 2026, 09:22. Tea was made."]);
   });
 });

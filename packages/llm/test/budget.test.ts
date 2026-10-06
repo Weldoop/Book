@@ -28,8 +28,11 @@ describe("withBudget", () => {
     await b.complete(req());
     expect(b.spent().cost_usd).toBeLessThan(0.002);
     await b.complete(req());
-    await expect(b.complete(req())).rejects.toMatchObject({ name: "BudgetExceededError", cap: "cost_usd" });
     expect(b.spent().cost_usd).toBeGreaterThanOrEqual(0.002);
+    const afterTurn = b.spent().cost_usd;
+    await b.complete(req({ purpose: "delta_repair" }));
+    expect(b.spent().cost_usd).toBeGreaterThan(afterTurn);
+    await expect(b.complete(req())).rejects.toMatchObject({ name: "BudgetExceededError", cap: "cost_usd" });
   });
 
   it("is transparent without caps", async () => {

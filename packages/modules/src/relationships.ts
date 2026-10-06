@@ -74,8 +74,8 @@ export const relationshipsModule: Module = {
 
   snapshot: relationshipSnapshot,
 
-  render(state, config) {
-    return { panel: relationshipSnapshot(state, config) };
+  render() {
+    return {};
   },
 };
 

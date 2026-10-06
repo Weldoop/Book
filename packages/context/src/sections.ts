@@ -1,4 +1,5 @@
-import type { Config, DueItem, Entity, Fact, Module, State } from "@book/schema";
+import { diffMinutes, humanTime } from "@book/engine";
+import type { Beat, Config, DueItem, Entity, Fact, Module, State } from "@book/schema";
 import { orderThreads, selectThreads } from "./attention.ts";
 import { MAX_BEATS, MAX_FACTS_PER_ENTITY_IN_CONTEXT, WINDOW_TURNS } from "./budget.ts";
 import { dayOfWeek, fitLines, renderSection, tokensOf, trimOldestSentences } from "./text.ts";
@@ -31,7 +32,7 @@ export function sceneSection(config: Config, state: State): Section {
   if (locId) {
     lines.push(`Location: ${nameOf(state, locId)} [${locId}]`);
     const present = Object.values(state.entities)
-      .filter((e) => e.location === locId && e.id !== config.player_id)
+      .filter((e) => e.location === locId && e.id !== config.player_id && !e.tags.includes("unmet"))
       .sort((a, b) => (TYPE_RANK[a.type] ?? 9) - (TYPE_RANK[b.type] ?? 9) || a.id.localeCompare(b.id));
     if (present.length > 0) lines.push(`Present: ${present.map((e) => `${e.name} [${e.id}]`).join(", ")}`);
   } else {
@@ -63,7 +64,7 @@ export function dueSection(config: Config, due: DueItem[], fate: number | undefi
 
 /** Every open thread, for out-of-character recall ("what am I meant to be doing?"). Costs a cheap call only. */
 export function allThreadsSection(state: State, cap: number): Section {
-  const ordered = orderThreads(state.threads);
+  const ordered = orderThreads(state.threads.filter((t) => t.scale !== "potential"));
   const lines = ordered.slice(0, MAX_THREADS).map((t) => {
     const due = t.due ? ` due ${t.due}` : "";
     return `- ${t.id} [${t.kind}]${due}: ${t.text}`;
@@ -81,8 +82,9 @@ export function threadsSection(state: State, config: Config, input: string, cap:
   const chosen = selectThreads(state, config, input);
   const lines = chosen.map((t) => {
     const due = t.due ? ` due ${t.due}` : "";
+    const aside = t.scale === "minor" && t.was_major ? " set aside" : "";
     const ents = t.entities.length ? ` (${t.entities.join(", ")})` : "";
-    return `- ${t.id} [${t.kind}]${due}: ${t.text}${ents}`;
+    return `- ${t.id} [${t.kind}/${t.scale}]${aside}${due}: ${t.text}${ents}`;
   });
   const fit = fitLines("## OPEN THREADS", lines, cap, "end");
   const openCount = state.threads.filter((t) => t.status === "open").length;
@@ -116,11 +118,17 @@ function factOrder(a: Fact, b: Fact): number {
   return b.importance - a.importance || b.turn - a.turn;
 }
 
+/** A person's memory that has already lapsed stays out of the prompt. */
+function liveFacts(entity: Entity, now: string): Fact[] {
+  return entity.facts.filter((fact) => fact.expires === undefined || diffMinutes(now, fact.expires) < 0);
+}
+
 function focusLine(state: State, entry: FocusEntry): string {
   const e = entry.entity;
   const where = e.location ? ` @ ${nameOf(state, e.location)}` : "";
   const aka = e.aliases.length ? `; aka ${e.aliases.join(", ")}` : "";
-  const facts = entry.facts.length ? `: ${entry.facts.map((f) => f.text).join("; ")}` : "";
+  const remembered = entry.facts.map((f) => f.text).join("; ");
+  const facts = remembered ? (e.type === "person" ? ` remembers: ${remembered}` : `: ${remembered}`) : "";
   return `- ${e.name} [${e.id}] (${e.type}${where}${aka})${facts}`;
 }
 
@@ -135,7 +143,7 @@ export function focusSection(
   for (const id of ids) {
     const entity = state.entities[id];
     if (!entity) continue;
-    const sorted = [...entity.facts].sort(factOrder);
+    const sorted = liveFacts(entity, state.clock.now).sort(factOrder);
     if (sorted.length > MAX_FACTS_PER_ENTITY_IN_CONTEXT) trimmed = true;
     entries.push({ entity, facts: sorted.slice(0, MAX_FACTS_PER_ENTITY_IN_CONTEXT) });
   }
@@ -175,7 +183,7 @@ export function storySection(state: State, cap: number): Section {
   return { text: `${header}\n${fit.text}`, trimmed: fit.trimmed };
 }
 
-export function recentBeats(state: State): { turn: number; text: string }[] {
+export function recentBeats(state: State): Beat[] {
   return state.beats.filter((b) => b.turn > state.summaries.last_compacted_turn);
 }
 
@@ -190,10 +198,25 @@ export function beatsSection(state: State, cap: number): Section {
   };
 }
 
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Bold marks a phrase the save did not know, so the next turn can create it. */
+function markNew(narration: string, highlights: string[] | undefined): string {
+  if (!highlights || highlights.length === 0) return narration;
+  // One pass over every phrase at once, longest first, so "Owen" inside "Owen's" is marked once.
+  const body = [...highlights]
+    .sort((a, b) => b.length - a.length)
+    .map((phrase) => escapeRegExp(phrase).replace(/\\s+/g, "\\s+"))
+    .join("|");
+  return narration.replace(new RegExp(`\\b(?:${body})\\b`, "gi"), (found) => `**${found}**`);
+}
+
 export function windowSection(state: State, cap: number): Section {
   const header = "## LAST TURNS";
   const turns = state.window.slice(-WINDOW_TURNS);
-  const lines = turns.map((t) => `Player: ${t.input}\nGM: ${t.narration}`);
+  const lines = turns.map((t) => `Player: ${t.input}\nGM: ${markNew(t.narration, t.highlights)}`);
   const fit = fitLines(header, lines, cap, "start");
   if (fit.lines.length === 0 && lines.length > 0) {
     const last = turns[turns.length - 1];
@@ -208,6 +231,40 @@ export function windowSection(state: State, cap: number): Section {
     text: renderSection(header, fit.lines),
     trimmed: fit.trimmed || state.window.length > turns.length,
   };
+}
+
+/**
+ * The save, placed after the verbatim turns so a stale line in that window cannot outrank it.
+ * The status figures are the ones the player is shown. Carrying is included because narration
+ * was leaving items behind that the save still held.
+ */
+export function engineNowSection(config: Config, state: State, modules: Module[]): Section {
+  const lines = [
+    "Factual. This is the save. LAST TURNS may quote an older balance, place, or item. If they disagree, these lines win. Do not narrate a different one.",
+    "Carrying is the bag from the whole save, including purchases from turns that have left LAST TURNS. An item on that line is already bought.",
+  ];
+  const player = state.entities[config.player_id];
+  const locId = player?.location ?? null;
+  const place = locId ? state.entities[locId] : undefined;
+  lines.push(place ? `Location: ${place.name} [${place.id}]` : "Location: unknown");
+
+  const status: string[] = [];
+  for (const key of config.presentation.status_line) {
+    if (key === "turn") status.push(`Turn ${state.turn}`);
+    else if (key === "time") status.push(humanTime(state.clock.now));
+    else if (key === "location" && place) status.push(place.name);
+  }
+  const carried: string[] = [];
+  for (const m of [...modules].sort((a, b) => a.id.localeCompare(b.id))) {
+    for (const line of m.truth?.(state, config) ?? []) {
+      if (!line.trim()) continue;
+      if (line.startsWith("Carrying")) carried.push(line);
+      else status.push(line);
+    }
+  }
+  if (status.length > 0) lines.push(status.join(" | "));
+  lines.push(...carried);
+  return { text: renderSection("## ENGINE NOW", lines), trimmed: false };
 }
 
 export function inputSection(input: string, kind: "act" | "continue"): Section {

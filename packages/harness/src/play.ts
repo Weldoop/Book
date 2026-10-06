@@ -1,4 +1,5 @@
-import type { Config, LLMUsage, Store, LLMProvider } from "@book/schema";
+import type { Config, LLMUsage, State, Store, LLMProvider } from "@book/schema";
+import { BudgetExceededError } from "@book/llm";
 import type { RuntimeApi, TurnResultLike } from "./runtime-api.ts";
 
 export interface PlayIO {
@@ -42,13 +43,35 @@ export function endingLines(result: TurnResultLike): string[] {
   return lines;
 }
 
+/** Dimmed offers under the status line. They do not choose the player's action. */
+export function suggestionLine(result: TurnResultLike): string | null {
+  const lines = result.suggestions?.map((item) => item.trim()).filter((item) => item.length > 0) ?? [];
+  if (lines.length === 0) return null;
+  return lines.map((item) => `[ ${item} ]`).join("  ");
+}
+
 /**
  * Offered only when the GM says the scene has closed, which is the console's version of a "move to
  * the next scene" button: the prompt to move on never lands in the middle of something.
  */
 export function sceneLine(result: TurnResultLike): string | null {
   if (!result.scene_ended || result.ending) return null;
-  return "--- the scene closes --- press enter to move on, or say what you do next";
+  const index = result.chapter_index ?? result.turn;
+  const title = result.chapter_title?.trim();
+  const head = title ? `Chapter ${index}\n${title}` : `Chapter ${index}`;
+  return `────────\n${head}\n────────\n\nSay what you do next.`;
+}
+
+/** Bold, and yellow when the console has colour. Marks stay out of the saved narration. */
+export function emphasize(narration: string, highlights: string[] | undefined, color: boolean): string {
+  if (!highlights || highlights.length === 0) return narration;
+  // One pass, longest phrase first, so a name inside a longer phrase is marked once.
+  const body = [...highlights]
+    .sort((a, b) => b.length - a.length)
+    .map((phrase) => phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+"))
+    .join("|");
+  const re = new RegExp(`\\b(?:${body})\\b`, "gi");
+  return narration.replace(re, (found) => (color ? `\x1b[1;33m${found}\x1b[0m` : `**${found}**`));
 }
 
 /** One quiet line when the turn did not come back clean, so a stutter can be reported without running inspect. */
@@ -74,6 +97,40 @@ export function usageLine(result: TurnResultLike, wallMs: number): string {
   return `in ${sum((x) => x.input_tokens)}  out ${sum((x) => x.output_tokens)}  cached ${sum((x) => x.cached_input_tokens)}  $${sum((x) => x.cost_usd).toFixed(4)}  ${secs}s  ${result.outcome}`;
 }
 
+/**
+ * One line when a whole session got no prompt cache reads. Anthropic caches nothing under a
+ * per-model minimum prefix (4096 tokens on Haiku 4.5, 1024 on Sonnet 4.x), so the static blocks
+ * of a short contract are billed in full every turn on the small model.
+ */
+export function cacheNotice(results: TurnResultLike[]): string | null {
+  const usage = results.flatMap((r) => r.record.usage);
+  if (usage.length < 4) return null;
+  if (usage.some((u) => u.cached_input_tokens > 0)) return null;
+  const last = results.at(-1);
+  const prefix = (last?.record.context_parts ?? [])
+    .filter((p) => p.name === "contract" || p.name === "module_fragments")
+    .reduce((n, p) => n + p.tokens, 0);
+  const models = [...new Set(usage.map((u) => u.model))].join(", ");
+  return `No prompt cache reads this session on ${models}. The cached prefix is about ${prefix} tokens; Haiku 4.5 caches only from 4096, Sonnet 4.x from 1024.`;
+}
+
+/** Open threads with their scale. Debug only: the player's page never uses these words. */
+export function threadDebug(state: State): string {
+  const open = state.threads.filter((t) => t.status === "open");
+  if (open.length === 0) return "threads: none open";
+  const lines = ["threads:"];
+  for (const t of open) {
+    const who = t.entities.length > 0 ? ` [${t.entities.join(", ")}]` : "";
+    const parent = t.parent ? ` parent ${t.parent}` : "";
+    const due = t.due ? ` due ${t.due}` : "";
+    const lapses = t.expires ? ` lapses ${t.expires}` : "";
+    const aside = t.was_major ? (t.scale === "major" ? " was-major" : " set-aside") : "";
+    const warmth = t.warm ? "warm" : "cold";
+    lines.push(`  ${t.id} ${t.scale}${aside} ${t.kind} ${warmth} touched ${t.last_interacted_turn}${due}${lapses}${parent}${who}: ${t.text}`);
+  }
+  return lines.join("\n");
+}
+
 export function debugDump(result: TurnResultLike): string {
   const r = result.record;
   const lines = [`turn ${r.turn} (${r.kind}) outcome ${r.outcome}`, "context parts:"];
@@ -97,18 +154,54 @@ export async function runPlay(opts: PlayOptions): Promise<void> {
     ...(opts.logRaw ? { logRaw: true } : {}),
   });
 
+  const present = (result: TurnResultLike): void => {
+    const roll = rollLine(result);
+    if (roll) io.write(`\n${roll}\n`);
+    io.write(`\n${emphasize(result.narration, result.highlights, io.color === true)}\n`);
+    for (const notice of result.notices ?? []) {
+      if (notice.trim()) io.write(`${notice}\n`);
+    }
+    if (result.status) io.write(`\n${result.status}\n`);
+    if (opts.config.presentation.profile === "tabletop" && result.panel.length > 0) {
+      io.write(result.panel.map((p) => `  ${p}`).join("\n") + "\n");
+    }
+    const scene = sceneLine(result);
+    if (scene) io.write(`\n${dim(scene)}\n`);
+    const chips = suggestionLine(result);
+    if (chips) io.write(`\n${dim(chips)}\n`);
+    const ending = endingLines(result);
+    if (ending.length > 0) io.write(`\n${ending.join("\n\n")}\n`);
+  };
+
+  let debug = opts.debug ?? false;
+  let last: TurnResultLike | undefined;
+  const session: TurnResultLike[] = [];
+
   const existing = (await opts.store.listSaves()).some((s) => s.save_id === opts.saveId);
   if (existing) {
     const state = await opts.store.loadSave(opts.saveId);
     io.write(dim(`Resumed "${opts.saveId}" at turn ${state.turn}.`) + "\n");
   } else {
     await opts.api.newGame(rt, opts.saveId);
-    io.write(dim(`New game "${opts.saveId}": ${opts.config.meta.title}. Type your first action (for example "Start the game").`) + "\n");
+    const tOpen = performance.now();
+    const opened = opts.api.openBook ? await opts.api.openBook(rt, opts.saveId) : null;
+    if (opened) {
+      io.write(dim(`New game "${opts.saveId}": ${opts.config.meta.title}.`) + "\n");
+      last = opened;
+      session.push(opened);
+      present(opened);
+      if (debug) {
+        const stutter = stutterLine(opened);
+        if (stutter) io.write(dim(stutter) + "\n");
+      }
+      io.write(dim(`[${usageLine(opened, performance.now() - tOpen)}]`) + "\n");
+    } else {
+      io.write(dim(`New game "${opts.saveId}": ${opts.config.meta.title}.`) + "\n");
+      const premise = opts.config.meta.premise.trim();
+      if (premise) io.write(`\n${premise}\n`);
+    }
   }
   io.write(dim("One line = one turn (several actions in one line are fine). End a line with \\ to continue it on the next line. /quit to exit, /debug for the debug dump.") + "\n");
-
-  let debug = opts.debug ?? false;
-  let last: TurnResultLike | undefined;
 
   for (;;) {
     let line = await io.readLine("\n> ");
@@ -123,7 +216,10 @@ export async function runPlay(opts: PlayOptions): Promise<void> {
     if (text === "/debug") {
       debug = !debug;
       io.write(dim(`debug ${debug ? "on" : "off"}`) + "\n");
-      if (debug && last) io.write(dim(debugDump(last)) + "\n");
+      if (debug && last) {
+        io.write(dim(debugDump(last)) + "\n");
+        io.write(dim(threadDebug(await opts.store.loadSave(opts.saveId))) + "\n");
+      }
       continue;
     }
 
@@ -135,29 +231,43 @@ export async function runPlay(opts: PlayOptions): Promise<void> {
 
     const t0 = performance.now();
     let result: TurnResultLike;
+    let released = false;
     try {
       result = await opts.api.playTurn(rt, opts.saveId, text, {
         onInterlude: (t) => io.write(`\n${dim(t)}\n`),
+        onReleased: (r) => {
+          released = true;
+          present(r);
+          if (debug) {
+            const early = stutterLine(r);
+            if (early) io.write(dim(early) + "\n");
+          }
+        },
       });
     } catch (err) {
+      if (err instanceof BudgetExceededError) {
+        const stop = opts.stopCheck?.() ?? err.message;
+        io.write(dim(`Stopping: ${stop}. Your save is intact; raise the cap and resume with the same --save.`) + "\n");
+        break;
+      }
       io.write(`\nError: ${err instanceof Error ? err.message : String(err)}\n`);
       break;
     }
     last = result;
-    const roll = rollLine(result);
-    if (roll) io.write(`\n${roll}\n`);
-    io.write(`\n${result.narration}\n`);
-    if (result.status) io.write(`\n${result.status}\n`);
-    if (opts.config.presentation.profile === "tabletop" && result.panel.length > 0) {
-      io.write(result.panel.map((p) => `  ${p}`).join("\n") + "\n");
+    session.push(result);
+    if (!released) {
+      present(result);
+      if (debug) {
+        const stutter = stutterLine(result);
+        if (stutter) io.write(dim(stutter) + "\n");
+      }
     }
-    const scene = sceneLine(result);
-    if (scene) io.write(`\n${dim(scene)}\n`);
-    const ending = endingLines(result);
-    if (ending.length > 0) io.write(`\n${ending.join("\n\n")}\n`);
-    const stutter = stutterLine(result);
-    if (stutter) io.write(dim(stutter) + "\n");
     io.write(dim(`[${usageLine(result, performance.now() - t0)}]`) + "\n");
-    if (debug) io.write(dim(debugDump(result)) + "\n");
+    if (debug) {
+      io.write(dim(debugDump(result)) + "\n");
+      io.write(dim(threadDebug(await opts.store.loadSave(opts.saveId))) + "\n");
+    }
   }
+  const cache = cacheNotice(session);
+  if (cache) io.write(dim(cache) + "\n");
 }

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { EntityTypeSchema, IdSchema, LocalDateTimeSchema, ThreadKindSchema } from "./ids.ts";
+import { EntityTypeSchema, IdSchema, LocalDateTimeSchema, ThreadKindSchema, ThreadScaleSchema } from "./ids.ts";
 
 /** Closed, versioned set of state-change operations. Each op is owned by one module. */
 export const DELTA_VERSION = 1 as const;
@@ -9,6 +9,8 @@ export const OpSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("clock.advance"), minutes: z.number().int().min(0) }),
   // A deliberate long skip (sleep, travel, waiting). Capped by `time.max_skip_minutes`, not `max_per_turn`.
   z.object({ op: z.literal("clock.skip"), minutes: z.number().int().min(1), reason: z.string().min(1) }),
+  /** An exact local time, including one already past. A time-travel book uses this to go backward. */
+  z.object({ op: z.literal("clock.set"), now: LocalDateTimeSchema }),
   z.object({
     op: z.literal("entity.create"),
     id: IdSchema,
@@ -17,6 +19,8 @@ export const OpSchema = z.discriminatedUnion("op", [
     aliases: z.array(z.string()).optional(),
     location: IdSchema.optional(),
     facts: z.array(z.string()).optional(),
+    /** `unmet` hides a person until they share the player's location. `unvisited` marks a place not yet entered. */
+    tags: z.array(z.string().min(1)).max(8).optional(),
   }),
   z.object({ op: z.literal("entity.move"), id: IdSchema, location: IdSchema }),
   z.object({
@@ -33,12 +37,28 @@ export const OpSchema = z.discriminatedUnion("op", [
     entities: z.array(IdSchema).optional(),
     /** Set when this thread grows out of one the player just resolved, so chains are traceable. */
     parent: z.string().optional(),
+    /** Defaults to a minor. The opening uses major. An offer is potential. */
+    scale: ThreadScaleSchema.default("minor"),
+  }),
+  z.object({
+    op: z.literal("thread.adopt"),
+    id: z.string(),
+    /** Raise an offer to a minor, a minor to a major, or set a major back to a minor. */
+    scale: z.enum(["minor", "major"]),
   }),
   z.object({ op: z.literal("thread.resolve"), id: z.string() }),
   // stats
   z.object({ op: z.literal("stat.add"), key: IdSchema, amount: z.number(), reason: z.string().optional() }),
   z.object({ op: z.literal("stat.set"), key: IdSchema, value: z.number(), reason: z.string().optional() }),
   // inventory
+  z.object({
+    op: z.literal("item.create"),
+    id: IdSchema,
+    name: z.string().min(1),
+    price: z.number().nonnegative().optional(),
+    /** True when this is gear the player keeps. Omit it for a scene good. */
+    keeps: z.boolean().optional(),
+  }),
   z.object({ op: z.literal("inventory.add"), owner: IdSchema, item: IdSchema, qty: z.number().int().min(1).default(1) }),
   z.object({ op: z.literal("inventory.remove"), owner: IdSchema, item: IdSchema, qty: z.number().int().min(1).default(1) }),
   // relationships
@@ -49,10 +69,14 @@ export type OpName = Op["op"];
 
 export const OP_NAMES: OpName[] = OpSchema.options.map((o) => o.shape.op.value);
 
-/** Set by the GM when it resolved a risky action with the supplied fate die. */
+/**
+ * Set by the GM when it resolved a risky action with the supplied fate die.
+ * `stat` is loose on purpose: the model often writes a label ("Crew morale").
+ * The engine maps that to the real id, and rejects one that matches nothing.
+ */
 export const CheckSchema = z.object({
   what: z.string().min(1),
-  stat: IdSchema.optional(),
+  stat: z.string().min(1).max(80).optional(),
 });
 export type Check = z.infer<typeof CheckSchema>;
 
@@ -62,11 +86,50 @@ export const TurnDraftSchema = z.object({
   beat: z.string().min(1),
   focus_next: z.array(IdSchema).optional(),
   need: z.array(IdSchema).optional(),
-  check: CheckSchema.optional(),
+  /** `null` is treated as omitted. Some models emit it when they did not roll. */
+  check: CheckSchema.nullish(),
   /** Set only when the scene has come to a natural close, which is when memory may compact. */
   scene_ended: z.boolean().optional(),
+  /** A few words naming the chapter, set together with scene_ended. */
+  chapter_title: z.preprocess((value) => {
+    if (typeof value !== "string") return undefined;
+    const text = value.trim().replace(/\s+/g, " ").slice(0, 60);
+    return text.length > 0 ? text : undefined;
+  }, z.string().max(60).optional()),
+  /**
+   * Phrases in the narration the save does not know yet: a person, a place, an object.
+   * Extra entries are dropped. The engine keeps at most four that are actually new.
+   */
+  highlights: z.preprocess((value) => {
+    if (!Array.isArray(value)) return undefined;
+    const out = value
+      .filter((item): item is string => typeof item === "string")
+      .map((item) => item.trim().replace(/\s+/g, " "))
+      .filter((item) => item.length >= 3 && item.length <= 40)
+      .slice(0, 8);
+    return out.length > 0 ? out : undefined;
+  }, z.array(z.string().min(1).max(40)).max(8).optional()),
+  /**
+   * Place id where the narration stops. Optional: a missing `at` is not a violation.
+   * When it is set, it has to be the player's location after the delta.
+   */
+  at: IdSchema.optional(),
   /** Short private notes for the GM's own use over the next few turns. Never shown to the player. */
   notes: z.array(z.string()).optional(),
+  /**
+   * Up to three short things the player might type next. Offers only.
+   * Extra entries are dropped. A missing list is the same as none.
+   */
+  suggested_actions: z.preprocess((value) => {
+    if (!Array.isArray(value)) return undefined;
+    const out = value
+      .filter((item): item is string => typeof item === "string")
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0)
+      .slice(0, 3)
+      .map((item) => item.slice(0, 80));
+    return out.length > 0 ? out : undefined;
+  }, z.array(z.string().min(1).max(80)).max(3).optional()),
 });
 /** Raw model draft. `delta` is parsed op-by-op by the validator so one bad op can be reported precisely. */
 export type TurnDraft = z.infer<typeof TurnDraftSchema>;

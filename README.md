@@ -2,7 +2,7 @@
 
 A universal AI story engine (working name: `book`). Code owns the truth; one model call per turn writes the story and proposes state changes; nothing is shown until it passes validation and is committed.
 
-Start with `docs/ARCHITECTURE.md` and `AGENTS.md`.
+Start with `docs/OVERVIEW.md` for the idea and the current architecture. `docs/ARCHITECTURE.md` is the detailed plan; `AGENTS.md` is the working rules.
 
 ## Quick start
 
@@ -56,7 +56,7 @@ pnpm book replay ... --provider anthropic --max-cost-usd 2
 When a cap is used up, play stops between turns and says so; the save is intact, so raising the cap
 and reusing the same `--save` resumes where you left off.
 
-Models default to `claude-sonnet-4-5` (strong) and `claude-haiku-4-5` (cheap); override with `BOOK_MODEL_STRONG` and `BOOK_MODEL_CHEAP`. Run `pnpm book models` to see what your key can reach.
+Models default to `claude-sonnet-4-6` (strong) and `claude-haiku-4-5-20251001` (cheap); override with `BOOK_MODEL_STRONG` and `BOOK_MODEL_CHEAP`. Run `pnpm book models` to see what your key can reach.
 
 Extended thinking is disabled by default: its hidden tokens are billed at the output rate and were
 eating the output cap (ADR 0003). Set `BOOK_THINKING=on` to turn it back on and measure the

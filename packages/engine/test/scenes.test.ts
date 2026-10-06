@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ConfigSchema, type Config, type State, type TurnDraft } from "@book/schema";
-import { coreModule, collectNotes, createInitialState, openScene } from "../src/index.ts";
+import { applyDraft, coreModule, collectNotes, createInitialState, openScene, UNMET, UNVISITED } from "../src/index.ts";
 
 function config(over: Record<string, unknown> = {}): Config {
   return ConfigSchema.parse({
@@ -70,5 +70,39 @@ describe("collectNotes", () => {
   it("keeps nothing at all when notes are switched off for the game", () => {
     const s = state({ notes: [{ turn: 1, text: "old" }] });
     expect(collectNotes(s, config({ notes: { enabled: false } }), draft({ notes: ["new"] }), 2)).toEqual([]);
+  });
+});
+
+describe("presence", () => {
+  it("clears unvisited on arrival and unmet only for people who share the room", () => {
+    const cfg = config({
+      seed: {
+        entities: [
+          { id: "player", type: "person", name: "You", location: "room" },
+          { id: "room", type: "place", name: "Room", tags: [UNVISITED] },
+          { id: "lane", type: "place", name: "Lane" },
+          { id: "ada", type: "person", name: "Ada", location: "room", tags: [UNMET] },
+          { id: "bo", type: "person", name: "Bo", location: "lane", tags: [UNMET] },
+        ],
+      },
+    });
+    const s = createInitialState(cfg, [coreModule], "s1");
+    const next = applyDraft(
+      s,
+      cfg,
+      [coreModule],
+      draft({
+        delta: [
+          { op: "entity.create", id: "shed", type: "place", name: "The shed", tags: [UNVISITED] },
+          { op: "entity.create", id: "nio", type: "person", name: "Nio", tags: [UNMET] },
+        ],
+      }),
+      { input: "look", due: [] },
+    );
+    expect(next.entities.room?.tags).not.toContain(UNVISITED);
+    expect(next.entities.shed?.tags).toContain(UNVISITED);
+    expect(next.entities.ada?.tags).not.toContain(UNMET);
+    expect(next.entities.bo?.tags).toContain(UNMET);
+    expect(next.entities.nio?.tags).toContain(UNMET);
   });
 });

@@ -21,80 +21,67 @@ export function outputFormatText(order: OutputOrder, config?: Config): string {
       : "Write the keys in this order: narration, delta, beat.";
   const lines = [
     "OUTPUT",
-    "Reply with a single JSON object only. No prose, no code fences, no commentary before or after it.",
+    "Reply with a single JSON object only. No prose, no code fences.",
     "Write the narration once, inside the JSON. Never write the story as plain text as well.",
-    "Keys:",
-    '- "narration": string, the story text for the player.',
-    '- "delta": array of ops (use [] if nothing changed).',
-    '- "beat": one line, at most 20 words, summarising what happened.',
-    '- "focus_next": optional array of entity ids likely to matter next turn.',
-    '- "need": optional array of ids you lack information on.',
-    '- "check": optional {"what": "what was at stake", "stat": "stat id"} - set this ONLY when you resolved the action with the fate die.',
-    '- "scene_ended": optional true - set this ONLY when the scene has just come to a natural close.',
+    'Optional keys: "focus_next", "need", "check" only with the fate die, "scene_ended" with "chapter_title", "at" where travel stops, "highlights" (up to 4 new names), "suggested_actions" (up to 3 short offers).',
   ];
-  if (config?.notes.enabled) {
-    lines.push('- "notes": optional array of short private strings, for your eyes only (see NOTES).');
-  }
+  if (config?.notes.enabled) lines.push('Optional "notes": short private strings (see NOTES).');
   lines.push(keys);
   return lines.join("\n");
 }
 
 export function sceneText(config: Config): string {
-  return [
-    "- A scene is one continuous stretch of story: a place, a conversation, a job of work. SCENE says which one you are in and how long it has run.",
-    '- Set "scene_ended": true only on the turn one genuinely closes: the player leaves, sleeps, the conversation is over, the errand is done. The engine tidies its memory at that moment, so answer honestly.',
-    `- Never set it mid-conversation or mid-task because a turn felt finished. After about ${config.scenes.max_beats} turns the engine tidies up regardless.`,
-  ].join("\n");
+  return `- You alone end a scene, with "scene_ended": true and a short "chapter_title", when the player leaves, sleeps, the talk is over, or the errand is done. The engine will not infer it. Never set it mid-task. After about ${config.scenes.max_beats} turns memory is tidied anyway.`;
 }
 
 export function notesText(config: Config): string {
-  return [
-    `- You may add short private notes in "notes": a secret the player has not found, a turn you mean to take soon, a detail to pay off. The newest ${config.notes.max_in_context} come back under YOUR PRIVATE NOTES.`,
-    "- They are never shown to the player. Never mention or quote them, and never write them into the narration.",
-    `- They expire after ${config.notes.ttl_turns} turns. If one still matters, make it real: open a thread, or add an entity fact. A note is a reminder to yourself; a thread is a promise to the story.`,
-  ].join("\n");
+  return `- "notes" are private. The newest ${config.notes.max_in_context} return under YOUR PRIVATE NOTES and expire after ${config.notes.ttl_turns} turns. Never show them. If one still matters, open a thread.`;
 }
 
 const VIOLENCE: Record<string, string> = {
-  deflect: [
-    "- The player may attempt violence; you never narrate the injury. The attempt misses, is blocked, is flinched away from, or lands harmlessly, for a concrete physical reason.",
-    "- Make it cost them instead: people react, leave, call someone, stop trusting them, and the trouble follows. Open a thread for the fallout and move relationships in the delta.",
-  ].join("\n"),
-  consequence: [
-    "- The player may attempt violence and it lands. Report it plainly in one or two clauses and move on: no gore, no technique, no dwelling on pain or fear.",
-    "- The world answers immediately and in proportion. Bystanders intervene, people call someone, and the authorities of this setting arrive on their own schedule.",
-    "- The cost is the story: put the injury, the money, the standing and the trouble in the delta, and open a thread for what the player now has to live with.",
-  ].join("\n"),
-  adventure: [
-    "- This is an adventure: fights are part of the genre. Blows land, people are wounded, and characters can die. Keep it swashbuckling, not gruesome; no lingering on gore or suffering.",
-    "- Put every injury in the delta. Tag a killed character with entity.fact.add and stop referring to them as present.",
-  ].join("\n"),
+  deflect:
+    "- The player may attempt violence; you never narrate the injury. It misses or is blocked for a physical reason. People react. Open a thread for the fallout.",
+  consequence:
+    "- The player may attempt violence and it lands. One or two clauses, then move on: no gore. The world answers immediately. Put the cost in the delta.",
+  adventure:
+    "- This is an adventure: fights are part of the genre. Blows land, people are wounded, and characters can die. No lingering on gore. Put every injury in the delta.",
 };
 
 const HARSHNESS: Record<string, string> = {
   forgiving: "- Consequences are gentle. Mistakes cost a little and can be walked back.",
   normal: "- Consequences are realistic. Mistakes cost something that has to be dealt with.",
-  unforgiving:
-    "- Consequences are heavy. Mistakes cost money, standing, health or a relationship outright, and they stick.",
+  unforgiving: "- Consequences are heavy. Mistakes cost money, standing, health or a relationship, and they stick.",
 };
+
+/** Travel sentences from this book's own words. A book with no journeys and no local steps adds none. */
+export function travelLines(config: Config): string[] {
+  const lines = [
+    '- Set "at" to the player\'s place id. The engine creates it if new and moves them this turn. A person, town, outside, upstairs, downstairs, inside, or home is not a place unless the sheet names it.',
+  ];
+  const journeys = config.travel.journeys;
+  const local = config.travel.local;
+  if (journeys.length > 0) {
+    const sample = journeys[0] ?? "leave";
+    lines.push(`- In this book these also count as a trip: ${journeys.join(", ")}. With these, "for" counts as well ("${sample} for").`);
+  }
+  if (local.length > 0) {
+    lines.push(`- These are a few steps inside the current place, not a new place: ${local.join(", ")}.`);
+  }
+  return lines;
+}
 
 export function fateText(config: Config): string {
   const lines = [
-    "- When a risky or uncertain action needs a result, use the supplied FATE DIE value instead of inventing the outcome. You decide whether an action is risky enough to need it; routine actions just succeed.",
-    '- When you do use it, set "check" in the output so the engine can show the player what was rolled.',
+    "- A risky action uses the supplied FATE DIE. Hard work spends energy with stat.add. Set \"check\" when you use the die.",
   ];
   if (config.dice?.visible) {
-    lines.push(
-      "- The player sees the roll, so the narration must match it: a low roll must visibly go wrong and a high roll must visibly go well.",
-    );
+    lines.push("- The player sees the roll, so a low roll must visibly go wrong and a high roll must visibly go well.");
     if (config.dice.stat_modifier) {
-      lines.push(
-        '- Name the stat the check leans on in "check".stat. A strong stat should carry a middling roll; a weak one should not.',
-      );
+      lines.push('- Name the stat the check leans on in "check".stat. A strong stat should carry a middling roll; a weak one should not.');
     }
   } else {
     lines.push(
-      "- The player does NOT see the roll. Never mention dice, odds or luck. When an action fails or half-works, the narration must give a concrete in-world reason the player can see - someone saw it coming, a hand was wet, a drawer stuck. Never let an attempt simply fizzle with no stated cause.",
+      "- The player does NOT see the roll. Never mention dice, odds or luck. When an action fails or half-works, give a concrete in-world reason the player can see.",
     );
   }
   return lines.join("\n");
@@ -102,42 +89,95 @@ export function fateText(config: Config): string {
 
 export function timeText(config: Config): string {
   const lines = [
-    "- Elapsed time goes in delta as clock.advance (minutes).",
-    `- For a deliberate stretch of sleeping, travelling or waiting, use clock.skip with a reason, up to ${config.time.max_skip_minutes} minutes in one turn.`,
+    `- Elapsed time is clock.advance (minutes) or clock.skip with a reason, up to ${config.time.max_skip_minutes} minutes. A stated time is the clock. clock.set may be earlier. Do not skip past something urgent.`,
   ];
   if (config.time.max_skip_minutes === 0) lines.push("- This character does not skip time. Play the hours through.");
   if (config.time.rest_note) lines.push(`- Rest in this world: ${config.time.rest_note}`);
-  lines.push("- A skip must be plausible for this character and this world. Do not skip past something urgent.");
   return lines.join("\n");
 }
 
 export function threadText(config: Config): string {
+  const majors = config.threads.max_majors;
   return [
-    `- OPEN THREADS shows at most ${config.threads.max_in_context} of the live threads, not all of them. Threads the player ignores drop off this list and come back as consequences when their deadline passes.`,
-    "- Thread the player caused and threads the world set matter equally. One action may resolve more than one: list every thread.resolve it earns.",
-    "- When resolving a thread opens a new question, open the follow-up with thread.open and set parent to the thread it came from.",
-    "- Do not nag. Mention a thread only when the scene gives it a reason to come up.",
+    "- A thread's scale is potential, minor or major. Never say those words to the player.",
+    `- At most ${majors} majors and ${config.threads.max_in_context} threads are shown, not all of them: last ${config.threads.rewarm_hours} hours, their place, a name just used, or a close deadline. A person merely in the room does not bring one in.`,
+    `- "potential" is an offer this turn. It lapses after ${config.threads.potential_hours} hours. thread.adopt to "minor" only when the player takes it up.`,
+    `- A long matter is "major". At most ${majors} lead. Opening another flags the quiet one set aside. Mention it once, then leave it. If they keep ignoring it, its deadline still happens. A child sets parent. Resolving a major leaves its minors open.`,
+    "- Do not reopen an open thread, or one resolved in the last 48 hours. A named weekday is that weekday on due. A figure in a thread is not the balance. Do not nag.",
   ].join("\n");
+}
+
+function payKey(config: Config): string {
+  const keys = config.stats.filter((stat) => stat.type === "currency").map((stat) => stat.key);
+  if (keys.includes("cash")) return "cash";
+  return keys[0] ?? "money";
+}
+
+function workedExamples(config: Config, modules: Module[]): string {
+  const lines = [
+    "EXAMPLES",
+    '{"op":"entity.fact.add","id":"<person id who witnessed it>","fact":"Heard you promise to bring the mower back by four","importance":2}',
+  ];
+  if (modules.some((m) => m.ops.includes("inventory.add"))) {
+    const item =
+      config.items.find((candidate) => candidate.price !== undefined && candidate.price > 0 && !/wallet|purse/.test(candidate.id)) ??
+      config.items.find((candidate) => candidate.price !== undefined) ??
+      config.items[0];
+    if (item && item.price !== undefined && item.price > 0 && modules.some((m) => m.ops.includes("stat.add"))) {
+      lines.push(`{"op":"inventory.add","owner":"${config.player_id}","item":"${item.id}","qty":1}`);
+      lines.push(`{"op":"stat.add","key":"${payKey(config)}","amount":-${item.price},"reason":"${item.name}"}`);
+    } else {
+      lines.push(
+        item
+          ? `{"op":"inventory.add","owner":"${config.player_id}","item":"${item.id}","qty":1}`
+          : `{"op":"inventory.add","owner":"${config.player_id}","item":"<catalog item id>","qty":1}`,
+      );
+    }
+  }
+  return lines.join("\n");
+}
+
+function purchaseLines(config: Config, modules: Module[]): string[] {
+  if (!modules.some((m) => m.ops.includes("inventory.add"))) return [];
+  const key = payKey(config);
+  return [
+    "- Gear is kept. Goods are used in the scene. Copy the id. A bag, a receipt, or an envelope is narration. Do not create it and do not add it.",
+    "- A new thing the save must remember is item.create this turn (keeps true for gear, a price when sold), then inventory.add. A good eaten, drunk, handed over, or set down is inventory.remove that turn. Gear stays until it is lost.",
+    `- A purchase is inventory.add of that one catalog item to "${config.player_id}" and stat.add of its price as a negative amount on "${key}". An item on that line is already bought. Charge the stated figure, a whole unit, or narrate the refusal. Nothing is no stat.add.`,
+  ];
+}
+
+function balanceLine(config: Config): string {
+  const keys = config.stats.filter((stat) => stat.type === "currency").map((stat) => stat.key);
+  if (keys.includes("cash") && keys.includes("bank")) {
+    return "- Cash and the bank balance are currency stats. The wallet is one object. Notes are stat.add on cash. The card is stat.add on bank. Never store notes as a pile of objects.";
+  }
+  return "- A currency balance is the currency stat in STATE. Never store money as a pile of objects.";
 }
 
 export function contractText(config: Config, modules: Module[], order: OutputOrder): string {
   const style = config.gm_style;
   const tabletop = config.presentation.profile === "tabletop";
   const lines: string[] = [
-    "You are the Game Master of an interactive story. Code owns the truth: you narrate and propose changes, code validates and applies them.",
+    "You are the Game Master. Code owns the truth: you narrate and propose changes, code validates and applies them.",
     `Game: ${config.meta.title}. Tone: ${config.meta.tone}.${config.meta.premise ? ` Premise: ${config.meta.premise}` : ""}`,
     `The player character id is "${config.player_id}".`,
     "",
     "RULES",
-    "- You never write state. You propose `delta` ops.",
-    "- Every change to money, stats, items, time, relationships, threads or new named characters MUST appear in delta. If it is not in delta, it did not happen.",
-    "- Declare every new named person or place with entity.create before any op or focus_next refers to it.",
-    "- Use only ids shown in the context. Never invent ops or fields.",
+    "- You never write state. You propose `delta` ops. Every change to money, stats, items, time, relationships, threads or new named characters MUST appear in delta. If it is not in delta, it did not happen.",
+    "- entity.create a new person or place before any op refers to it. Use only ids in the context.",
+    "- Other people know only what they have seen, heard, or been told. If it would change a later scene, add one entity.fact.add. A passing remark gets nothing. importance 1 fades in a day, 2 in a week, and importance 3 is a fight, a betrayal, or real harm. A stated memory is already on them, or you add it because they witnessed it.",
+    "- ENGINE NOW is the save. It wins over LAST TURNS and STORY SO FAR on money, place, time, and what is carried. **Bold** in LAST TURNS is new: create it.",
+    ...travelLines(config),
+    '- Refuse a trip once, and give the reason. If they ask again, entity.create if needed, entity.move, and set "at". A second refusal is not allowed.',
+    "- If the narration buys, orders, eats, drinks, or puts down a catalog item, the same delta records it. Otherwise do not narrate it.",
+    ...purchaseLines(config, modules),
+    balanceLine(config),
+    "- Stat keys are the ids in brackets in STATE, not the labels. Do not name a person tagged unmet until they share the player's location.",
     tabletop
       ? "- Stat numbers and rolls may appear in narration (tabletop profile)."
       : "- Never write the status line or stat numbers in narration; the engine renders them.",
-    "- The player's message may contain several actions: handle them in order in one narration.",
-    '- If the input is "..." (kind continue), advance the scene using DUE EVENTS or natural progression.',
+    '- Handle several actions in order. Input "..." (kind continue) advances from DUE EVENTS.',
     "",
     "TIME",
     timeText(config),
@@ -162,6 +202,8 @@ export function contractText(config: Config, modules: Module[], order: OutputOrd
   for (const rule of style.extra_rules) lines.push(`- ${rule}`);
   if (config.notes.enabled) lines.push("", "NOTES", notesText(config));
   lines.push(
+    "",
+    workedExamples(config, modules),
     "",
     "CONTENT",
     RATING[config.meta.content_rating] ?? RATING.clean ?? "",
@@ -207,6 +249,7 @@ export function buildStaticBlocks(
 ): StaticBlocks {
   const contract = contractText(config, modules, order);
   const frag = moduleFragmentsText(config, modules, fragmentCap);
+  // Both blocks are the static prefix. ENGINE NOW and LAST TURNS are in the user message, after this prefix.
   const system: LLMSystemBlock[] = [{ text: contract, cache: true }];
   if (frag.text) system.push({ text: frag.text, cache: true });
   return { system, contract, fragments: frag.text, fragmentsTrimmed: frag.trimmed };

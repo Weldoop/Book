@@ -1,3 +1,4 @@
+import { humanTime, memoryExpiry, shortTime } from "@book/engine";
 import type { Config, Fact, Module, State } from "@book/schema";
 import { orderThreads } from "./attention.ts";
 import { recentBeats } from "./sections.ts";
@@ -34,8 +35,11 @@ const REQUEST_STORY_CAP = 700;
  */
 export function shouldCompact(state: State, config: Config): boolean {
   const beats = recentBeats(state).length;
-  if (beats >= config.scenes.max_beats) return true;
-  return state.scene.closed && beats >= config.scenes.min_beats;
+  const sceneClose = state.scene.closed && beats >= config.scenes.min_beats;
+  if (sceneClose) return true;
+  const hold = state.summaries.compaction_hold_until;
+  if (hold !== undefined && state.turn < hold) return false;
+  return beats >= config.scenes.max_beats;
 }
 
 /**
@@ -52,11 +56,12 @@ export function windowKeep(state: State, config: Config): number {
 export const COMPACTION_SYSTEM = [
   "You are the archivist of an interactive story. Compress old events into durable memory. Reply with a single JSON object only, no prose, no code fences.",
   "Keys:",
-  '- "chapter_summary": string, at most 150 words, covering the beats shown.',
-  '- "story_so_far": string, at most 350 words, merging the current story so far with the new chapter. You MUST keep running jokes, favours owed, promises, nicknames and recurring characters.',
+  '- "chapter_summary": string, at most 80 words, covering the beats shown.',
+  '- "story_so_far": string, at most 160 words, merging the current story so far with the new chapter. You MUST keep running jokes, favours owed, promises and recurring characters. Keep nicknames only when a beat uses them.',
   '- "facts": array of {"id": string, "fact": string, "importance": 1|2|3}. For each entity you want to tidy, list ALL the facts it should keep (consolidated: merge duplicates, drop outdated or trivial ones, at most 8 per entity). Your list replaces its old facts. Only use entity ids shown below; omit entities that need no change.',
   '- "resolve_threads": array of thread ids that are clearly finished. Only use ids shown below.',
   "Never invent events. Use only what is shown.",
+  "Never write live money, health, energy, or the clock. Those belong to the engine. Do not copy a stale balance from the old summary. A goal that says how much had to last is not the current balance.",
 ].join("\n");
 
 export interface CompactionInput {
@@ -73,7 +78,8 @@ export function buildCompactionRequest(i: CompactionInput): BuiltContext {
   const storyFit = story ? trimOldestSentences(story, REQUEST_STORY_CAP) : { text: "", trimmed: false };
   const storyText = story ? `## CURRENT STORY SO FAR\n${storyFit.text}` : "";
 
-  const beatLines = recentBeats(state).map((b) => `- t${b.turn}: ${b.text}`);
+  // Each beat carries its weekday and time, so a chapter is never summarised onto the wrong day.
+  const beatLines = recentBeats(state).map((b) => `- t${b.turn}${b.clock ? ` ${shortTime(b.clock)}` : ""}: ${b.text}`);
   const beatFit = fitLines("## BEATS SINCE LAST COMPACTION", beatLines, REQUEST_BEATS_CAP, "start");
   const beatsText = renderSection("## BEATS SINCE LAST COMPACTION", beatFit.lines);
 
@@ -97,7 +103,19 @@ export function buildCompactionRequest(i: CompactionInput): BuiltContext {
   const entityFit = fitLines("## ENTITY FACTS (importance 1-3)", entityLines, REQUEST_ENTITIES_CAP, "end");
   const entitiesText = renderSection("## ENTITY FACTS (importance 1-3)", entityFit.lines);
 
+  const locId = state.entities[i.config.player_id]?.location ?? null;
+  const locName = locId ? (state.entities[locId]?.name ?? locId) : "unknown";
+  const stateLines = [
+    "Engine truth. Do not copy these balances into the summary.",
+    `Clock: ${humanTime(state.clock.now)}`,
+    locId ? `Location: ${locName} [${locId}]` : "Location: unknown",
+    ...i.modules.flatMap((m) => m.snapshot(state, i.config)).filter((line) => line.trim()),
+  ];
+  const stateFit = fitLines("## STATE", stateLines, 400, "end");
+  const stateText = renderSection("## STATE", stateFit.lines);
+
   const sections: { part: string; text: string; trimmed: boolean }[] = [
+    { part: "state_snapshot", text: stateText, trimmed: stateFit.trimmed },
     { part: "story_so_far", text: storyText, trimmed: storyFit.trimmed },
     { part: "beats", text: beatsText, trimmed: beatFit.trimmed },
     { part: "threads", text: threadsText, trimmed: threadFit.trimmed },
@@ -169,14 +187,20 @@ export function parseCompactionResult(
   };
 }
 
-function consolidate(existing: Fact[], incoming: CompactionFact[], turn: number): Fact[] {
-  const turnByText = new Map(existing.map((f) => [f.text, f.turn]));
+function consolidate(existing: Fact[], incoming: CompactionFact[], turn: number, now: string, kind: string): Fact[] {
+  const prior = new Map(existing.map((f) => [f.text, f]));
   const seen = new Set<string>();
   const facts: Fact[] = [];
   for (const f of incoming) {
     if (seen.has(f.fact)) continue;
     seen.add(f.fact);
-    facts.push({ text: f.fact, importance: f.importance, turn: turnByText.get(f.fact) ?? turn });
+    const old = prior.get(f.fact);
+    const fact: Fact = { text: f.fact, importance: f.importance, turn: old?.turn ?? turn };
+    if (kind === "person" && f.importance < 3) {
+      const expires = old?.expires ?? memoryExpiry(now, f.importance);
+      if (expires) fact.expires = expires;
+    }
+    facts.push(fact);
   }
   const ranked = facts
     .map((f, index) => ({ f, index }))
@@ -185,10 +209,22 @@ function consolidate(existing: Fact[], incoming: CompactionFact[], turn: number)
   return ranked.sort((a, b) => a.index - b.index).map((r) => r.f);
 }
 
+/** "Sat 3 Oct 2026, 09:20 to Sat 3 Oct 2026, 23:10." The dates come from the clock, not the archivist. */
+export function chapterRange(state: State): string {
+  const beats = recentBeats(state).filter((b) => b.clock);
+  const first = beats[0]?.clock;
+  const last = beats.at(-1)?.clock;
+  if (!first || !last) return "";
+  const from = humanTime(first);
+  const to = humanTime(last);
+  return from === to ? `${from}.` : `${from} to ${to}.`;
+}
+
 export function applyCompaction(state: State, result: CompactionResult, config: Config): State {
-  const chapter = result.chapter_summary.trim()
-    ? trimOldestSentences(result.chapter_summary, CHAPTER_CAP_TOKENS).text
-    : "";
+  const range = chapterRange(state);
+  const summary = result.chapter_summary.trim();
+  const body = summary ? trimOldestSentences(summary, CHAPTER_CAP_TOKENS).text : "";
+  const chapter = body && range ? `${range} ${body}` : body;
   const story = result.story_so_far.trim()
     ? trimOldestSentences(result.story_so_far, STORY_SO_FAR_CAP_TOKENS).text
     : state.summaries.story_so_far;
@@ -204,7 +240,7 @@ export function applyCompaction(state: State, result: CompactionResult, config: 
   for (const [id, incoming] of byEntity) {
     const entity = state.entities[id];
     if (!entity) continue;
-    entities[id] = { ...entity, facts: consolidate(entity.facts, incoming, state.turn) };
+    entities[id] = { ...entity, facts: consolidate(entity.facts, incoming, state.turn, state.clock.now, entity.type) };
   }
 
   const resolve = new Set(result.resolve_threads);

@@ -1,10 +1,15 @@
 import { z } from "zod";
-import { EntityTypeSchema, IdSchema, LocalDateTimeSchema, ThreadKindSchema } from "./ids.ts";
+import { EntityTypeSchema, IdSchema, LocalDateTimeSchema, ThreadKindSchema, ThreadScaleSchema } from "./ids.ts";
 
 export const FactSchema = z.object({
   text: z.string(),
   importance: z.union([z.literal(1), z.literal(2), z.literal(3)]).default(2),
   turn: z.number().int().min(0),
+  /**
+   * When a person's memory lapses, as local time. Absent means it stays:
+   * a place, a seeded trait, or a serious memory such as a fight.
+   */
+  expires: LocalDateTimeSchema.optional(),
 });
 export type Fact = z.infer<typeof FactSchema>;
 
@@ -27,9 +32,21 @@ export const ThreadSchema = z.object({
   due: LocalDateTimeSchema.optional(),
   status: z.enum(["open", "resolved", "failed"]).default("open"),
   entities: z.array(IdSchema).default([]),
-  /** False once the thread has used up its unprompted reminders. Cold threads stay in state but leave the prompt. */
+  /** Offer, a thread the player took up, or a long matter. The player never sees this word. */
+  scale: ThreadScaleSchema.default("minor"),
+  /** True once this was a major and then stepped back. Stays true if it is taken up again. */
+  was_major: z.boolean().default(false),
+  /** Scene index when this major stepped back. It is mentioned during that scene only. */
+  set_aside_scene: z.number().int().min(1).optional(),
+  /** Turn the player last named it, or it was opened or adopted. Standing in its place does not count. */
+  last_interacted_turn: z.number().int().min(0).default(0),
+  /** Clock time of that same interaction. Warmth lasts `threads.rewarm_hours` from here. */
+  last_interacted_at: LocalDateTimeSchema.optional(),
+  /** When an unclaimed offer lapses. Absent on minors and majors. */
+  expires: LocalDateTimeSchema.optional(),
+  /** True when the player dealt with it inside `threads.rewarm_hours`. */
   warm: z.boolean().default(true),
-  /** Unprompted reminders spent so far; see `Config.threads.max_reminders`. */
+  /** Unused. Kept so older saves and configs still load. */
   reminders: z.number().int().min(0).default(0),
   last_shown_turn: z.number().int().min(0).default(0),
   /** Thread this one grew out of, so chains are visible in the logs. */
@@ -38,10 +55,12 @@ export const ThreadSchema = z.object({
   on_overdue: z.string().optional(),
   opened_turn: z.number().int().min(0),
   resolved_turn: z.number().int().min(0).optional(),
+  /** Clock time when the thread was resolved. Used to keep that matter closed for 48 story hours. */
+  resolved_at: LocalDateTimeSchema.optional(),
 });
 export type Thread = z.infer<typeof ThreadSchema>;
 
-export const BeatSchema = z.object({ turn: z.number().int().min(0), text: z.string() });
+export const BeatSchema = z.object({ turn: z.number().int().min(0), text: z.string(), clock: LocalDateTimeSchema.optional() });
 export type Beat = z.infer<typeof BeatSchema>;
 
 export const TranscriptTurnSchema = z.object({
@@ -49,6 +68,8 @@ export const TranscriptTurnSchema = z.object({
   input: z.string(),
   narration: z.string(),
   clock: LocalDateTimeSchema,
+  /** Phrases in the narration that were not in the save. Shown bold, and marked for the next turn. */
+  highlights: z.array(z.string()).max(4).optional(),
 });
 export type TranscriptTurn = z.infer<typeof TranscriptTurnSchema>;
 
@@ -56,6 +77,11 @@ export const SummariesSchema = z.object({
   chapters: z.array(z.string()).default([]),
   story_so_far: z.string().default(""),
   last_compacted_turn: z.number().int().min(0).default(0),
+  /**
+   * After a failed chapter write, skip the beat-ceiling retry until this turn.
+   * A scene the GM actually closed still compacts.
+   */
+  compaction_hold_until: z.number().int().min(0).optional(),
 });
 export type Summaries = z.infer<typeof SummariesSchema>;
 
@@ -64,6 +90,8 @@ export const SceneSchema = z.object({
   started_turn: z.number().int().min(0).default(0),
   /** Set when the GM declares the scene closed. The next input opens the next one. */
   closed: z.boolean().default(false),
+  /** The title of the chapter that just closed. Absent on a scene that is still running. */
+  title: z.string().max(60).optional(),
 });
 export type Scene = z.infer<typeof SceneSchema>;
 

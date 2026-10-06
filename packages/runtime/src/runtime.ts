@@ -1,5 +1,6 @@
 import {
   applyDraft,
+  dropInventedCharges,
   classifyInput,
   collectDue,
   createInitialState,
@@ -9,6 +10,7 @@ import {
   severityOf,
   openScene,
   stripOocPrefix,
+  playerNotices,
   validateDraft,
 } from "@book/engine";
 import {
@@ -17,6 +19,7 @@ import {
   buildCompactionRequest,
   buildOocContext,
   buildRepairContext,
+  deltaFormatHint,
   buildTurnContext,
   parseCompactionResult,
   shouldCompact,
@@ -74,11 +77,33 @@ export interface TurnResult {
   scene_ended?: boolean;
   /** Set when the GM resolved the action with the die and the config shows rolls to the player. */
   roll?: { value: number; band: string; what: string; stat?: string };
+  /** Engine-printed warnings (low money, a broken promise). The narration may also mention them. */
+  notices: string[];
+  /** Up to three short offers for what the player might type next. Absent when the draft gave none. */
+  suggestions?: string[];
+  /** New names in the narration, for the player to see in bold. */
+  highlights?: string[];
+  /** Title of the chapter that just closed. */
+  chapter_title?: string;
+  /** Index of the chapter that just closed. */
+  chapter_index?: number;
   record: TurnRecord;
 }
 
 export interface TurnHooks {
   onInterlude?(text: string): void;
+  /** Fired with the validated turn before the archivist runs, so the player can read while memory is written. */
+  onReleased?(result: TurnResult): void;
+}
+
+const COMPACTION_HOLD_TURNS = 5;
+const COMPACTION_MAX_TOKENS = 1600;
+
+function holdCompaction(state: State): State {
+  return {
+    ...state,
+    summaries: { ...state.summaries, compaction_hold_until: state.turn + COMPACTION_HOLD_TURNS },
+  };
 }
 
 export function createRuntime(opts: {
@@ -115,7 +140,7 @@ interface Evaluated {
   violations: Violation[];
 }
 
-function evaluate(state: State, rt: Runtime, text: string): Evaluated {
+function evaluate(state: State, rt: Runtime, text: string, input = ""): Evaluated {
   const parsed = parseDraftText(text);
   if (!parsed.ok) {
     return {
@@ -130,7 +155,7 @@ function evaluate(state: State, rt: Runtime, text: string): Evaluated {
       ],
     };
   }
-  const result = validateDraft(state, rt.config, rt.modules, parsed.draft);
+  const result = validateDraft(state, rt.config, rt.modules, parsed.draft, input);
   return { draft: parsed.draft, text, violations: result.violations };
 }
 
@@ -164,7 +189,7 @@ async function playOoc(rt: Runtime, state: State, rawInput: string): Promise<Tur
     at: new Date().toISOString(),
   };
   await rt.store.appendLog(state.save_id, { type: "ooc", record });
-  return { turn: state.turn, kind: "ooc", narration: record.narration ?? "", ...view(rt, state), outcome: "ok", record };
+  return { turn: state.turn, kind: "ooc", narration: record.narration ?? "", ...view(rt, state), outcome: "ok", notices: [], record };
 }
 
 /** Any input after a final ending. No model call: the story is over and the save stays closed. */
@@ -191,6 +216,7 @@ async function replayEnding(rt: Runtime, state: State, rawInput: string, ending:
     ...view(rt, state),
     outcome: "ended",
     ending: { id: ending.id, title: ending.title, text: ending.text },
+    notices: [],
     record,
   };
 }
@@ -250,7 +276,7 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
     json: true,
   });
   const rawOf = (text: string) => (rt.logRaw ? { raw: text } : {});
-  let current = evaluate(state, rt, first.text);
+  let current = evaluate(state, rt, first.text, input);
   attempts.push({ kind: "draft", draft: current.draft ?? current.text, ...rawOf(first.text), violations: current.violations, usage: first.usage });
 
   let repairs = 0;
@@ -280,7 +306,7 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
             json: true,
           })
         : await call({ tier: "strong", purpose: "format_repair", system: ctx.system, messages: ctx.messages, max_tokens: TURN_MAX_TOKENS, json: true });
-      current = evaluate(state, rt, res.text);
+      current = evaluate(state, rt, res.text, input);
       attempts.push({ kind: "format_repair", draft: current.draft ?? current.text, ...rawOf(res.text), violations: current.violations, usage: res.usage });
     } else if (canPatchDelta && current.draft) {
       const rc = buildRepairContext({
@@ -293,11 +319,37 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
         violations: current.violations,
         narration: current.draft.narration,
       });
-      const res = await call({ tier: "cheap", purpose: "delta_repair", system: rc.system, messages: rc.messages, max_tokens: 400, json: true });
-      const fixed = parseDeltaRepair(res.text);
+      const askRepair = (hint?: string) =>
+        call({
+          tier: "cheap",
+          purpose: "delta_repair",
+          system: rc.system,
+          messages: hint ? [...rc.messages, { role: "user", content: hint }] : rc.messages,
+          max_tokens: 400,
+          json: true,
+        });
+      let res = await askRepair();
+      let fixed = parseDeltaRepair(res.text);
+      if (!fixed.ok) {
+        const unread = `The delta repair could not be read (${fixed.error}).`;
+        attempts.push({
+          kind: "delta_repair",
+          draft: current.draft,
+          ...rawOf(res.text),
+          violations: [{ severity: "fixable", code: "repair_unreadable", message: unread }],
+          usage: res.usage,
+        });
+        res = await askRepair(deltaFormatHint(config.player_id));
+        fixed = parseDeltaRepair(res.text);
+      }
       if (fixed.ok) {
-        const candidate: TurnDraft = { ...current.draft, delta: fixed.delta, beat: fixed.beat ?? current.draft.beat };
-        const result = validateDraft(state, config, modules, candidate);
+        const candidate: TurnDraft = {
+          ...current.draft,
+          delta: dropInventedCharges(current.draft.delta, fixed.delta, current.draft.narration, config),
+          beat: fixed.beat ?? current.draft.beat,
+          ...(fixed.at ? { at: fixed.at } : {}),
+        };
+        const result = validateDraft(state, config, modules, candidate, input);
         current = { draft: candidate, text: JSON.stringify(candidate), violations: result.violations };
       } else {
         current = {
@@ -335,7 +387,7 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
         max_tokens: TURN_MAX_TOKENS,
         json: true,
       });
-      current = evaluate(state, rt, res.text);
+      current = evaluate(state, rt, res.text, input);
       attempts.push({ kind: "rewrite_repair", draft: current.draft ?? current.text, ...rawOf(res.text), violations: current.violations, usage: res.usage });
     }
     repairs++;
@@ -371,6 +423,7 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
       ...view(rt, state),
       outcome: "rolled_back",
       ...(interlude ? { interlude } : {}),
+      notices: [],
       record,
     };
   }
@@ -380,17 +433,6 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
     due,
     shown_threads: ctx.threads_shown ?? [],
   });
-
-  if (shouldCompact(next, config)) {
-    try {
-      const req = buildCompactionRequest({ config, state: next, modules });
-      const res = await call({ tier: "cheap", purpose: "compaction", system: req.system, messages: req.messages, max_tokens: 900, json: true });
-      const parsed = parseCompactionResult(res.text);
-      if (parsed.ok) next = applyCompaction(next, parsed.value, config);
-    } catch {
-      // Compaction is best-effort; the next turn retries.
-    }
-  }
 
   const elapsed = diffMinutes(next.clock.now, state.clock.now);
   if (config.offscreen?.enabled && elapsed >= config.offscreen.min_skip_hours * 60) {
@@ -406,26 +448,29 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
   const fired = pickEnding(next, config);
   if (fired) next = markEnding(next, fired);
 
-  const record: TurnRecord = {
+  const outcome = rewrote ? "rewritten" : repairs > 0 ? "repaired" : "ok";
+  const check = current.draft.check;
+  const partial: TurnRecord = {
     ...baseRecord,
     narration: current.draft.narration,
     beat: current.draft.beat,
     delta: current.draft.delta,
-    ...(current.draft.check ? { check: current.draft.check } : {}),
-    outcome: rewrote ? "rewritten" : repairs > 0 ? "repaired" : "ok",
-    usage: usages,
+    ...(check ? { check } : {}),
+    outcome,
+    usage: [...usages],
   };
-  await rt.store.commitTurn({ save_id: saveId, expected_turn: state.turn, state: next, record });
-
-  const check = current.draft.check;
-  return {
+  const visible: TurnResult = {
     turn: next.turn,
     kind,
     narration: current.draft.narration,
     ...view(rt, next),
-    outcome: record.outcome,
+    outcome,
+    notices: playerNotices(due, next),
     ...(interlude ? { interlude } : {}),
-    ...(next.scene.closed ? { scene_ended: true } : {}),
+    ...(next.scene.closed
+      ? { scene_ended: true, ...(next.scene.title ? { chapter_title: next.scene.title } : {}), chapter_index: next.scene.index }
+      : {}),
+    ...(next.window.at(-1)?.highlights?.length ? { highlights: next.window.at(-1)?.highlights } : {}),
     ...(fired
       ? {
           ending: {
@@ -446,6 +491,39 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
           },
         }
       : {}),
-    record,
+    ...(current.draft.suggested_actions?.length ? { suggestions: current.draft.suggested_actions } : {}),
+    record: partial,
   };
+
+  let hookError: unknown;
+  try {
+    hooks.onReleased?.(visible);
+  } catch (err) {
+    hookError = err;
+  }
+
+  if (shouldCompact(next, config)) {
+    try {
+      const req = buildCompactionRequest({ config, state: next, modules });
+      const res = await call({
+        tier: "cheap",
+        purpose: "compaction",
+        system: req.system,
+        messages: req.messages,
+        max_tokens: COMPACTION_MAX_TOKENS,
+        json: true,
+      });
+      const parsed = parseCompactionResult(res.text);
+      if (parsed.ok) next = applyCompaction(next, parsed.value, config);
+      else next = holdCompaction(next);
+    } catch {
+      next = holdCompaction(next);
+    }
+  }
+
+  const record: TurnRecord = { ...partial, usage: usages };
+  await rt.store.commitTurn({ save_id: saveId, expected_turn: state.turn, state: next, record });
+  const result: TurnResult = { ...visible, record };
+  if (hookError) throw hookError;
+  return result;
 }

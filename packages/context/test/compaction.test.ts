@@ -50,6 +50,14 @@ describe("shouldCompact", () => {
     const s = makeState({ beats: beats(30), summaries: { chapters: [], story_so_far: "", last_compacted_turn: 15 } });
     expect(shouldCompact(s, config)).toBe(false);
   });
+
+  it("skips the beat-ceiling retry after a failed chapter write, but still compacts a scene the GM closed", () => {
+    const summaries = { chapters: [], story_so_far: "", last_compacted_turn: 0, compaction_hold_until: 15 };
+    const held = makeState({ turn: 10, beats: beats(20), summaries });
+    expect(shouldCompact(held, config)).toBe(false);
+    expect(shouldCompact(makeState({ turn: 15, beats: beats(20), summaries }), config)).toBe(true);
+    expect(shouldCompact(makeState({ turn: 10, beats: beats(20), summaries, scene: closed }), config)).toBe(true);
+  });
 });
 
 describe("buildCompactionRequest", () => {
@@ -76,10 +84,22 @@ describe("buildCompactionRequest", () => {
     expect(text).toContain("Glenys [glenys]");
     expect(text).not.toContain("Dai [dai]");
     const sys = req.system[0]?.text ?? "";
-    for (const k of ["chapter_summary", "story_so_far", "facts", "resolve_threads", "150 words", "350 words", "running jokes", "favours owed", "promises", "nicknames"]) {
+    for (const k of ["chapter_summary", "story_so_far", "facts", "resolve_threads", "80 words", "160 words", "running jokes", "favours owed", "promises", "nicknames"]) {
       expect(sys).toContain(k);
     }
     expect(req.total_tokens).toBe(req.parts.reduce((n, p) => n + p.tokens, 0));
+  });
+
+  it("shows the live balances and forbids copying them or an unused nickname", () => {
+    const req = buildCompactionRequest({ config, state: makeState(), modules: [statsModule] });
+    const text = req.messages[0]?.content ?? "";
+    expect(text).toContain("45.00");
+    expect(text).toContain("Do not copy these balances");
+    expect(text).toContain("The Flat");
+    const sys = req.system[0]?.text ?? "";
+    expect(sys).toContain("stale balance");
+    expect(sys).toContain("Never write live money");
+    expect(sys).toContain("Keep nicknames only when a beat uses them");
   });
 
   it("stays bounded on a big state and never lists half an entity", () => {

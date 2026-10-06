@@ -7,13 +7,14 @@ export interface ContextBudget {
   due_events: number;
   threads: number;
   notes: number;
+  world_sheet: number;
   entities_in_focus: number;
   window: number;
   beats: number;
   story_so_far: number;
 }
 
-/** Per-part token caps from docs/ARCHITECTURE.md section 6. Sum is ~4.5k. */
+/** Per-part token caps from docs/ARCHITECTURE.md section 6. Sum is ~4.9k, still under 5k. */
 export const DEFAULT_BUDGET: ContextBudget = {
   contract: 700,
   module_fragments: 500,
@@ -22,6 +23,7 @@ export const DEFAULT_BUDGET: ContextBudget = {
   due_events: 100,
   threads: 300,
   notes: 120,
+  world_sheet: 350,
   entities_in_focus: 500,
   window: 800,
   beats: 400,

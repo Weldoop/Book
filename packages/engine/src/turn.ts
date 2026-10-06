@@ -2,14 +2,24 @@ import {
   TurnDraftSchema,
   type Config,
   type DueItem,
+  type Entity,
   type GmNote,
   type Module,
+  type Op,
   type State,
   type TurnDraft,
   type TurnKind,
   type Violation,
 } from "@book/schema";
+import { consistencyViolations, materializeAt } from "./consistency.ts";
+import { driftStats } from "./drift.ts";
+import { selectHighlights } from "./highlights.ts";
+import { syncPresence } from "./core.ts";
+import { forgetMemories } from "./memory.ts";
+import { normalizeDraft } from "./normalize.ts";
 import { processOps } from "./ops.ts";
+import { resolveStatKey } from "./stat-key.ts";
+import { duplicateOpenThread, sharedContentWords } from "./threads.ts";
 import { rngFor } from "./rng.ts";
 import { addMinutes, diffMinutes } from "./time.ts";
 
@@ -41,13 +51,13 @@ export const OVERDUE_PREFIX = "overdue:";
  */
 export function overdueThreads(state: State, config: Config): DueItem[] {
   return state.threads
-    .filter((t) => t.status === "open" && t.due !== undefined && diffMinutes(state.clock.now, t.due) >= 0)
+    .filter((t) => t.status === "open" && t.scale !== "potential" && t.due !== undefined && diffMinutes(state.clock.now, t.due) >= 0)
     .map((t) => ({
       id: `${OVERDUE_PREFIX}${t.id}`,
       kind: "scheduled" as const,
       text:
         t.on_overdue ??
-        `The deadline has passed on "${t.text}" and it was never dealt with. Play the consequences now.`,
+        `The deadline has passed on "${t.text}". If the story already settled it, thread.resolve ${t.id}. Otherwise play the consequences now.`,
       entities: t.entities.filter((id) => state.entities[id]),
     }));
 }
@@ -76,12 +86,43 @@ export function severityOf(violations: Violation[]): "none" | "fixable" | "game_
   return violations.some((v) => v.severity === "game_breaking") ? "game_breaking" : "fixable";
 }
 
-export function validateDraft(state: State, config: Config, modules: Module[], draft: TurnDraft): ValidationResult {
-  const { violations } = processOps(state, config, modules, draft.delta);
+/** Maps a label written in check.stat onto the real id. An unknown name is fixable. */
+function checkStat(config: Config, draft: TurnDraft): Violation[] {
+  const stat = draft.check?.stat;
+  if (!stat) return [];
+  const key = resolveStatKey(config, stat);
+  if (!key) {
+    const known = config.stats.map((s) => s.key).join(", ");
+    return [
+      {
+        severity: "fixable",
+        code: "unknown_stat",
+        message: `check.stat '${stat}' is not a stat. Omit it, or use one of: ${known}.`,
+      },
+    ];
+  }
+  if (key !== stat && draft.check) draft.check.stat = key;
+  return [];
+}
+
+export function validateDraft(
+  state: State,
+  config: Config,
+  modules: Module[],
+  draft: TurnDraft,
+  input = "",
+): ValidationResult {
+  normalizeDraft(state, config, draft);
+  materializeAt(state, config, draft);
+  const processed = processOps(withThreadContact(state, config, input), config, modules, draft.delta);
   const warnings: string[] = [];
   const words = draft.narration.trim().split(/\s+/).length;
   if (words > config.gm_style.max_words * 2) {
     warnings.push(`narration has ${words} words (limit ${config.gm_style.max_words})`);
+  }
+  const violations = [...processed.violations, ...checkStat(config, draft)];
+  if (processed.violations.length === 0) {
+    violations.push(...consistencyViolations(state, processed.state, config, draft, input, processed.applied));
   }
   return { ok: violations.length === 0, violations, warnings };
 }
@@ -98,30 +139,32 @@ export function parseDraft(value: unknown): { ok: true; draft: TurnDraft } | { o
 export interface ApplyContext {
   input: string;
   due: DueItem[];
-  /** Threads the prompt actually showed this turn, so reminders can be counted. */
+  /** Threads the prompt actually showed this turn. */
   shown_threads?: string[];
 }
 
 /**
- * Counts the reminders a thread has spent and cools it once it runs out, so an ignored thread
- * stops crowding the prompt. A thread the player touched, or one whose deadline is close,
- * is warm again.
+ * Warm means the player dealt with the thread inside `rewarm_hours`. Showing it, or standing
+ * in its place, does not spend that time. A deadline brings a thread back without making it warm.
  */
 export function ageThreads(state: State, config: Config, shown: string[], turn: number): void {
-  const { max_reminders, rewarm_hours } = config.threads;
+  const window = config.threads.rewarm_hours * 60;
   const shownSet = new Set(shown);
   for (const t of state.threads) {
     if (t.status !== "open") continue;
-    const nearDeadline = t.due !== undefined && diffMinutes(t.due, state.clock.now) <= rewarm_hours * 60;
-    if (nearDeadline) {
-      t.warm = true;
-      t.reminders = 0;
-      continue;
-    }
-    if (!shownSet.has(t.id)) continue;
-    t.last_shown_turn = turn;
-    t.reminders += 1;
-    if (t.reminders > max_reminders) t.warm = false;
+    if (shownSet.has(t.id)) t.last_shown_turn = turn;
+    t.warm = t.last_interacted_at !== undefined && diffMinutes(state.clock.now, t.last_interacted_at) < window;
+  }
+}
+
+/** An offer nobody took up lapses. It does not become a punishment. */
+export function lapsePotentials(state: State, turn: number): void {
+  const now = state.clock.now;
+  for (const thread of state.threads) {
+    if (thread.status !== "open" || thread.scale !== "potential" || thread.expires === undefined) continue;
+    if (diffMinutes(now, thread.expires) < 0) continue;
+    thread.status = "failed";
+    thread.resolved_turn = turn;
   }
 }
 
@@ -152,35 +195,102 @@ export function openScene(state: State): State {
   return { ...state, scene: { index: state.scene.index + 1, started_turn: state.turn, closed: false } };
 }
 
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Whole-word match. Short labels are skipped so "a" does not touch every thread. */
+function namesEntity(entity: Entity, input: string): boolean {
+  if (input.trim().length === 0) return false;
+  for (const term of [entity.name, ...entity.aliases]) {
+    const t = term.trim();
+    if (t.length < 2) continue;
+    const re = new RegExp(`(?<![\\p{L}\\p{N}_])${escapeRegExp(t)}(?![\\p{L}\\p{N}_])`, "iu");
+    if (re.test(input)) return true;
+  }
+  return false;
+}
+
+/**
+ * The player dealt with a thread by naming someone or some place on it. Opening and adopting
+ * count too. Standing in its place does not, and neither does someone merely sharing the room.
+ */
+export function noteThreadContact(state: State, config: Config, input: string, turn: number): void {
+  for (const thread of state.threads) {
+    if (thread.status !== "open") continue;
+    let named = false;
+    for (const id of thread.entities) {
+      if (id === config.player_id) continue;
+      const entity = state.entities[id];
+      if (entity && namesEntity(entity, input)) named = true;
+    }
+    if (!named) continue;
+    thread.last_interacted_turn = Math.max(thread.last_interacted_turn, turn);
+    thread.last_interacted_at = state.clock.now;
+  }
+}
+
+/**
+ * Money changing hands for the matter a thread is about settles it: "Budget plan switch" closes
+ * the mobile plan thread, and "Corner shop shift wages" closes the shift.
+ */
+export function settlePaidThreads(state: State, config: Config, applied: Op[], turn: number): void {
+  const keys = new Set(config.stats.filter((stat) => stat.type === "currency").map((stat) => stat.key));
+  for (const op of applied) {
+    if (op.op !== "stat.add" || !keys.has(op.key) || op.amount === 0 || !op.reason) continue;
+    for (const thread of state.threads) {
+      if (thread.status !== "open" || sharedContentWords(op.reason, thread.text) < 2) continue;
+      thread.status = "resolved";
+      thread.resolved_turn = turn;
+      thread.resolved_at = state.clock.now;
+    }
+  }
+}
+
+function withThreadContact(state: State, config: Config, input: string): State {
+  const next = structuredClone(state);
+  noteThreadContact(next, config, input, state.turn + 1);
+  return next;
+}
+
 /** Applies a draft that has already passed validation. Pure: returns the next state. */
 export function applyDraft(state: State, config: Config, modules: Module[], draft: TurnDraft, ctx: ApplyContext): State {
-  const processed = processOps(state, config, modules, draft.delta);
+  normalizeDraft(state, config, draft);
+  materializeAt(state, config, draft);
+  const processed = processOps(withThreadContact(state, config, ctx.input), config, modules, draft.delta);
   if (processed.violations.length > 0) {
     throw new Error("applyDraft called with a draft that fails validation");
   }
   let next = processed.state;
   const turn = state.turn + 1;
 
-  if (processed.skipped === 0 && processed.minutes < config.time.min_per_action) {
+  if (!processed.anchored && processed.skipped === 0 && processed.minutes < config.time.min_per_action) {
     next = { ...next, clock: { now: addMinutes(next.clock.now, config.time.min_per_action - processed.minutes) } };
   }
 
   next = structuredClone(next);
+  driftStats(next, config, processed);
+  settlePaidThreads(next, config, processed.applied, turn);
   for (const item of ctx.due) {
-    if (item.thread) {
+    if (item.thread && !duplicateOpenThread(next.threads, item.thread.text, undefined, next.clock.now)) {
       next.threads.push({
         id: `t${next.threads.length + 1}`,
         kind: item.thread.kind,
         text: item.thread.text,
         status: "open",
         entities: item.entities.filter((id) => next.entities[id]),
+        scale: "minor",
+        was_major: false,
         warm: true,
         reminders: 0,
         last_shown_turn: turn,
+        last_interacted_turn: turn,
+        last_interacted_at: next.clock.now,
         opened_turn: turn,
       });
     }
     // An overdue thread has now had its consequence narrated, so it stops asking for one.
+    // One the GM resolved this turn was already settled, so it is not a failure.
     if (item.id.startsWith(OVERDUE_PREFIX)) {
       const t = next.threads.find((x) => x.id === item.id.slice(OVERDUE_PREFIX.length));
       if (t && t.status === "open") {
@@ -190,6 +300,8 @@ export function applyDraft(state: State, config: Config, modules: Module[], draf
     }
   }
   ageThreads(next, config, ctx.shown_threads ?? [], turn);
+  forgetMemories(next);
+  lapsePotentials(next, turn);
 
   const clockBefore = state.clock.now;
   for (const m of modules) {
@@ -197,14 +309,43 @@ export function applyDraft(state: State, config: Config, modules: Module[], draf
   }
 
   next.turn = turn;
-  if (draft.scene_ended) next.scene = { ...next.scene, closed: true };
+  if (draft.scene_ended) {
+    const title = draft.chapter_title?.trim();
+    next.scene = { ...next.scene, closed: true, ...(title ? { title } : {}) };
+  }
   next.notes = collectNotes(next, config, draft, turn);
-  next.beats.push({ turn, text: draft.beat });
+  next.beats.push({ turn, text: draft.beat, clock: next.clock.now });
   if (next.beats.length > BEATS_CAP) next.beats = next.beats.slice(-BEATS_CAP);
-  next.window.push({ turn, input: ctx.input, narration: draft.narration, clock: next.clock.now });
+  const highlights = selectHighlights(draft.narration, draft.highlights, next, config);
+  next.window.push({
+    turn,
+    input: ctx.input,
+    narration: draft.narration,
+    clock: next.clock.now,
+    ...(highlights.length > 0 ? { highlights } : {}),
+  });
   if (next.window.length > WINDOW_CAP) next.window = next.window.slice(-WINDOW_CAP);
   next.focus_next = (draft.focus_next ?? []).filter((id) => next.entities[id]).slice(0, 8);
-  return next;
+  return syncPresence(next, config);
+}
+
+/**
+ * Warnings the engine prints itself, so a missed narration cannot hide them. An overdue thread is
+ * named in the player's words, and one the turn resolved is not a warning.
+ */
+export function playerNotices(due: DueItem[], state?: State): string[] {
+  const out: string[] = [];
+  for (const d of due) {
+    if (d.kind === "conditional") {
+      out.push(d.text);
+      continue;
+    }
+    if (!d.id.startsWith(OVERDUE_PREFIX)) continue;
+    const thread = state?.threads.find((t) => t.id === d.id.slice(OVERDUE_PREFIX.length));
+    if (thread?.status === "resolved") continue;
+    out.push(thread ? `The deadline has passed on "${thread.text}".` : d.text);
+  }
+  return out;
 }
 
 export function pickInterlude(state: State, config: Config): string {

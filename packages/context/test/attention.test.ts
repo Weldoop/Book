@@ -128,6 +128,13 @@ describe("mapAttention", () => {
     expect(attend({ limit: 50 })).toEqual(ids);
   });
 
+  it("hides an unmet person unless the player names them", () => {
+    const state = entityState();
+    state.entities.glenys = { ...state.entities.glenys!, tags: ["unmet"] };
+    expect(attend({}, state)).not.toContain("glenys");
+    expect(attend({ input: "I look for Glenys" }, state)).toContain("glenys");
+  });
+
   it("returns an empty list when there is nothing to show", () => {
     const state = makeState({ entities: { player: makeEntity({ id: "player", location: null }) } });
     expect(attend({}, state)).toEqual([]);

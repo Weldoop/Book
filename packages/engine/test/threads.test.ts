@@ -25,6 +25,9 @@ function stateWith(threads: Partial<Thread>[], now = config.time.start): State {
       text: `thread ${i + 1}`,
       status: "open" as const,
       entities: [],
+      scale: "minor" as const,
+      was_major: false,
+      last_interacted_turn: 0,
       warm: true,
       reminders: 0,
       last_shown_turn: 0,
@@ -60,43 +63,47 @@ describe("clock.skip", () => {
     const night = { op: "clock.skip", minutes: 540, reason: "slept until morning" };
     const advance = { op: "clock.advance", minutes: 540 };
     expect(processOps(stateWith([]), config, modules, [night]).violations).toEqual([]);
-    expect(processOps(stateWith([]), config, modules, [advance]).violations[0]?.code).toBe("time_jump");
+    const jumped = processOps(stateWith([]), config, modules, [advance]).violations[0];
+    expect(jumped).toMatchObject({ code: "time_jump", severity: "fixable" });
+    expect(jumped?.message).toContain("clock.skip");
+    const month = processOps(stateWith([]), config, modules, [{ op: "clock.advance", minutes: 2000 }]).violations[0];
+    expect(month).toMatchObject({ code: "time_jump", severity: "game_breaking" });
   });
 });
 
 describe("ageThreads", () => {
-  it("spends a reminder only for threads the prompt actually showed", () => {
-    const state = stateWith([{ id: "t1" }, { id: "t2" }]);
+  it("records that a thread was shown without cooling it", () => {
+    const state = stateWith([
+      { id: "t1", last_interacted_at: "2026-10-03T09:20" },
+      { id: "t2", last_interacted_at: "2026-10-03T09:20" },
+    ]);
     ageThreads(state, config, ["t1"], 1);
-    expect(state.threads[0]).toMatchObject({ reminders: 1, last_shown_turn: 1, warm: true });
-    expect(state.threads[1]).toMatchObject({ reminders: 0, warm: true });
+    expect(state.threads[0]).toMatchObject({ last_shown_turn: 1, warm: true, reminders: 0 });
+    expect(state.threads[1]).toMatchObject({ last_shown_turn: 0, warm: true, reminders: 0 });
   });
 
-  it("cools a thread once its reminders run out", () => {
-    const state = stateWith([{ id: "t1" }]);
-    for (let turn = 1; turn <= 3; turn++) ageThreads(state, config, ["t1"], turn);
-    expect(state.threads[0]).toMatchObject({ reminders: 3, warm: false });
+  it("goes cold once the player has left it for the warm window, even if it was shown", () => {
+    const state = stateWith([{ id: "t1", last_interacted_at: "2026-10-03T09:20" }], "2026-10-03T21:20");
+    ageThreads(state, config, ["t1"], 4);
+    expect(state.threads[0]).toMatchObject({ warm: false, reminders: 0 });
   });
 
-  it("re-warms a cold thread as its deadline comes into view", () => {
-    const state = stateWith(
-      [{ id: "t1", due: "2026-10-03T18:00", warm: false, reminders: 9 }],
-      "2026-10-03T09:20",
-    );
-    ageThreads(state, config, [], 5);
-    expect(state.threads[0]).toMatchObject({ warm: true, reminders: 0 });
+  it("stays warm inside the window after the player dealt with it", () => {
+    const state = stateWith([{ id: "t1", last_interacted_at: "2026-10-03T09:20" }], "2026-10-03T21:19");
+    ageThreads(state, config, [], 4);
+    expect(state.threads[0]?.warm).toBe(true);
   });
 
-  it("leaves a cold thread cold while its deadline is far off", () => {
-    const state = stateWith([{ id: "t1", due: "2026-10-09T18:00", warm: false }], "2026-10-03T09:20");
+  it("does not treat a close deadline as the player having dealt with it", () => {
+    const state = stateWith([{ id: "t1", due: "2026-10-03T18:00", warm: true }], "2026-10-03T09:20");
     ageThreads(state, config, [], 5);
     expect(state.threads[0]?.warm).toBe(false);
   });
 
   it("ignores threads that are already resolved", () => {
-    const state = stateWith([{ id: "t1", status: "resolved" }]);
+    const state = stateWith([{ id: "t1", status: "resolved", last_interacted_at: "2026-10-03T09:20" }]);
     ageThreads(state, config, ["t1"], 1);
-    expect(state.threads[0]?.reminders).toBe(0);
+    expect(state.threads[0]?.last_shown_turn).toBe(0);
   });
 });
 

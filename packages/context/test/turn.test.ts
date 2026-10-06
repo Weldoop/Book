@@ -1,4 +1,7 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { ConfigSchema, estimateTokens, type Module, type Op, type State } from "@book/schema";
+import { contractText } from "../src/contract.ts";
 import { buildTurnContext, DEFAULT_BUDGET } from "../src/index.ts";
 import { inventoryModule, makeBigState, makeConfig, makeState, makeThread, statsModule } from "./fixtures.ts";
 
@@ -37,15 +40,42 @@ describe("buildTurnContext structure", () => {
     expect(contract?.text).toContain("At most 90 words");
     expect(contract?.text).toContain("second person");
     expect(contract?.text).toContain("End on a small hook.");
+    expect(contract?.text).toContain("inventory.add of that one catalog item");
+    expect(contract?.text).toContain("A bag, a receipt, or an envelope is narration.");
+    expect(contract?.text).toContain("An item on that line is already bought.");
     expect(contract?.text).toContain("Never decide the player's");
     expect(contract?.text).toContain("Tone: grounded, dry");
     expect(contract?.text).toContain("fades to black");
     expect(contract?.text).toContain("involving minors");
     expect(contract?.text).toContain("single JSON object");
+    expect(contract?.text).toContain("Refuse a trip once");
+    expect(contract?.text).toContain("ENGINE NOW is the save");
+    expect(contract?.text).toContain("importance 3 is a fight");
+    expect(contract?.text).toContain("would change a later scene");
+    expect(contract?.text).toContain("A passing remark gets nothing");
+    expect(contract?.text).toContain("already on them");
+    expect(contract?.text).toContain('{"op":"entity.fact.add"');
+    expect(contract?.text).not.toContain("weigh anchor");
+    expect(contract?.text).not.toContain("airlock");
+    expect(contract?.text).toContain('"at"');
     expect(contract?.text).toContain("stat.add{");
     expect(contract?.text).toContain("inventory.remove{");
     expect(frags?.text).toContain("STATS: money is in GBP");
     expect(frags?.text).toContain("INVENTORY:");
+  });
+
+  it("seeds travel words and the premise from the book", () => {
+    const space = makeConfig({
+      meta: { title: "Drift", tone: "cold", premise: "A hauler between the moons." },
+      travel: { journeys: ["jump", "set a course"], local: ["airlock", "bridge"] },
+    });
+    const text =
+      buildTurnContext({ config: space, state: makeState(), modules, input: "look", kind: "act", due: [] }).system[0]?.text ??
+      "";
+    expect(text).toContain("A hauler between the moons.");
+    expect(text).toContain("jump, set a course");
+    expect(text).toContain("airlock, bridge");
+    expect(text).not.toContain("weigh anchor");
   });
 
   it("states the numbers rule differently for tabletop and varies content-rating text", () => {
@@ -81,6 +111,7 @@ describe("buildTurnContext structure", () => {
       "## STORY SO FAR",
       "## RECENT BEATS",
       "## LAST TURNS",
+      "## ENGINE NOW",
       "## PLAYER INPUT",
     ].map((h) => text.indexOf(h));
     expect(order.every((i) => i >= 0)).toBe(true);
@@ -89,6 +120,10 @@ describe("buildTurnContext structure", () => {
     expect(text).toContain("Present: Glenys [glenys]");
     expect(text).toContain("Player: hello\nGM: Hi there.");
     expect(text).toContain("money: 45.00 GBP");
+    expect(text).toContain("Factual. This is the save.");
+    expect(text).toContain("An item on that line is already bought.");
+    expect(text.indexOf("## ENGINE NOW")).toBeGreaterThan(text.indexOf("## LAST TURNS"));
+    expect(text).toContain("Location: The Flat [flat]");
 
     const bare = build({}, makeState());
     const bareText = bare.messages[0]?.content ?? "";
@@ -96,6 +131,19 @@ describe("buildTurnContext structure", () => {
       expect(bareText).not.toContain(h);
     }
     expect(bare.messages).toHaveLength(1);
+  });
+
+  it("shows a fight in focus and leaves a lapsed memory out", () => {
+    const state = makeState();
+    const glenys = state.entities.glenys;
+    if (!glenys) throw new Error("missing glenys");
+    glenys.facts = [
+      { text: "You shoved her", importance: 3, turn: 1 },
+      { text: "You were short about the bins", importance: 1, turn: 1, expires: "2026-10-01T09:00" },
+    ];
+    const text = build({}, state).messages[0]?.content ?? "";
+    expect(text).toContain("remembers: You shoved her");
+    expect(text).not.toContain("short about the bins");
   });
 
   it("shows only a fate die section when there are no due events", () => {
@@ -108,9 +156,9 @@ describe("buildTurnContext structure", () => {
   it("lists dated threads soonest first, then warm threads", () => {
     const state = makeState({
       threads: [
-        makeThread({ id: "late", text: "later one", due: "2026-10-09T10:00" }),
-        makeThread({ id: "warm", text: "running joke", kind: "callback", opened_turn: 2 }),
-        makeThread({ id: "soon", text: "sooner one", due: "2026-10-04T10:00" }),
+        makeThread({ id: "late", text: "later one", due: "2026-10-09T10:00", entities: ["glenys"] }),
+        makeThread({ id: "warm", text: "running joke", kind: "callback", opened_turn: 2, entities: ["glenys"] }),
+        makeThread({ id: "soon", text: "sooner one", due: "2026-10-04T10:00", entities: ["glenys"] }),
         makeThread({ id: "done", text: "finished", status: "resolved" }),
       ],
     });
@@ -172,10 +220,12 @@ describe("buildTurnContext structure", () => {
       "due_events",
       "threads",
       "notes",
+      "world_sheet",
       "entities_in_focus",
       "story_so_far",
       "beats",
       "window",
+      "engine_now",
       "input",
     ]);
     expect(ctx.total_tokens).toBe(ctx.parts.reduce((n, p) => n + p.tokens, 0));
@@ -320,5 +370,30 @@ describe("budget", () => {
     const ctx = build({ budget: { module_fragments: 20 } });
     expect(part(ctx, "module_fragments").trimmed).toBe(true);
     expect(part(ctx, "module_fragments").tokens).toBeLessThanOrEqual(20);
+  });
+});
+
+describe("Uplands contract size", () => {
+  it("stays under 1800 tokens with the book's own rules", () => {
+    const book = ConfigSchema.parse(JSON.parse(readFileSync(new URL("../../../configs/uk-life/config.json", import.meta.url), "utf8")));
+    const quiet = (id: string, ops: Module["ops"]): Module => ({
+      id,
+      ops,
+      initState: () => ({}),
+      validateOp: () => [],
+      applyOp: (_op: Op, state: State) => state,
+      promptFragment: () => "",
+      focus: () => [],
+      due: () => [],
+      snapshot: () => [],
+      render: () => ({}),
+    });
+    const modules = [
+      quiet("core", ["clock.advance", "clock.skip", "entity.create", "entity.move", "entity.fact.add", "thread.open", "thread.adopt", "thread.resolve"]),
+      quiet("inventory", ["item.create", "inventory.add", "inventory.remove"]),
+      quiet("relationships", ["relationship.add"]),
+      quiet("stats", ["stat.add", "stat.set"]),
+    ];
+    expect(estimateTokens(contractText(book, modules, "narration_first"))).toBeLessThan(1800);
   });
 });

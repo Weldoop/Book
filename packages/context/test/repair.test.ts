@@ -39,7 +39,7 @@ describe("delta_repair", () => {
   it("has a small system prompt with op signatures and the return-only instruction", () => {
     expect(ctx.system).toHaveLength(1);
     const sys = ctx.system[0]?.text ?? "";
-    expect(sys).toContain('Return ONLY a JSON object {"delta":[...],"beat":"..."}');
+    expect(sys).toContain('Return ONLY a JSON object {"delta":[...],"beat":"...","at":"<place id, when the scene stops in a place>"}');
     expect(sys).toContain("Do not change the narration");
     expect(sys).toContain("stat.add{");
     expect(sys).toContain("clock.advance{");

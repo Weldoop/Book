@@ -7,7 +7,7 @@ import { inventoryModule, makeModule, statsModule } from "./fixtures.ts";
 describe("describeOps", () => {
   it("renders core ops plus only the active module ops", () => {
     const text = describeOps([statsModule]);
-    for (const n of ["clock.advance", "entity.create", "entity.move", "entity.fact.add", "thread.open", "thread.resolve", "stat.add", "stat.set"]) {
+    for (const n of ["clock.advance", "entity.create", "entity.move", "entity.fact.add", "thread.open", "thread.adopt", "thread.resolve", "stat.add", "stat.set"]) {
       expect(text).toContain(`- ${n}{`);
     }
     expect(text).not.toContain("inventory.add");

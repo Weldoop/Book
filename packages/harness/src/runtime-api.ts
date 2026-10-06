@@ -19,6 +19,13 @@ export interface TurnResultLike {
   roll?: { value: number; band: string; what: string; stat?: string };
   ending?: { id: string; title: string; text: string; continuation?: string };
   scene_ended?: boolean;
+  highlights?: string[];
+  chapter_title?: string;
+  chapter_index?: number;
+  /** Engine-printed warnings under the narration. Absent on older stand-ins. */
+  notices?: string[];
+  /** Short offers for the next line. Absent when the turn gave none. */
+  suggestions?: string[];
   record: TurnRecord;
 }
 
@@ -40,8 +47,10 @@ export interface RuntimeApi {
     rt: RuntimeLike,
     saveId: string,
     input: string,
-    hooks?: { onInterlude?(text: string): void },
+    hooks?: { onInterlude?(text: string): void; onReleased?(result: TurnResultLike): void },
   ): Promise<TurnResultLike>;
+  /** Deals the first chapter when the config asks for one. Absent runtimes skip it. */
+  openBook?(rt: RuntimeLike, saveId: string): Promise<TurnResultLike | null>;
 }
 
 export async function loadRuntimeApi(): Promise<RuntimeApi> {
@@ -57,5 +66,10 @@ export async function loadRuntimeApi(): Promise<RuntimeApi> {
   if (!api.createRuntime || !api.newGame || !api.playTurn) {
     throw new Error("@book/runtime must export createRuntime, newGame and playTurn");
   }
-  return { createRuntime: api.createRuntime, newGame: api.newGame, playTurn: api.playTurn };
+  return {
+    createRuntime: api.createRuntime,
+    newGame: api.newGame,
+    playTurn: api.playTurn,
+    ...(api.openBook ? { openBook: api.openBook } : {}),
+  };
 }

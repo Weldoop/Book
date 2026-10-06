@@ -15,7 +15,12 @@ export function testConfig(overrides: Record<string, unknown> = {}): Config {
       { key: "money", type: "currency", start: 45, display: "GBP" },
       { key: "health", type: "bounded", min: 0, max: 100, start: 100 },
     ],
-    items: [{ id: "phone", name: "Phone" }],
+    items: [
+      { id: "phone", name: "Phone" },
+      { id: "cob", name: "Cob", price: 4.2 },
+      { id: "spare", name: "Spare" },
+      { id: "torch", name: "Torch", keeps: true },
+    ],
     dice: { sides: 100, thresholds: [10, 25, 50, 75, 90], labels: ["a", "b", "c", "d", "e", "f"] },
     events: {
       scheduled: [{ id: "inspection", at: "2026-10-05T10:00", text: "Inspection", thread: { kind: "commitment", text: "Inspection day" } }],

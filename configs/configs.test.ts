@@ -139,7 +139,8 @@ describe.each(configNames)("config %s", (name) => {
     expect(dice.labels).toHaveLength(dice.thresholds.length + 1);
     const sorted = [...dice.thresholds].sort((a, b) => a - b);
     expect(dice.thresholds).toEqual(sorted);
-    expect(Math.max(...dice.thresholds)).toBeLessThan(dice.sides);
+    expect(Math.max(...dice.thresholds)).toBeLessThan(100);
+    expect(Math.min(...dice.thresholds)).toBeGreaterThan(0);
   });
 
   it("has enough interludes and a rollback note", () => {
@@ -155,8 +156,32 @@ describe("uk-life specifics", () => {
     expect(config.modules).toEqual(["stats", "inventory", "relationships", "events", "dice", "offscreen"]);
     expect(config.time.start).toBe("2026-10-03T09:20");
     expect(config.meta.content_rating).toBe("romance");
-    expect(config.presentation).toEqual({ profile: "light", status_line: ["turn", "money", "health", "location", "time"] });
-    expect(config.stats.find((s) => s.key === "money")?.start).toBe(45);
+    expect(config.presentation).toEqual({
+      profile: "light",
+      status_line: ["turn", "cash", "bank", "health", "energy", "location", "time"],
+    });
+    expect(config.seed.entities.filter((entity) => entity.type === "person" && entity.id !== "player").map((entity) => entity.id)).toEqual([
+      "1",
+      "2",
+      "3",
+      "4",
+    ]);
+    expect(config.events.scheduled.find((event) => event.id === "bins-out")?.entities).toContain("1");
+    expect(config.opening?.pinned ?? []).toEqual([]);
+    expect(config.opening?.cast?.map((person) => person.name)).toEqual([
+      "Nia Davies",
+      "Tomos Reed",
+      "Aisha Khan",
+      "Owen Price",
+      "Leah Morgan",
+      "Harri Jones",
+      "Sian Berg",
+      "Jake Okoye",
+    ]);
+    expect(config.stats.find((s) => s.key === "cash")?.start).toBe(15);
+    expect(config.items.find((item) => item.id === "phone")?.keeps).toBe(true);
+    expect(config.items.find((item) => item.id === "pint")?.keeps).toBeUndefined();
+    expect(config.stats.find((s) => s.key === "bank")?.start).toBe(30);
     expect(config.dice).toMatchObject({ sides: 100, thresholds: [10, 25, 50, 75, 90] });
     expect(config.offscreen).toMatchObject({ enabled: true, min_skip_hours: 6, max_entities: 4, max_tokens: 600 });
     expect(config.gm_style).toMatchObject({ max_words: 90, person: "second", never_decide_for_player: true });
@@ -177,8 +202,18 @@ describe("pirate specifics", () => {
     expect(config.modules).toEqual(["stats", "inventory", "relationships", "events", "dice"]);
     expect(config.presentation.profile).toBe("tabletop");
     expect(config.meta.content_rating).toBe("clean");
-    expect(config.dice?.sides).toBe(20);
+    expect(config.dice).toMatchObject({
+      sides: 20,
+      thresholds: [5, 25, 50, 75, 90],
+      visible: true,
+      stat_modifier: false,
+    });
+    expect(config.time.max_per_turn).toBe(1440);
+    expect(config.time.max_skip_minutes).toBe(10080);
+    expect(config.travel.journeys).toEqual(expect.arrayContaining(["sail", "set a course", "weigh anchor"]));
+    expect(config.travel.local).toEqual(expect.arrayContaining(["rail", "deck", "hold"]));
     expect(config.offscreen?.enabled ?? false).toBe(false);
+    expect(config.opening).toEqual({});
     const keys = config.stats.map((s) => s.key);
     expect(keys).toEqual(
       expect.arrayContaining(["gold", "supplies", "crew_morale", "ship_hull", "reputation_crown", "reputation_pirates"]),

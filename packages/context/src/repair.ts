@@ -2,7 +2,8 @@ import type { Config, DueItem, Module, State, Violation } from "@book/schema";
 import { mapAttention } from "./attention.ts";
 import { resolveBudget } from "./budget.ts";
 import { describeOps } from "./ops.ts";
-import { focusSection, sceneSection, stateSection } from "./sections.ts";
+import { engineNowSection, focusSection, sceneSection, stateSection } from "./sections.ts";
+import { worldSheetSection } from "./world.ts";
 import { extractJsonObject, tokensOf } from "./text.ts";
 import { assembleTurn, joinSections, sumTokens } from "./turn.ts";
 import type { BuiltContext, ContextPart, OutputOrder } from "./types.ts";
@@ -31,17 +32,42 @@ const REJECTED_DRAFT_CAP = 1000;
 const NARRATION_CAP = 600;
 const DELTA_FOCUS_LIMIT = 6;
 
-function deltaRepairSystem(modules: Module[]): string {
+function deltaRepairSystem(config: Config, modules: Module[]): string {
+  const local = config.travel.local;
+  const localNote = local.length > 0 ? ` A step to ${local.join(", ")} is not a new place.` : "";
   return [
     "You repair the bookkeeping of one story turn. Code owns the truth; you never write state, you propose `delta` ops.",
     "RULES",
     "- Every change to money, stats, items, time, relationships, threads or new named characters must appear in delta.",
-    "- Elapsed time goes in delta as clock.advance (minutes).",
+    "- Elapsed time goes in delta as clock.advance (minutes). clock.set to an exact local time may be earlier.",
     "- Declare every new named person or place with entity.create before any op refers to it.",
-    "- Use only ids shown in the context. Never invent ops or fields.",
+    "- Use only ids shown in the context. Item ids must be copied from the world sheet. Move the player with entity.move to a place id.",
+    "- A purchase of one catalog item is inventory.add of that item and one negative stat.add of its price. A second item needs its own pair.",
+    modules.some((m) => m.ops.includes("item.create"))
+      ? "- Gear and goods are on the world sheet. A bag, a receipt, or an envelope is narration. A new thing the save must remember is item.create in this delta, then inventory.add. A good that is finished is inventory.remove in this same delta."
+      : "",
+    "- A priced purchase is a whole multiple of the catalog price and inventory.add to the player. Never take less than one unit. Stat keys are the ids in STATE, not the labels.",
+    "- ENGINE NOW is the save. Carrying there is already owned, including turns that have left the chat. Do not inventory.add or charge an item that line already lists. Do not change money, place, or what is carried to match an older figure in the narration.",
+    `- If the player asked to go somewhere and was not refused, set "at" to that place id. The engine creates it when the save does not have it and moves the player this turn.${localNote}`,
+    "- If clock.advance is longer than one scene, replace it with clock.skip (a reason is required) and keep the move.",
+    "- If the narration names a clock time, the clock must land on it. A forward step is clock.advance. clock.set may be earlier. Do not write \"later\".",
+    "- Do not add a negative stat.add unless the narration states that amount. If it cost nothing, remove the charge. A repair may fix a move or a clock. It may not invent a charge.",
+    "- Set at to the place id where the player is. The engine creates that place when it is new and moves the player this turn.",
+    "- Never invent ops or fields.",
     "OPS",
     describeOps(modules),
-    'Return ONLY a JSON object {"delta":[...],"beat":"..."} that corrects the rejected ops. Do not change the narration.',
+    'Return ONLY a JSON object {"delta":[...],"beat":"...","at":"<place id, when the scene stops in a place>"} that corrects the rejected ops. Do not change the narration.',
+  ]
+    .filter((line) => line.length > 0)
+    .join("\n");
+}
+
+/** Shown again when a repair reply is not JSON. The engine still does not invent the ops. */
+export function deltaFormatHint(playerId: string): string {
+  return [
+    "That reply was not valid JSON. Return one JSON object and nothing else.",
+    `{"delta":[{"op":"entity.create","id":"<place-id>","type":"place","name":"<Place name>"},{"op":"entity.move","id":"${playerId}","location":"<place-id>"}],"at":"<place-id>","beat":"You arrive."}`,
+    "Create the place only when the world sheet does not already have it, then move the player, and set at to that place id. Copy the ids from the violation. Leave out entity.create when the place already exists. If the narration stops in a place, that is the place. Do not add a stat.add charge the narration does not state.",
   ].join("\n");
 }
 
@@ -110,7 +136,9 @@ function buildDeltaRepair(i: RepairInput): BuiltContext {
 
   const sections = [
     { part: "scene", section: sceneSection(i.config, i.state) },
+    { part: "world_sheet", section: worldSheetSection(i.config, i.state, budget.state_snapshot) },
     { part: "state_snapshot", section: stateSection(i.config, i.state, i.modules, budget.state_snapshot) },
+    { part: "engine_now", section: engineNowSection(i.config, i.state, i.modules) },
     { part: "entities_in_focus", section: focus.section },
     {
       part: "narration",
@@ -125,7 +153,7 @@ function buildDeltaRepair(i: RepairInput): BuiltContext {
     },
     { part: "input", section: { text: `## PLAYER INPUT\n${i.input}`, trimmed: false } },
   ];
-  const system = deltaRepairSystem(i.modules);
+  const system = deltaRepairSystem(i.config, i.modules);
   const parts: ContextPart[] = [
     { name: "contract", tokens: tokensOf(system), trimmed: false },
     ...sections.map(({ part, section }) => ({

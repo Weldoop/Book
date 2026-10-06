@@ -3,12 +3,14 @@ import type { Module, OpName } from "@book/schema";
 type Field = readonly [name: string, type: string, optional?: boolean];
 
 const KIND = "commitment|goal|debt|mystery|callback";
+const SCALE = "potential|minor|major";
 const ETYPE = "person|place|item|faction|other";
 const WHEN = "YYYY-MM-DDTHH:mm";
 
 /** Hand-written signatures. Field names must match OpSchema in packages/schema/src/delta.ts. */
 export const OP_FIELDS: Record<OpName, readonly Field[]> = {
   "clock.advance": [["minutes", "int>=0"]],
+  "clock.set": [["now", WHEN]],
   "clock.skip": [
     ["minutes", "int>=1"],
     ["reason", "str"],
@@ -20,6 +22,7 @@ export const OP_FIELDS: Record<OpName, readonly Field[]> = {
     ["aliases", "[str]", true],
     ["location", "id", true],
     ["facts", "[str]", true],
+    ["tags", "[str]", true],
   ],
   "entity.move": [
     ["id", "id"],
@@ -36,6 +39,11 @@ export const OP_FIELDS: Record<OpName, readonly Field[]> = {
     ["due", WHEN, true],
     ["entities", "[id]", true],
     ["parent", "thread id", true],
+    ["scale", SCALE, true],
+  ],
+  "thread.adopt": [
+    ["id", "thread id"],
+    ["scale", "minor|major"],
   ],
   "thread.resolve": [["id", "thread id"]],
   "stat.add": [
@@ -47,6 +55,12 @@ export const OP_FIELDS: Record<OpName, readonly Field[]> = {
     ["key", "stat"],
     ["value", "num"],
     ["reason", "str", true],
+  ],
+  "item.create": [
+    ["id", "id"],
+    ["name", "str"],
+    ["price", "num", true],
+    ["keeps", "bool", true],
   ],
   "inventory.add": [
     ["owner", "id"],
@@ -67,10 +81,12 @@ export const OP_FIELDS: Record<OpName, readonly Field[]> = {
 
 export const CORE_OPS: OpName[] = [
   "clock.advance",
+  "clock.set",
   "entity.create",
   "entity.move",
   "entity.fact.add",
   "thread.open",
+  "thread.adopt",
   "thread.resolve",
 ];
 
@@ -98,7 +114,7 @@ export function activeOpNames(modules: Module[]): string[] {
 export function describeOps(modules: Module[]): string {
   const lines = activeOpNames(modules).map((n) => `- ${signature(n)}`);
   return [
-    'Each delta item is {"op":"<name>", ...fields}. "?" marks optional fields. id = lowercase slug [a-z0-9_.-].',
+    '{"op":"<name>", ...fields}. "?" is optional. id matches [a-z0-9_.-].',
     ...lines,
   ].join("\n");
 }

@@ -59,7 +59,7 @@ describe("AnthropicProvider", () => {
     expect(c.headers["x-api-key"]).toBe("sk-test-secret");
     expect(c.headers["anthropic-version"]).toBe("2023-06-01");
     expect(c.headers["content-type"]).toBe("application/json");
-    expect(c.body.model).toBe("claude-sonnet-4-5");
+    expect(c.body.model).toBe("claude-sonnet-4-6");
     expect(c.body.max_tokens).toBe(300);
     expect(c.body.temperature).toBe(0.7);
     expect(c.body.system[0].cache_control).toEqual({ type: "ephemeral" });
@@ -67,12 +67,48 @@ describe("AnthropicProvider", () => {
     expect(c.body.messages).toEqual([{ role: "user", content: expect.any(String) }]);
   });
 
+  it("sends a retired model id as the current default", async () => {
+    const { p, calls } = make([OK], { BOOK_MODEL_STRONG: "claude-sonnet-4-5" });
+    await p.complete(req());
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.body.model).toBe("claude-sonnet-4-6");
+  });
+
+  it("retries a missing model once on the tier default, and hides the raw error", async () => {
+    const missing = { status: 404, body: { error: { type: "not_found_error", message: "model: claude-sonnet-9 not found" } } };
+    const swapped = make([missing, OK], { BOOK_MODEL_STRONG: "claude-sonnet-9" });
+    const r = await swapped.p.complete(req());
+    expect(r.text).toBe("hello world");
+    expect(swapped.calls.map((c) => c.body.model)).toEqual(["claude-sonnet-9", "claude-sonnet-4-6"]);
+
+    const down = make([missing]);
+    const err = await down.p.complete(req()).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(LLMError);
+    expect((err as Error).message).toBe("The storyteller is unavailable right now. Try again in a moment.");
+    expect((err as Error).message).not.toContain("not_found");
+    expect((err as Error).message).not.toContain("sk-test-secret");
+    expect(down.calls).toHaveLength(1);
+  });
+
   it("maps cheap tier to the cheap model and honours env overrides", async () => {
     const { p, calls } = make([OK, OK], { BOOK_MODEL_CHEAP: "my-cheap" });
     await p.complete(req({ tier: "cheap" }));
     await p.complete(req({ tier: "strong" }));
     expect(calls[0]!.body.model).toBe("my-cheap");
-    expect(calls[1]!.body.model).toBe("claude-sonnet-4-5");
+    expect(calls[1]!.body.model).toBe("claude-sonnet-4-6");
+  });
+
+  it("costs a call at the price of the model the tier resolves to", async () => {
+    const haiku = make([OK], { BOOK_MODEL_STRONG: "claude-haiku-4-5-20251001" });
+    const sonnet = make([OK]);
+    const a = await haiku.p.complete(req({ tier: "strong" }));
+    const b = await sonnet.p.complete(req({ tier: "strong" }));
+    // 100 fresh in at $1, 400 cached at $0.10, 50 out at $5 per million.
+    expect(a.usage.cost_usd).toBeCloseTo((100 * 1 + 400 * 0.1 + 50 * 5) / 1_000_000, 9);
+    expect(b.usage.cost_usd).toBeCloseTo((100 * 3 + 400 * 0.3 + 50 * 15) / 1_000_000, 9);
+    const pinned = make([OK], { BOOK_MODEL_STRONG: "claude-haiku-4-5-20251001", BOOK_PRICE_STRONG_IN: "2" });
+    const c = await pinned.p.complete(req({ tier: "strong" }));
+    expect(c.usage.cost_usd).toBeCloseTo((100 * 2 + 400 * 0.1 + 50 * 5) / 1_000_000, 9);
   });
 
   it("prefills an open brace for json requests and restores it in the reply", async () => {

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { MockProvider } from "@book/llm";
 import { MemoryStore } from "@book/store";
-import { endingLines, runCli, runPlay, sceneLine } from "../src/index.ts";
+import { emphasize, endingLines, runCli, runPlay, sceneLine, suggestionLine } from "../src/index.ts";
 import type { PlayIO } from "../src/index.ts";
 import { fakeRuntimeApi, makeConfig } from "./helpers.ts";
 import { writeFile } from "node:fs/promises";
@@ -57,10 +57,25 @@ describe("runPlay", () => {
     expect(text.indexOf("Fate 3")).toBeLessThan(text.indexOf("You pick the lock"));
   });
 
-  it("marks a turn that stuttered and says what the engine did", async () => {
-    const io = scriptedIO(["one", "two"]);
+  it("keeps a repair out of the story and names it only in the debug view", async () => {
+    const quiet = scriptedIO(["one", "two"]);
     const api = fakeRuntimeApi({ outcomeFor: (t) => (t === 2 ? "repaired" : "ok") });
-    await runPlay({ api, config: makeConfig("light"), store: new MemoryStore(), llm: new MockProvider(), saveId: "p", io });
+    await runPlay({ api, config: makeConfig("light"), store: new MemoryStore(), llm: new MockProvider(), saveId: "p", io: quiet });
+    const quietText = quiet.out.join("");
+    expect(quietText).not.toContain("needed a repair");
+    expect(quietText).toContain("repaired");
+
+    const io = scriptedIO(["one", "two"]);
+    const debugApi = fakeRuntimeApi({ outcomeFor: (t) => (t === 2 ? "repaired" : "ok") });
+    await runPlay({
+      api: debugApi,
+      config: makeConfig("light"),
+      store: new MemoryStore(),
+      llm: new MockProvider(),
+      saveId: "p",
+      io,
+      debug: true,
+    });
     const text = io.out.join("");
     expect(text).toContain("[turn 2 needed a repair: delta_repair]");
     expect(text).not.toContain("turn 1 needed");
@@ -127,12 +142,35 @@ describe("sceneLine", () => {
   });
 
   it("offers the way on once the GM closes the scene", () => {
-    expect(sceneLine({ ...(base as object), scene_ended: true } as never)).toContain("the scene closes");
+    const line = sceneLine({ ...(base as object), scene_ended: true, chapter_index: 2, chapter_title: "Monday, and the rent" } as never);
+    expect(line).toContain("Chapter 2");
+    expect(line).toContain("Monday, and the rent");
+    expect(line).toContain("Say what you do next.");
   });
 
   it("stays quiet when an ending is already doing the talking", () => {
     const ended = { ...(base as object), scene_ended: true, ending: { id: "e", title: "T", text: "x" } };
     expect(sceneLine(ended as never)).toBeNull();
+  });
+});
+
+describe("emphasize", () => {
+  it("paints a new name yellow and bold, and uses marks when there is no colour", () => {
+    expect(emphasize("Seren waves.", ["Seren"], true)).toContain("\x1b[1;33mSeren\x1b[0m");
+    expect(emphasize("Seren waves.", ["Seren"], false)).toBe("**Seren** waves.");
+  });
+});
+
+describe("suggestionLine", () => {
+  const base = { turn: 1, kind: "act", narration: "n", status: null, panel: [], outcome: "ok", record: {} } as never;
+
+  it("is absent when the turn offered nothing", () => {
+    expect(suggestionLine(base)).toBeNull();
+  });
+
+  it("prints up to the offers the turn returned", () => {
+    const line = suggestionLine({ ...(base as object), suggestions: ["Make tea", "Go to the kitchen"] } as never);
+    expect(line).toBe("[ Make tea ]  [ Go to the kitchen ]");
   });
 });
 

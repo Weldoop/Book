@@ -6,6 +6,7 @@ import {
   diffMinutes,
   humanTime,
   parseLocal,
+  playerNotices,
   rngFor,
   stripOocPrefix,
 } from "../src/index.ts";
@@ -49,5 +50,17 @@ describe("classifyInput", () => {
   it("strips the out-of-character prefix", () => {
     expect(stripOocPrefix("OOC: what now?")).toBe("what now?");
     expect(stripOocPrefix("(what now?)")).toBe("what now?");
+  });
+});
+
+describe("playerNotices", () => {
+  it("prints low-money warnings and broken promises, and leaves the calendar to the story", () => {
+    const lines = playerNotices([
+      { id: "low-funds", kind: "conditional", text: "Pasta week is approaching.", entities: ["player"] },
+      { id: "overdue:t4", kind: "scheduled", text: "You said you would be there at two.", entities: [] },
+      { id: "bins-out", kind: "scheduled", text: "Bin night.", entities: [] },
+      { id: "street", kind: "random", text: "A seagull considers your sandwich.", entities: [] },
+    ]);
+    expect(lines).toEqual(["Pasta week is approaching.", "You said you would be there at two."]);
   });
 });
