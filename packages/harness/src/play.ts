@@ -65,14 +65,13 @@ export function sceneLine(result: TurnResultLike): string | null {
 /** Bold, and yellow when the console has colour. Marks stay out of the saved narration. */
 export function emphasize(narration: string, highlights: string[] | undefined, color: boolean): string {
   if (!highlights || highlights.length === 0) return narration;
-  let out = narration;
-  const phrases = [...highlights].sort((a, b) => b.length - a.length);
-  for (const phrase of phrases) {
-    const body = phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
-    const re = new RegExp(`\\b${body}\\b`, "gi");
-    out = out.replace(re, (found) => (color ? `\x1b[1;33m${found}\x1b[0m` : `**${found}**`));
-  }
-  return out;
+  // One pass, longest phrase first, so a name inside a longer phrase is marked once.
+  const body = [...highlights]
+    .sort((a, b) => b.length - a.length)
+    .map((phrase) => phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+"))
+    .join("|");
+  const re = new RegExp(`\\b(?:${body})\\b`, "gi");
+  return narration.replace(re, (found) => (color ? `\x1b[1;33m${found}\x1b[0m` : `**${found}**`));
 }
 
 /** One quiet line when the turn did not come back clean, so a stutter can be reported without running inspect. */
@@ -96,6 +95,23 @@ export function usageLine(result: TurnResultLike, wallMs: number): string {
   const sum = (pick: (x: LLMUsage) => number): number => u.reduce((n, x) => n + pick(x), 0);
   const secs = (wallMs / 1000).toFixed(1);
   return `in ${sum((x) => x.input_tokens)}  out ${sum((x) => x.output_tokens)}  cached ${sum((x) => x.cached_input_tokens)}  $${sum((x) => x.cost_usd).toFixed(4)}  ${secs}s  ${result.outcome}`;
+}
+
+/**
+ * One line when a whole session got no prompt cache reads. Anthropic caches nothing under a
+ * per-model minimum prefix (4096 tokens on Haiku 4.5, 1024 on Sonnet 4.x), so the static blocks
+ * of a short contract are billed in full every turn on the small model.
+ */
+export function cacheNotice(results: TurnResultLike[]): string | null {
+  const usage = results.flatMap((r) => r.record.usage);
+  if (usage.length < 4) return null;
+  if (usage.some((u) => u.cached_input_tokens > 0)) return null;
+  const last = results.at(-1);
+  const prefix = (last?.record.context_parts ?? [])
+    .filter((p) => p.name === "contract" || p.name === "module_fragments")
+    .reduce((n, p) => n + p.tokens, 0);
+  const models = [...new Set(usage.map((u) => u.model))].join(", ");
+  return `No prompt cache reads this session on ${models}. The cached prefix is about ${prefix} tokens; Haiku 4.5 caches only from 4096, Sonnet 4.x from 1024.`;
 }
 
 /** Open threads with their scale. Debug only: the player's page never uses these words. */
@@ -159,6 +175,7 @@ export async function runPlay(opts: PlayOptions): Promise<void> {
 
   let debug = opts.debug ?? false;
   let last: TurnResultLike | undefined;
+  const session: TurnResultLike[] = [];
 
   const existing = (await opts.store.listSaves()).some((s) => s.save_id === opts.saveId);
   if (existing) {
@@ -171,6 +188,7 @@ export async function runPlay(opts: PlayOptions): Promise<void> {
     if (opened) {
       io.write(dim(`New game "${opts.saveId}": ${opts.config.meta.title}.`) + "\n");
       last = opened;
+      session.push(opened);
       present(opened);
       if (debug) {
         const stutter = stutterLine(opened);
@@ -236,6 +254,7 @@ export async function runPlay(opts: PlayOptions): Promise<void> {
       break;
     }
     last = result;
+    session.push(result);
     if (!released) {
       present(result);
       if (debug) {
@@ -249,4 +268,6 @@ export async function runPlay(opts: PlayOptions): Promise<void> {
       io.write(dim(threadDebug(await opts.store.loadSave(opts.saveId))) + "\n");
     }
   }
+  const cache = cacheNotice(session);
+  if (cache) io.write(dim(cache) + "\n");
 }

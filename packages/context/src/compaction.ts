@@ -1,4 +1,4 @@
-import { memoryExpiry } from "@book/engine";
+import { humanTime, memoryExpiry, shortTime } from "@book/engine";
 import type { Config, Fact, Module, State } from "@book/schema";
 import { orderThreads } from "./attention.ts";
 import { recentBeats } from "./sections.ts";
@@ -78,7 +78,8 @@ export function buildCompactionRequest(i: CompactionInput): BuiltContext {
   const storyFit = story ? trimOldestSentences(story, REQUEST_STORY_CAP) : { text: "", trimmed: false };
   const storyText = story ? `## CURRENT STORY SO FAR\n${storyFit.text}` : "";
 
-  const beatLines = recentBeats(state).map((b) => `- t${b.turn}: ${b.text}`);
+  // Each beat carries its weekday and time, so a chapter is never summarised onto the wrong day.
+  const beatLines = recentBeats(state).map((b) => `- t${b.turn}${b.clock ? ` ${shortTime(b.clock)}` : ""}: ${b.text}`);
   const beatFit = fitLines("## BEATS SINCE LAST COMPACTION", beatLines, REQUEST_BEATS_CAP, "start");
   const beatsText = renderSection("## BEATS SINCE LAST COMPACTION", beatFit.lines);
 
@@ -106,6 +107,7 @@ export function buildCompactionRequest(i: CompactionInput): BuiltContext {
   const locName = locId ? (state.entities[locId]?.name ?? locId) : "unknown";
   const stateLines = [
     "Engine truth. Do not copy these balances into the summary.",
+    `Clock: ${humanTime(state.clock.now)}`,
     locId ? `Location: ${locName} [${locId}]` : "Location: unknown",
     ...i.modules.flatMap((m) => m.snapshot(state, i.config)).filter((line) => line.trim()),
   ];
@@ -207,10 +209,22 @@ function consolidate(existing: Fact[], incoming: CompactionFact[], turn: number,
   return ranked.sort((a, b) => a.index - b.index).map((r) => r.f);
 }
 
+/** "Sat 3 Oct 2026, 09:20 to Sat 3 Oct 2026, 23:10." The dates come from the clock, not the archivist. */
+export function chapterRange(state: State): string {
+  const beats = recentBeats(state).filter((b) => b.clock);
+  const first = beats[0]?.clock;
+  const last = beats.at(-1)?.clock;
+  if (!first || !last) return "";
+  const from = humanTime(first);
+  const to = humanTime(last);
+  return from === to ? `${from}.` : `${from} to ${to}.`;
+}
+
 export function applyCompaction(state: State, result: CompactionResult, config: Config): State {
-  const chapter = result.chapter_summary.trim()
-    ? trimOldestSentences(result.chapter_summary, CHAPTER_CAP_TOKENS).text
-    : "";
+  const range = chapterRange(state);
+  const summary = result.chapter_summary.trim();
+  const body = summary ? trimOldestSentences(summary, CHAPTER_CAP_TOKENS).text : "";
+  const chapter = body && range ? `${range} ${body}` : body;
   const story = result.story_so_far.trim()
     ? trimOldestSentences(result.story_so_far, STORY_SO_FAR_CAP_TOKENS).text
     : state.summaries.story_so_far;

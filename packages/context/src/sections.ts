@@ -1,5 +1,5 @@
 import { diffMinutes, humanTime } from "@book/engine";
-import type { Config, DueItem, Entity, Fact, Module, State } from "@book/schema";
+import type { Beat, Config, DueItem, Entity, Fact, Module, State } from "@book/schema";
 import { orderThreads, selectThreads } from "./attention.ts";
 import { MAX_BEATS, MAX_FACTS_PER_ENTITY_IN_CONTEXT, WINDOW_TURNS } from "./budget.ts";
 import { dayOfWeek, fitLines, renderSection, tokensOf, trimOldestSentences } from "./text.ts";
@@ -183,7 +183,7 @@ export function storySection(state: State, cap: number): Section {
   return { text: `${header}\n${fit.text}`, trimmed: fit.trimmed };
 }
 
-export function recentBeats(state: State): { turn: number; text: string }[] {
+export function recentBeats(state: State): Beat[] {
   return state.beats.filter((b) => b.turn > state.summaries.last_compacted_turn);
 }
 
@@ -205,13 +205,12 @@ function escapeRegExp(text: string): string {
 /** Bold marks a phrase the save did not know, so the next turn can create it. */
 function markNew(narration: string, highlights: string[] | undefined): string {
   if (!highlights || highlights.length === 0) return narration;
-  let out = narration;
-  const phrases = [...highlights].sort((a, b) => b.length - a.length);
-  for (const phrase of phrases) {
-    const re = new RegExp(`\\b${escapeRegExp(phrase).replace(/\\s+/g, "\\s+")}\\b`, "gi");
-    out = out.replace(re, (found) => (found.startsWith("**") ? found : `**${found}**`));
-  }
-  return out;
+  // One pass over every phrase at once, longest first, so "Owen" inside "Owen's" is marked once.
+  const body = [...highlights]
+    .sort((a, b) => b.length - a.length)
+    .map((phrase) => escapeRegExp(phrase).replace(/\\s+/g, "\\s+"))
+    .join("|");
+  return narration.replace(new RegExp(`\\b(?:${body})\\b`, "gi"), (found) => `**${found}**`);
 }
 
 export function windowSection(state: State, cap: number): Section {
