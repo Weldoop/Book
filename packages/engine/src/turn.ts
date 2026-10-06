@@ -11,6 +11,7 @@ import {
   type Violation,
 } from "@book/schema";
 import { consistencyViolations } from "./consistency.ts";
+import { selectHighlights } from "./highlights.ts";
 import { syncPresence } from "./core.ts";
 import { forgetMemories } from "./memory.ts";
 import { processOps } from "./ops.ts";
@@ -281,11 +282,21 @@ export function applyDraft(state: State, config: Config, modules: Module[], draf
   }
 
   next.turn = turn;
-  if (draft.scene_ended) next.scene = { ...next.scene, closed: true };
+  if (draft.scene_ended) {
+    const title = draft.chapter_title?.trim();
+    next.scene = { ...next.scene, closed: true, ...(title ? { title } : {}) };
+  }
   next.notes = collectNotes(next, config, draft, turn);
   next.beats.push({ turn, text: draft.beat });
   if (next.beats.length > BEATS_CAP) next.beats = next.beats.slice(-BEATS_CAP);
-  next.window.push({ turn, input: ctx.input, narration: draft.narration, clock: next.clock.now });
+  const highlights = selectHighlights(draft.narration, draft.highlights, next, config);
+  next.window.push({
+    turn,
+    input: ctx.input,
+    narration: draft.narration,
+    clock: next.clock.now,
+    ...(highlights.length > 0 ? { highlights } : {}),
+  });
   if (next.window.length > WINDOW_CAP) next.window = next.window.slice(-WINDOW_CAP);
   next.focus_next = (draft.focus_next ?? []).filter((id) => next.entities[id]).slice(0, 8);
   return syncPresence(next, config);

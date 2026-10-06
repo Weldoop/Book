@@ -125,9 +125,13 @@ function verbPattern(verbs: string[], prepositions: string, span: number): RegEx
   return new RegExp(`\\b(?:${body})\\b[^.]{0,${span}}?\\b(?:${prepositions})\\s+${DEST}`, "gi");
 }
 
-/** The last place the player asked to go to, using this book's travel words. */
-export function tripDestination(input: string, config: Config): string | null {
-  const hits: { index: number; dest: string }[] = [];
+interface DestHit {
+  index: number;
+  dest: string;
+}
+
+function destinationHits(input: string, config: Config): DestHit[] {
+  const hits: DestHit[] = [];
   const scan = (pattern: RegExp | null) => {
     if (!pattern) return;
     for (const match of input.toLowerCase().matchAll(pattern)) {
@@ -144,7 +148,28 @@ export function tripDestination(input: string, config: Config): string | null {
   scan(immediateTripPattern(travel.means, "to|towards|toward|into"));
   scan(verbPattern(travel.journeys, "to|towards|toward|into|for", 48));
   hits.sort((a, b) => a.index - b.index);
+  return hits;
+}
+
+/** The last place the player asked to go to, using this book's travel words. */
+export function tripDestination(input: string, config: Config): string | null {
+  return destinationHits(input, config).at(-1)?.dest ?? null;
+}
+
+/**
+ * The last place the narration walks the player into. "Dai heads to the pub" is his trip.
+ * "You head into the kitchen" is the player's.
+ */
+function narrationDestination(narration: string, config: Config): string | null {
+  const hits = destinationHits(narration, config).filter((hit) => playerSpoke(narration, hit.index));
   return hits.at(-1)?.dest ?? null;
+}
+
+function playerSpoke(original: string, index: number): boolean {
+  const sentence = (original.slice(Math.max(0, index - 40), index).split(/[.!?\n]/).pop() ?? "").trim();
+  if (/\byou\b/i.test(sentence)) return true;
+  if (/[A-Za-z]{2,}$/.test(sentence) && !/\byou$/i.test(sentence)) return false;
+  return !/\b(?:he|she|they)\b/i.test(sentence);
 }
 
 export function isTravelRefusal(narration: string): boolean {
@@ -209,37 +234,58 @@ function notADestination(state: State, dest: string): boolean {
 }
 
 function checkTravel(before: State, after: State, config: Config, draft: TurnDraft, input: string, applied: Op[]): Violation[] {
-  const dest = tripDestination(input, config);
-  if (!dest || isLocalStep(dest, config.travel.local) || notADestination(before, dest)) return [];
+  const stops = new Set<string>();
+  const asked = tripDestination(input, config);
+  const told = narrationDestination(draft.narration, config);
+  if (asked) stops.add(asked);
+  if (told) stops.add(told);
+  const out: Violation[] = [];
+  for (const dest of stops) {
+    const missed = missedStop(before, after, config, draft, applied, dest, dest === asked);
+    if (missed) out.push(missed);
+  }
+  return out;
+}
+
+function missedStop(
+  before: State,
+  after: State,
+  config: Config,
+  draft: TurnDraft,
+  applied: Op[],
+  dest: string,
+  asked: boolean,
+): Violation | null {
+  if (isLocalStep(dest, config.travel.local) || notADestination(before, dest)) return null;
   const end = playerLocation(after, config);
   const endEntity = end ? after.entities[end] : undefined;
   const created = new Set<string>();
   for (const op of applied) {
     if (op.op === "entity.create" && op.type === "place") created.add(op.id);
   }
-  if (endEntity && placeMatches(endEntity.name, endEntity.aliases, endEntity.id, dest)) return [];
-  if (end && created.has(end)) return [];
+  if (endEntity && placeMatches(endEntity.name, endEntity.aliases, endEntity.id, dest)) return null;
+  if (end && created.has(end) && !knownPlace(before, dest)) return null;
   if (isTravelRefusal(draft.narration)) {
     const prev = before.window.at(-1);
     if (prev && tripDestination(prev.input, config) && isTravelRefusal(prev.narration)) {
-      return [
-        violation(
-          "game_breaking",
-          "trip_insisted",
-          `The player already asked to leave and was refused. They asked again to go to "${dest}". Do not refuse twice: narrate the departure, entity.create the place if it does not exist, entity.move the player, and set "at" to that place id.`,
-        ),
-      ];
+      return violation(
+        "game_breaking",
+        "trip_insisted",
+        `The player already asked to leave and was refused. They asked again to go to "${dest}". Do not refuse twice: narrate the departure, entity.create the place if it does not exist, entity.move the player, and set "at" to that place id.`,
+      );
     }
-    return [];
+    return null;
   }
   const here = endEntity?.name ?? "the same place";
-  return [
-    violation(
-      "fixable",
-      "arrived_elsewhere",
-      `The player asked to go to "${dest}" but the narration leaves them at ${here}${end ? ` [${end}]` : ""}. entity.move them to a place whose name matches "${dest}", creating it with entity.create in this delta if it does not exist, and set "at" to that place id.`,
-    ),
-  ];
+  const where = `${here}${end ? ` [${end}]` : ""}`;
+  const lead = asked
+    ? `The player asked to go to "${dest}" but the narration leaves them at ${where}.`
+    : `The narration goes to "${dest}" but the player is at ${where}.`;
+  return violation(
+    "fixable",
+    "arrived_elsewhere",
+    `${lead} entity.move them to a place whose name matches "${dest}", creating it with entity.create in this delta if it does not exist, and set "at" to that place id.`,
+  );
 }
 
 function pluralize(word: string): string {
@@ -691,7 +737,104 @@ function checkItems(before: State, after: State, config: Config, draft: TurnDraf
   return out;
 }
 
-/** Checks that run after a legal delta: place, travel, and catalog items. They do not invent ops. */
+const PLAN_TIME = /\b(?:for|until|before|after|alarm|deadline|due|from)\s+$/i;
+
+/** The last clock time the narration states as now. "Alarm for 08:00" is a plan, not the clock. */
+function statedClock(narration: string): { hours: number; minutes: number } | null {
+  let found: { hours: number; minutes: number } | null = null;
+  for (const match of narration.matchAll(/\b(\d{1,2}):(\d{2})\b/g)) {
+    const hours = Number(match[1]);
+    const minutes = Number(match[2]);
+    if (hours > 23 || minutes > 59 || match.index === undefined) continue;
+    const before = narration.slice(Math.max(0, match.index - 16), match.index);
+    if (PLAN_TIME.test(before) || /£\s*$/.test(before)) continue;
+    found = { hours, minutes };
+  }
+  return found;
+}
+
+function clockFace(iso: string): { hours: number; minutes: number } | null {
+  const match = /T(\d{2}):(\d{2})$/.exec(iso);
+  if (!match) return null;
+  return { hours: Number(match[1]), minutes: Number(match[2]) };
+}
+
+function minutesUntil(from: string, hours: number, minutes: number): number {
+  const face = clockFace(from);
+  if (!face) return -1;
+  let delta = hours * 60 + minutes - (face.hours * 60 + face.minutes);
+  if (delta < 0) delta += 24 * 60;
+  return delta;
+}
+
+function pad(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+function checkClock(before: State, after: State, config: Config, draft: TurnDraft): Violation[] {
+  const stated = statedClock(draft.narration);
+  const landed = clockFace(after.clock.now);
+  if (!stated || !landed) return [];
+  if (stated.hours === landed.hours && stated.minutes === landed.minutes) return [];
+  const label = `${pad(stated.hours)}:${pad(stated.minutes)}`;
+  const now = `${pad(landed.hours)}:${pad(landed.minutes)}`;
+  const mins = minutesUntil(before.clock.now, stated.hours, stated.minutes);
+  const cap = Math.max(config.time.max_skip_minutes, config.time.max_per_turn);
+  let exact: string;
+  if (mins === 0) {
+    exact = ` The clock was already ${label}. Leave it there, or name the later time and put those minutes in the delta.`;
+  } else if (mins > 0 && mins <= cap) {
+    exact = ` From ${before.clock.now.slice(11)}, clock.advance ${mins} minutes lands on ${label}.`;
+  } else {
+    exact = ` That time is not a forward step within ${cap} minutes. Narrate the clock the delta actually sets, and put the exact minutes in clock.advance or clock.skip.`;
+  }
+  return [
+    violation(
+      "fixable",
+      "clock_mismatch",
+      `The narration says ${label} but the clock is ${now}.${exact} Put that exact number in the delta.`,
+    ),
+  ];
+}
+
+/** A negative currency change. */
+function asCharge(op: unknown, keys: Set<string>): { key: string; amount: number } | null {
+  if (!op || typeof op !== "object") return null;
+  const rec = op as { op?: unknown; key?: unknown; amount?: unknown };
+  if (rec.op !== "stat.add" || typeof rec.key !== "string" || typeof rec.amount !== "number") return null;
+  if (!keys.has(rec.key) || !(rec.amount < 0)) return null;
+  return { key: rec.key, amount: rec.amount };
+}
+
+function mentionsAmount(narration: string, amount: number): boolean {
+  const abs = Math.abs(amount);
+  if (!Number.isFinite(abs) || abs === 0) return false;
+  const hay = narration.replace(/,/g, "");
+  const forms = new Set([String(abs), abs.toFixed(2)]);
+  for (const form of forms) {
+    const body = form.replace(".", "\\.");
+    if (new RegExp(`(?:£\\s*)?${body}\\b`).test(hay)) return true;
+  }
+  return false;
+}
+
+/**
+ * A repair may fix a move or a clock. It may not add a charge the narration never stated
+ * and the original delta never contained.
+ */
+export function dropInventedCharges(original: unknown[], next: unknown[], narration: string, config: Config): unknown[] {
+  const keys = new Set(config.stats.filter((stat) => stat.type === "currency").map((stat) => stat.key));
+  if (keys.size === 0) return next;
+  const prior = original.map((op) => asCharge(op, keys)).filter((op): op is { key: string; amount: number } => op !== null);
+  return next.filter((op) => {
+    const charge = asCharge(op, keys);
+    if (!charge) return true;
+    if (prior.some((item) => item.key === charge.key && Math.abs(item.amount - charge.amount) < 0.001)) return true;
+    return mentionsAmount(narration, charge.amount);
+  });
+}
+
+/** Checks that run after a legal delta: place, travel, clock, and catalog items. They do not invent ops. */
 export function consistencyViolations(
   before: State,
   after: State,
@@ -703,6 +846,7 @@ export function consistencyViolations(
   return [
     ...checkAt(after, config, draft),
     ...checkTravel(before, after, config, draft, input, applied),
+    ...checkClock(before, after, config, draft),
     ...checkItems(before, after, config, draft, applied),
   ];
 }

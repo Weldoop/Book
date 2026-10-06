@@ -68,6 +68,8 @@ export const TranscriptTurnSchema = z.object({
   input: z.string(),
   narration: z.string(),
   clock: LocalDateTimeSchema,
+  /** Phrases in the narration that were not in the save. Shown bold, and marked for the next turn. */
+  highlights: z.array(z.string()).max(4).optional(),
 });
 export type TranscriptTurn = z.infer<typeof TranscriptTurnSchema>;
 
@@ -88,6 +90,8 @@ export const SceneSchema = z.object({
   started_turn: z.number().int().min(0).default(0),
   /** Set when the GM declares the scene closed. The next input opens the next one. */
   closed: z.boolean().default(false),
+  /** The title of the chapter that just closed. Absent on a scene that is still running. */
+  title: z.string().max(60).optional(),
 });
 export type Scene = z.infer<typeof SceneSchema>;
 

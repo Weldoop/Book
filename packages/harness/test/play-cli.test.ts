@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { MockProvider } from "@book/llm";
 import { MemoryStore } from "@book/store";
-import { endingLines, runCli, runPlay, sceneLine, suggestionLine } from "../src/index.ts";
+import { emphasize, endingLines, runCli, runPlay, sceneLine, suggestionLine } from "../src/index.ts";
 import type { PlayIO } from "../src/index.ts";
 import { fakeRuntimeApi, makeConfig } from "./helpers.ts";
 import { writeFile } from "node:fs/promises";
@@ -142,12 +142,22 @@ describe("sceneLine", () => {
   });
 
   it("offers the way on once the GM closes the scene", () => {
-    expect(sceneLine({ ...(base as object), scene_ended: true } as never)).toContain("the scene closes");
+    const line = sceneLine({ ...(base as object), scene_ended: true, chapter_index: 2, chapter_title: "Monday, and the rent" } as never);
+    expect(line).toContain("Chapter 2");
+    expect(line).toContain("Monday, and the rent");
+    expect(line).toContain("Say what you do next.");
   });
 
   it("stays quiet when an ending is already doing the talking", () => {
     const ended = { ...(base as object), scene_ended: true, ending: { id: "e", title: "T", text: "x" } };
     expect(sceneLine(ended as never)).toBeNull();
+  });
+});
+
+describe("emphasize", () => {
+  it("paints a new name yellow and bold, and uses marks when there is no colour", () => {
+    expect(emphasize("Seren waves.", ["Seren"], true)).toContain("\x1b[1;33mSeren\x1b[0m");
+    expect(emphasize("Seren waves.", ["Seren"], false)).toBe("**Seren** waves.");
   });
 });
 

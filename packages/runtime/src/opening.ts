@@ -1,7 +1,7 @@
-import { applyDraft, validateDraft } from "@book/engine";
+import { addMinutes, applyDraft, validateDraft } from "@book/engine";
 import { buildRepairContext, buildTurnContext } from "@book/context";
 import { renderView } from "@book/modules";
-import type { Attempt, Config, State, TurnDraft, TurnRecord, Violation } from "@book/schema";
+import type { Attempt, Config, Module, State, TurnDraft, TurnRecord, Violation } from "@book/schema";
 import { parseDraftText } from "./parse.ts";
 import type { Runtime, TurnResult } from "./runtime.ts";
 
@@ -80,9 +80,7 @@ export async function openBook(rt: Runtime, saveId: string): Promise<TurnResult 
     });
   }
 
-  if (!accepted(current) || !current.draft) return null;
-
-  const draft = current.draft;
+  const draft = accepted(current) && current.draft ? current.draft : fallbackDraft(frame, rt.config, rt.modules);
   const next = applyDraft(frame, rt.config, rt.modules, draft, {
     input: OPENING_INPUT,
     due: [],
@@ -117,6 +115,7 @@ export async function openBook(rt: Runtime, saveId: string): Promise<TurnResult 
     notices: [],
     ...(next.scene.closed ? { scene_ended: true } : {}),
     ...(draft.suggested_actions?.length ? { suggestions: draft.suggested_actions } : {}),
+    ...(next.window.at(-1)?.highlights?.length ? { highlights: next.window.at(-1)?.highlights } : {}),
     record,
   };
 }
@@ -125,7 +124,8 @@ function openingInstruction(config: Config): string {
   return [
     `The book opens. This is the first chapter of ${config.meta.title}, not the whole story.`,
     config.meta.premise ? `The book is this: ${config.meta.premise}` : "",
-    "Deal 3 or 4 adults who already belong to this world. Create each with entity.create before anything refers to them.",
+    "Deal 3 or 4 adults who are not already in this save. Invent them. Create each with entity.create before anything refers to them. Do not recreate a person who was removed.",
+    pinnedLine(config),
     'Tag a person "unmet" when they are not in the player\'s current room. Do not name an unmet person in the narration, and do not treat them as present.',
     'If someone mentions a place the player has not entered, entity.create it in this same delta with the tag "unvisited".',
     'Open 1 or 2 threads with thread.open and set scale to "major". These are the long matters of the first chapter. Put the people and places each one turns on in entities. At least one is due in the future. Do not make the world\'s calendar the only goal.',
@@ -135,12 +135,84 @@ function openingInstruction(config: Config): string {
   ].join(" ");
 }
 
-/** Drops the seeded cast and its threads. Places, factions and the player's own things stay. */
+function pinnedLine(config: Config): string {
+  const ids = config.opening?.pinned ?? [];
+  const people = ids
+    .map((id) => config.seed.entities.find((entity) => entity.id === id && entity.type === "person"))
+    .filter((entity): entity is NonNullable<typeof entity> => entity !== undefined);
+  if (people.length === 0) return "No character is pinned. Do not keep a seeded housemate by recreating their name.";
+  return `These people are pinned by the book and stay: ${people.map((person) => `${person.name} (${person.id})`).join(", ")}. Do not create a second copy of them.`;
+}
+
+/** A scene the player can read when the model opening cannot be accepted. People come from the book's cast pool. */
+function fallbackDraft(state: State, config: Config, modules: Module[]): TurnDraft {
+  const placeId = state.entities[config.player_id]?.location ?? undefined;
+  const place = placeId ? state.entities[placeId] : undefined;
+  const dealt = dealCast(state.rng_seed, config.opening?.cast ?? []).filter((person) => !state.entities[person.id]);
+  const present = placeId ? dealt[0] : undefined;
+  const rest = present ? dealt.slice(1) : dealt;
+  const where = place?.name ?? "the room";
+  const narration = present
+    ? `The morning is already moving in ${where}. ${present.name} is here, mid-thought, and the rest of the house is somewhere else.`
+    : config.meta.premise.trim() || `The morning is already moving in ${where}. Nothing has been decided yet.`;
+  const delta: TurnDraft["delta"] = [{ op: "clock.advance", minutes: 1 }];
+  if (present) {
+    delta.unshift({
+      op: "entity.create",
+      id: present.id,
+      type: "person",
+      name: present.name,
+      location: placeId,
+      facts: present.facts.length > 0 ? present.facts : ["Here as the day starts."],
+    });
+  }
+  for (const person of rest) {
+    delta.push({
+      op: "entity.create",
+      id: person.id,
+      type: "person",
+      name: person.name,
+      tags: ["unmet"],
+      facts: person.facts.length > 0 ? person.facts : ["Not in the room yet."],
+    });
+  }
+  if (present) {
+    const due = `${addMinutes(state.clock.now, 24 * 60).slice(0, 10)}T18:00`;
+    delta.push({
+      op: "thread.open",
+      kind: "commitment",
+      text: `${present.name} is waiting on an answer about money before tomorrow evening.`,
+      due,
+      entities: [present.id],
+      scale: "major",
+    });
+  }
+  const draft: TurnDraft = {
+    narration,
+    delta,
+    beat: narration.split(/(?<=[.!?])\s/)[0]?.split(/\s+/).slice(0, 20).join(" ") ?? "The day starts.",
+  };
+  const checked = validateDraft(state, config, modules, draft, OPENING_INPUT);
+  if (checked.violations.length > 0) {
+    const quiet = config.meta.premise.trim() || `The morning is already moving in ${where}.`;
+    return { narration: quiet, delta: [{ op: "clock.advance", minutes: 1 }], beat: "The day starts." };
+  }
+  return draft;
+}
+
+function dealCast(seed: number, cast: { id: string; name: string; facts: string[] }[]): { id: string; name: string; facts: string[] }[] {
+  const ranked = cast.map((person, index) => ({ person, rank: (seed + index * 97) % 1009 }));
+  ranked.sort((a, b) => a.rank - b.rank || a.person.id.localeCompare(b.person.id));
+  return ranked.slice(0, 3).map((row) => row.person);
+}
+
+/** Drops the seeded cast and its threads. Pinned people, places, factions and the player's own things stay. */
 function stripCast(state: State, config: Config): State {
   const next = structuredClone(state);
+  const pinned = new Set(config.opening?.pinned ?? []);
   const removed = new Set<string>();
   for (const entity of Object.values(next.entities)) {
-    if (entity.type === "person" && entity.id !== config.player_id) {
+    if (entity.type === "person" && entity.id !== config.player_id && !pinned.has(entity.id)) {
       removed.add(entity.id);
       delete next.entities[entity.id];
     }

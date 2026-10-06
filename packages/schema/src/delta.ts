@@ -88,6 +88,25 @@ export const TurnDraftSchema = z.object({
   check: CheckSchema.nullish(),
   /** Set only when the scene has come to a natural close, which is when memory may compact. */
   scene_ended: z.boolean().optional(),
+  /** A few words naming the chapter, set together with scene_ended. */
+  chapter_title: z.preprocess((value) => {
+    if (typeof value !== "string") return undefined;
+    const text = value.trim().replace(/\s+/g, " ").slice(0, 60);
+    return text.length > 0 ? text : undefined;
+  }, z.string().max(60).optional()),
+  /**
+   * Phrases in the narration the save does not know yet: a person, a place, an object.
+   * Extra entries are dropped. The engine keeps at most four that are actually new.
+   */
+  highlights: z.preprocess((value) => {
+    if (!Array.isArray(value)) return undefined;
+    const out = value
+      .filter((item): item is string => typeof item === "string")
+      .map((item) => item.trim().replace(/\s+/g, " "))
+      .filter((item) => item.length >= 3 && item.length <= 40)
+      .slice(0, 8);
+    return out.length > 0 ? out : undefined;
+  }, z.array(z.string().min(1).max(40)).max(8).optional()),
   /**
    * Place id where the narration stops. Optional: a missing `at` is not a violation.
    * When it is set, it has to be the player's location after the delta.

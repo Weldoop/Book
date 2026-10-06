@@ -19,6 +19,9 @@ export interface TurnResultLike {
   roll?: { value: number; band: string; what: string; stat?: string };
   ending?: { id: string; title: string; text: string; continuation?: string };
   scene_ended?: boolean;
+  highlights?: string[];
+  chapter_title?: string;
+  chapter_index?: number;
   /** Engine-printed warnings under the narration. Absent on older stand-ins. */
   notices?: string[];
   /** Short offers for the next line. Absent when the turn gave none. */

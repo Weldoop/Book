@@ -71,6 +71,62 @@ describe("playTurn", () => {
     expect(state.focus_next).toEqual([]);
   });
 
+  it("drops a charge a repair adds when the narration never stated it", async () => {
+    const llm = scripted({
+      turn: [draft([{ op: "clock.advance", minutes: "ten" }], "You head into the kitchen.")],
+      delta_repair: [
+        JSON.stringify({
+          delta: [
+            { op: "entity.move", id: "player", location: "kitchen" },
+            { op: "stat.add", key: "cash", amount: -1.3, reason: "milk" },
+            { op: "clock.advance", minutes: 5 },
+          ],
+          beat: "Into the kitchen.",
+        }),
+      ],
+    });
+    const { rt, store } = await setup(llm);
+    const res = await playTurn(rt, "s1", "I look around");
+    expect(res.outcome).toBe("repaired");
+    const state = await store.loadSave("s1");
+    expect(statsOf(state).values.cash).toBe(15);
+    expect(state.entities.player?.location).toBe("kitchen");
+  });
+
+  it("marks a new name in bold for the next turn and leaves a known name plain", async () => {
+    const llm = scripted({
+      turn: [
+        JSON.stringify({
+          narration: "You pass Cerys. Seren waves from the door.",
+          delta: [],
+          beat: "Someone new.",
+          highlights: ["Seren", "Cerys", "and"],
+        }),
+        JSON.stringify({ narration: "Rain taps the window.", delta: [], beat: "Rain." }),
+      ],
+    });
+    const { rt, store } = await setup(llm);
+    const first = await playTurn(rt, "s1", "Look around");
+    expect(first.highlights).toEqual(["Seren"]);
+    expect((await store.loadSave("s1")).window[0]?.highlights).toEqual(["Seren"]);
+    await playTurn(rt, "s1", "Say hello");
+    const second = llm.calls.filter((call) => call.purpose === "turn")[1];
+    expect(JSON.stringify(second?.messages)).toContain("**Seren**");
+    expect(JSON.stringify(second?.messages)).not.toContain("**Cerys**");
+  });
+
+  it("names the chapter when the scene closes", async () => {
+    const llm = scripted({
+      turn: [JSON.stringify({ narration: "You climb the stairs and sleep.", delta: [], beat: "The inspection passes.", scene_ended: true })],
+    });
+    const { rt, store } = await setup(llm);
+    const res = await playTurn(rt, "s1", "Go up to bed");
+    expect(res.scene_ended).toBe(true);
+    expect(res.chapter_title).toBe("The inspection passes");
+    expect(res.chapter_index).toBe(1);
+    expect((await store.loadSave("s1")).scene.title).toBe("The inspection passes");
+  });
+
   it("returns three suggested actions and drops a fourth", async () => {
     const llm = scripted({
       turn: [
@@ -364,17 +420,42 @@ describe("openBook", () => {
     expect(state.entities.player?.type).toBe("person");
   });
 
-  it("leaves the seed in place when the chapter cannot be read", async () => {
+  it("deals a different cast when the chapter cannot be read", async () => {
+    const names = ["Nia Davies", "Tomos Reed", "Aisha Khan", "Owen Price", "Leah Morgan", "Harri Jones", "Sian Berg", "Jake Okoye"];
     const llm = scripted({ opening: ["nope"], rewrite_repair: ["still nope"] });
     const { rt, store } = await setup(llm);
-    expect(await openBook(rt, "s1")).toBeNull();
+    const opened = await openBook(rt, "s1");
+    expect(opened?.narration).toBeTruthy();
+    expect(opened?.narration).not.toMatch(/Type your first action/);
     const state = await store.loadSave("s1");
-    expect(state.turn).toBe(0);
-    expect(state.entities.cerys?.name).toBe("Cerys");
-    expect(state.threads.length).toBeGreaterThan(0);
+    expect(state.turn).toBe(1);
+    expect(state.entities.cerys).toBeUndefined();
+    const named = names.filter((name) => opened?.narration.includes(name));
+    expect(named).toHaveLength(1);
+    const unmet = Object.values(state.entities).filter((entity) => entity.tags.includes("unmet"));
+    expect(unmet.length).toBeGreaterThan(0);
+    for (const person of unmet) expect(opened?.narration).not.toContain(person.name);
+
+    await newGame(rt, "other-house");
+    const other = await openBook(rt, "other-house");
+    const otherNamed = names.filter((name) => other?.narration.includes(name));
+    expect(otherNamed).toHaveLength(1);
+    expect(otherNamed[0]).not.toBe(named[0]);
   });
 
-  it("refuses an opening that names someone the player has not met", async () => {
+  it("keeps a pinned character and still deals someone new", async () => {
+    const pinned = ConfigSchema.parse({ ...config, opening: { ...config.opening, pinned: ["cerys"] } });
+    const llm = scripted({ opening: ["nope"], rewrite_repair: ["still nope"] });
+    const { rt, store } = await setup(llm, { config: pinned });
+    const opened = await openBook(rt, "s1");
+    const state = await store.loadSave("s1");
+    expect(state.entities.cerys?.name).toBe("Cerys");
+    expect(state.entities.dai).toBeUndefined();
+    expect(opened?.narration).not.toContain("Dai");
+    expect(Object.values(state.entities).some((entity) => entity.id !== "cerys" && entity.id !== "player" && entity.type === "person")).toBe(true);
+  });
+
+  it("refuses an opening that names someone the player has not met, and still starts the chapter", async () => {
     const leaked = JSON.stringify({
       narration: "Rowan Hale is already in the doorway.",
       delta: [
@@ -385,8 +466,10 @@ describe("openBook", () => {
     });
     const llm = scripted({ opening: [leaked], rewrite_repair: [leaked] });
     const { rt, store } = await setup(llm);
-    expect(await openBook(rt, "s1")).toBeNull();
-    expect((await store.loadSave("s1")).entities.cerys).toBeTruthy();
+    const opened = await openBook(rt, "s1");
+    expect(opened?.narration).not.toContain("Rowan");
+    expect((await store.loadSave("s1")).entities.cerys).toBeUndefined();
+    expect((await store.loadSave("s1")).turn).toBe(1);
   });
 
   it("does nothing when the book does not deal an opening", async () => {

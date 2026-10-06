@@ -983,10 +983,19 @@ engine, and its model-authored status line had already drifted within a single s
     already carried is not a new sale, a verb counts only in the same sentence, and a decimal price
     is not a quantity. A weekday mismatch names the next date that is that weekday. See ADR 0019.
 
+### Decided after the sixty-cent week (6 Oct 2026)
+
+55. The narration's own trip is a destination, and a place that is not in the save is created in
+    that delta, then entered. A stated clock time is the time the minutes must land on. A repair
+    may fix a move or a clock, and may not add a charge the narration never stated. A dealt opening
+    always becomes a first scene. Pinned people stay. Otherwise the cast is new, and a failed model
+    opening picks three from the book's pool. A closed scene prints a chapter title. Up to four new
+    names are bold for the player and marked for the next turn. See ADR 0020.
+
 ### Build status (6 Oct 2026)
 
 Phase 0 (contracts) and Phase 1 (core build) are implemented, plus the fixes from the live sessions
-and the ADR 0005, 0006, 0007, 0008, 0009, 0010, 0011, 0012, 0013, 0014, 0015, 0016, 0017, 0018 and 0019 changes; 420 tests pass.
+and the ADR 0005, 0006, 0007, 0008, 0009, 0010, 0011, 0012, 0013, 0014, 0015, 0016, 0017, 0018, 0019 and 0020 changes; 425 tests pass.
 
 | Area | State |
 |---|---|
@@ -1011,6 +1020,7 @@ and the ADR 0005, 0006, 0007, 0008, 0009, 0010, 0011, 0012, 0013, 0014, 0015, 00
 | Gear, goods, and narration (ADR 0017) | done; exercised with the mock, not yet against a real model |
 | Shorter contract, room matches the sentence (ADR 0018) | done; exercised with the mock, not yet against a real model |
 | Missing beat filled in code, truer place and item checks (ADR 0019) | done; exercised with the mock, not yet against a real model |
+| Place, clock, repair charges, opening scene, chapter title, bold names (ADR 0020) | done; exercised with the mock, not yet against a real model |
 | Real-model benchmark (Phase 2) | three short live sessions played; full golden-session benchmark not yet run |
 | `need` / attention-miss handling, delta-first experiment results | not yet implemented / not yet measured |
 | Nuxt UI, Supabase, hosted trial, wizard | later phases |

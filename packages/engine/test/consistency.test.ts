@@ -382,6 +382,81 @@ describe("travel and place", () => {
     );
     expect(sleep.violations).toEqual([]);
 
+    const wandered = validateDraft(
+      fresh(),
+      cfg,
+      modules,
+      draft({ narration: "You head into the kitchen and fill the kettle." }),
+      "I look around.",
+    );
+    expect(wandered.violations.find((v) => v.code === "arrived_elsewhere")?.message).toContain("entity.create");
+
+    const followed = validateDraft(
+      fresh(),
+      cfg,
+      modules,
+      draft({
+        narration: "You head into the kitchen and fill the kettle.",
+        delta: [{ op: "entity.move", id: "player", location: "kitchen" }],
+      }),
+      "I look around.",
+    );
+    expect(followed.violations).toEqual([]);
+
+    const someoneElse = validateDraft(
+      fresh(),
+      cfg,
+      modules,
+      draft({ narration: "Dai heads to the pub. You stay by the window." }),
+      "I look around.",
+    );
+    expect(someoneElse.violations).toEqual([]);
+
+    const library = validateDraft(
+      fresh(),
+      cfg,
+      modules,
+      draft({ narration: "You head into the library and take a desk." }),
+      "I look around.",
+    );
+    expect(library.violations.find((v) => v.code === "arrived_elsewhere")?.message).toContain("library");
+
+    const onTime = validateDraft(
+      fresh(),
+      cfg,
+      modules,
+      draft({
+        narration: "The clock reads 09:47.",
+        delta: [{ op: "clock.advance", minutes: 47 }],
+      }),
+      "I look around.",
+    );
+    expect(onTime.violations).toEqual([]);
+
+    const wrongTime = validateDraft(
+      fresh(),
+      cfg,
+      modules,
+      draft({
+        narration: "The clock reads 09:47.",
+        delta: [{ op: "clock.advance", minutes: 10 }],
+      }),
+      "I look around.",
+    );
+    expect(wrongTime.violations.find((v) => v.code === "clock_mismatch")?.message).toContain("47");
+
+    const alarm = validateDraft(
+      fresh(),
+      cfg,
+      modules,
+      draft({
+        narration: "You set an alarm for 08:00 and stay put.",
+        delta: [{ op: "clock.advance", minutes: 1 }],
+      }),
+      "I set an alarm.",
+    );
+    expect(alarm.violations.filter((v) => v.code === "clock_mismatch")).toEqual([]);
+
     const bedState = fresh();
     const room = bedState.entities.room;
     if (!room) throw new Error("room missing");

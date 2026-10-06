@@ -443,7 +443,18 @@
     "visible": false,
     "stat_modifier": false
   },
-  "opening": {},
+  "opening": {
+    "cast": [
+      { "id": "nia-davies", "name": "Nia Davies" },
+      { "id": "tomos-reed", "name": "Tomos Reed" },
+      { "id": "aisha-khan", "name": "Aisha Khan" },
+      { "id": "owen-price", "name": "Owen Price" },
+      { "id": "leah-morgan", "name": "Leah Morgan" },
+      { "id": "harri-jones", "name": "Harri Jones" },
+      { "id": "sian-berg", "name": "Sian Berg" },
+      { "id": "jake-okoye", "name": "Jake Okoye" }
+    ]
+  },
   "offscreen": {
     "enabled": true,
     "min_skip_hours": 6,

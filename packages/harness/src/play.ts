@@ -56,7 +56,23 @@ export function suggestionLine(result: TurnResultLike): string | null {
  */
 export function sceneLine(result: TurnResultLike): string | null {
   if (!result.scene_ended || result.ending) return null;
-  return "--- the scene closes --- press enter to move on, or say what you do next";
+  const index = result.chapter_index ?? result.turn;
+  const title = result.chapter_title?.trim();
+  const head = title ? `Chapter ${index}\n${title}` : `Chapter ${index}`;
+  return `────────\n${head}\n────────\n\nSay what you do next.`;
+}
+
+/** Bold, and yellow when the console has colour. Marks stay out of the saved narration. */
+export function emphasize(narration: string, highlights: string[] | undefined, color: boolean): string {
+  if (!highlights || highlights.length === 0) return narration;
+  let out = narration;
+  const phrases = [...highlights].sort((a, b) => b.length - a.length);
+  for (const phrase of phrases) {
+    const body = phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+    const re = new RegExp(`\\b${body}\\b`, "gi");
+    out = out.replace(re, (found) => (color ? `\x1b[1;33m${found}\x1b[0m` : `**${found}**`));
+  }
+  return out;
 }
 
 /** One quiet line when the turn did not come back clean, so a stutter can be reported without running inspect. */
@@ -125,7 +141,7 @@ export async function runPlay(opts: PlayOptions): Promise<void> {
   const present = (result: TurnResultLike): void => {
     const roll = rollLine(result);
     if (roll) io.write(`\n${roll}\n`);
-    io.write(`\n${result.narration}\n`);
+    io.write(`\n${emphasize(result.narration, result.highlights, io.color === true)}\n`);
     for (const notice of result.notices ?? []) {
       if (notice.trim()) io.write(`${notice}\n`);
     }
@@ -162,7 +178,9 @@ export async function runPlay(opts: PlayOptions): Promise<void> {
       }
       io.write(dim(`[${usageLine(opened, performance.now() - tOpen)}]`) + "\n");
     } else {
-      io.write(dim(`New game "${opts.saveId}": ${opts.config.meta.title}. Type your first action (for example "Start the game").`) + "\n");
+      io.write(dim(`New game "${opts.saveId}": ${opts.config.meta.title}.`) + "\n");
+      const premise = opts.config.meta.premise.trim();
+      if (premise) io.write(`\n${premise}\n`);
     }
   }
   io.write(dim("One line = one turn (several actions in one line are fine). End a line with \\ to continue it on the next line. /quit to exit, /debug for the debug dump.") + "\n");

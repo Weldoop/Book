@@ -6,4 +6,6 @@ export * from "./ops.ts";
 export * from "./stat-key.ts";
 export * from "./state.ts";
 export * from "./turn.ts";
+export { dropInventedCharges } from "./consistency.ts";
+export { selectHighlights } from "./highlights.ts";
 export * from "./catalog.ts";

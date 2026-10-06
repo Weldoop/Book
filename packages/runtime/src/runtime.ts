@@ -1,5 +1,6 @@
 import {
   applyDraft,
+  dropInventedCharges,
   classifyInput,
   collectDue,
   createInitialState,
@@ -80,6 +81,12 @@ export interface TurnResult {
   notices: string[];
   /** Up to three short offers for what the player might type next. Absent when the draft gave none. */
   suggestions?: string[];
+  /** New names in the narration, for the player to see in bold. */
+  highlights?: string[];
+  /** Title of the chapter that just closed. */
+  chapter_title?: string;
+  /** Index of the chapter that just closed. */
+  chapter_index?: number;
   record: TurnRecord;
 }
 
@@ -338,7 +345,7 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
       if (fixed.ok) {
         const candidate: TurnDraft = {
           ...current.draft,
-          delta: fixed.delta,
+          delta: dropInventedCharges(current.draft.delta, fixed.delta, current.draft.narration, config),
           beat: fixed.beat ?? current.draft.beat,
           ...(fixed.at ? { at: fixed.at } : {}),
         };
@@ -460,7 +467,10 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
     outcome,
     notices: playerNotices(due),
     ...(interlude ? { interlude } : {}),
-    ...(next.scene.closed ? { scene_ended: true } : {}),
+    ...(next.scene.closed
+      ? { scene_ended: true, ...(next.scene.title ? { chapter_title: next.scene.title } : {}), chapter_index: next.scene.index }
+      : {}),
+    ...(next.window.at(-1)?.highlights?.length ? { highlights: next.window.at(-1)?.highlights } : {}),
     ...(fired
       ? {
           ending: {

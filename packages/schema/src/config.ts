@@ -203,8 +203,24 @@ export type NotesConfig = z.infer<typeof NotesConfigSchema>;
  * Each new save deals its own first chapter. `dealt_by` is reserved for a future card.
  * While it is absent, the Game Master deals the cast and the opening threads.
  */
+export const OpeningCastSchema = z.object({
+  id: IdSchema,
+  name: z.string().min(1),
+  facts: z.array(z.string()).default([]),
+});
+export type OpeningCast = z.infer<typeof OpeningCastSchema>;
+
 export const OpeningConfigSchema = z.object({
   dealt_by: z.enum(["gm"]).optional(),
+  /**
+   * People the book requires. A new game keeps them. Everyone else in the seed is replaced
+   * by the cast the opening deals.
+   */
+  pinned: z.array(IdSchema).optional(),
+  /**
+   * Used only when the model opening cannot be accepted. A save picks three, so two games differ.
+   */
+  cast: z.array(OpeningCastSchema).optional(),
 });
 export type OpeningConfig = z.infer<typeof OpeningConfigSchema>;
 

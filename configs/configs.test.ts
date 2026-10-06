@@ -160,7 +160,17 @@ describe("uk-life specifics", () => {
       profile: "light",
       status_line: ["turn", "cash", "bank", "health", "energy", "location", "time"],
     });
-    expect(config.opening).toEqual({});
+    expect(config.opening?.pinned ?? []).toEqual([]);
+    expect(config.opening?.cast?.map((person) => person.name)).toEqual([
+      "Nia Davies",
+      "Tomos Reed",
+      "Aisha Khan",
+      "Owen Price",
+      "Leah Morgan",
+      "Harri Jones",
+      "Sian Berg",
+      "Jake Okoye",
+    ]);
     expect(config.stats.find((s) => s.key === "cash")?.start).toBe(15);
     expect(config.items.find((item) => item.id === "phone")?.keeps).toBe(true);
     expect(config.items.find((item) => item.id === "pint")?.keeps).toBeUndefined();

@@ -114,7 +114,7 @@ describe("scene boundaries through a turn", () => {
 
     const closing = await playTurn(rt, "s1", "Go up to bed");
     expect(closing.scene_ended).toBe(true);
-    expect((await store.loadSave("s1")).scene).toEqual({ index: 1, started_turn: 0, closed: true });
+    expect((await store.loadSave("s1")).scene).toEqual({ index: 1, started_turn: 0, closed: true, title: "Made tea" });
 
     const next = await playTurn(rt, "s1", "Get up and make tea");
     expect(next.scene_ended).toBeUndefined();

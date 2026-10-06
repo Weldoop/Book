@@ -198,10 +198,26 @@ export function beatsSection(state: State, cap: number): Section {
   };
 }
 
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Bold marks a phrase the save did not know, so the next turn can create it. */
+function markNew(narration: string, highlights: string[] | undefined): string {
+  if (!highlights || highlights.length === 0) return narration;
+  let out = narration;
+  const phrases = [...highlights].sort((a, b) => b.length - a.length);
+  for (const phrase of phrases) {
+    const re = new RegExp(`\\b${escapeRegExp(phrase).replace(/\\s+/g, "\\s+")}\\b`, "gi");
+    out = out.replace(re, (found) => (found.startsWith("**") ? found : `**${found}**`));
+  }
+  return out;
+}
+
 export function windowSection(state: State, cap: number): Section {
   const header = "## LAST TURNS";
   const turns = state.window.slice(-WINDOW_TURNS);
-  const lines = turns.map((t) => `Player: ${t.input}\nGM: ${t.narration}`);
+  const lines = turns.map((t) => `Player: ${t.input}\nGM: ${markNew(t.narration, t.highlights)}`);
   const fit = fitLines(header, lines, cap, "start");
   if (fit.lines.length === 0 && lines.length > 0) {
     const last = turns[turns.length - 1];

@@ -56,6 +56,12 @@ function prepareDraft(value: unknown): unknown {
     const filled = beatFromNarration(narration);
     if (filled) draft.beat = filled;
   }
+  if (draft.scene_ended === true) {
+    const title = typeof draft.chapter_title === "string" ? draft.chapter_title.trim() : "";
+    const source = title || (typeof draft.beat === "string" ? draft.beat.trim() : "");
+    const chapter = source.split(/\s+/).filter(Boolean).slice(0, 8).join(" ").replace(/[.!?]+$/, "");
+    if (chapter) draft.chapter_title = chapter;
+  }
   return draft;
 }
 

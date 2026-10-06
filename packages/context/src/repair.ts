@@ -50,6 +50,9 @@ function deltaRepairSystem(config: Config, modules: Module[]): string {
     "- ENGINE NOW is the save. Carrying there is already owned, including turns that have left the chat. Do not inventory.add or charge an item that line already lists. Do not change money, place, or what is carried to match an older figure in the narration.",
     `- If the player asked to go somewhere and was not refused, entity.move them to a place that matches. Create the place first when the world sheet has no such place.${localNote}`,
     "- If clock.advance is longer than one scene, replace it with clock.skip (a reason is required) and keep the move.",
+    "- If the narration names a clock time, the minutes must land the clock on that time. State the number. Do not write \"later\".",
+    "- Do not add a negative stat.add unless the narration states that amount. A repair may fix a move or a clock. It may not invent a charge.",
+    "- If the narration stops in a place that is not in the save, entity.create it, entity.move the player, and set at.",
     "- Never invent ops or fields.",
     "OPS",
     describeOps(modules),
@@ -64,7 +67,7 @@ export function deltaFormatHint(playerId: string): string {
   return [
     "That reply was not valid JSON. Return one JSON object and nothing else.",
     `{"delta":[{"op":"entity.create","id":"<place-id>","type":"place","name":"<Place name>"},{"op":"entity.move","id":"${playerId}","location":"<place-id>"}],"at":"<place-id>","beat":"You arrive."}`,
-    "Create the place only when the world sheet does not already have it, then move the player, and set at to that place id. Copy the ids from the violation. Leave out entity.create when the place already exists. Do not add a trip the player did not ask for.",
+    "Create the place only when the world sheet does not already have it, then move the player, and set at to that place id. Copy the ids from the violation. Leave out entity.create when the place already exists. If the narration stops in a place, that is the place. Do not add a stat.add charge the narration does not state.",
   ].join("\n");
 }
 
