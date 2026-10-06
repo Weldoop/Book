@@ -693,6 +693,18 @@ describe("catalog items", () => {
     );
     expect(restated.violations.map((v) => v.code)).toEqual(["already_owned"]);
 
+    const repaid = validateDraft(
+      state,
+      cfg,
+      modules,
+      draft({
+        narration: "You transfer the four pounds to Aisha for the gloves she lent you the money for.",
+        delta: [{ op: "stat.add", key: "money", amount: -4, reason: "Paid Aisha back for the garden gloves" }],
+      }),
+      "Pay Aisha back for the gloves",
+    );
+    expect(repaid.violations).toEqual([]);
+
     const quiet = validateDraft(
       state,
       cfg,

@@ -19,6 +19,9 @@ const REFUSAL =
 const PAY =
   /\b(buy|bought|pay|paid|order|ordered|purchase|purchased|spend|spent)\b/gi;
 
+/** The spend settles money owed rather than buying what it names. */
+const REPAYS = /\b(?:pay(?:s|ing)? (?:\w+ )?back|paid (?:\w+ )?back|repay|repaid|repayment|owed?|loan|lent|borrowed|towards|my share|his share|her share|their share)\b/i;
+
 /** Money changing hands without a pay verb: "hands over a tenner", "taps your card", "the till beeps". */
 const SETTLES = /\b(?:hand(?:s|ed)? over|tap(?:s|ped)? (?:your|the|a) card|till|cashier|checkout|rings? (?:it|them|that|you) up|your change)\b/i;
 
@@ -758,6 +761,8 @@ function checkItems(before: State, after: State, config: Config, draft: TurnDraf
     noteBuy(buys, item, row.wanted);
   }
   for (const spend of currencySpends(applied, config)) {
+    // "£28 to Aisha for the textbook" settles a debt; the textbook is the reason, not the purchase.
+    if (REPAYS.test(spend.reason)) continue;
     for (const item of itemsInText(spend.reason, catalog)) {
       if (item.price === undefined || item.price <= 0) continue;
       const row = byId.get(item.id);

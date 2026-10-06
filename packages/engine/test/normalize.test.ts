@@ -113,6 +113,18 @@ describe("entity ids the model wrote for people already in the save", () => {
     expect(validateDraft(state, config(), modules, d).violations).toEqual([]);
     expect(d.delta).toHaveLength(2);
   });
+
+  it("creates a new person before the ops that refer to them", () => {
+    const state = fresh();
+    const d = draft({
+      delta: [
+        { op: "thread.open", kind: "goal", text: "Derek offered trial shifts, Mon to Wed evenings.", entities: ["derek-cornershop"] },
+        { op: "entity.create", id: "derek-cornershop", type: "person", name: "Derek", location: "bay-cafe" },
+      ],
+    });
+    expect(validateDraft(state, config(), modules, d).violations).toEqual([]);
+    expect((d.delta[0] as { op: string }).op).toBe("entity.create");
+  });
 });
 
 describe("threads the model wrote loosely", () => {
@@ -199,6 +211,9 @@ describe("the place the sentence sits in", () => {
     const here = draft({ narration: "You sit in your room and read." });
     inferAt(fresh(), config(), here);
     expect(here.at).toBeUndefined();
+    const recalled = draft({ narration: "Aisha glances up. 'You and me went to the kitchen on Saturday. That's about it.'" });
+    inferAt(fresh(), config(), recalled);
+    expect(recalled.at).toBeUndefined();
   });
 
   it("moves the player when the inferred place passes through the turn", () => {
@@ -222,10 +237,13 @@ describe("stats that move with the clock", () => {
     expect(values(slept).energy).toBe(100);
   });
 
-  it("does not drain a turn the GM already credited, or one set to an exact time", () => {
+  it("does not drain a turn the GM already priced, or one set to an exact time", () => {
     const nap = fresh();
     driftStats(nap, config(), { minutes: 120, skipped: 0, anchored: false, applied: [{ op: "stat.add", key: "energy", amount: 30 }] });
     expect(values(nap).energy).toBe(80);
+    const chores = fresh();
+    driftStats(chores, config(), { minutes: 180, skipped: 0, anchored: false, applied: [{ op: "stat.add", key: "energy", amount: -20 }] });
+    expect(values(chores).energy).toBe(80);
     const anchored = fresh();
     driftStats(anchored, config(), { minutes: 300, skipped: 0, anchored: true, applied: [] });
     expect(values(anchored).energy).toBe(80);

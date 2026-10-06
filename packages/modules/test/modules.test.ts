@@ -321,6 +321,23 @@ describe("stat display", () => {
     expect(stats?.snapshot(state, config).join(" ")).toBe("Stats: Gold [gold]: 72.00 doubloons");
   });
 
+  it("keeps a dated log of money moving, capped, and shows it under the stats", () => {
+    const { config, modules, state } = testSetup();
+    const stats = modules.find((m) => m.id === "stats");
+    if (!stats) throw new Error("stats module missing");
+    let next = { ...state, clock: { now: "2026-10-03T11:15" } };
+    next = stats.applyOp({ op: "stat.add", key: "money", amount: -2.5, reason: "Milk and bread" }, next, config);
+    next = stats.applyOp({ op: "stat.add", key: "health", amount: -5, reason: "Scratches" }, next, config);
+    next = { ...next, clock: { now: "2026-10-05T21:00" } };
+    next = stats.applyOp({ op: "stat.add", key: "money", amount: 40, reason: "Shift wages" }, next, config);
+    expect(stats.snapshot(next, config).at(-1)).toBe("Money so far: Sat 3 Oct 11:15 -£2.50 money Milk and bread; Mon 5 Oct 21:00 +£40.00 money Shift wages");
+    for (let i = 0; i < 15; i++) next = stats.applyOp({ op: "stat.add", key: "money", amount: -1, reason: `Coffee ${i}` }, next, config);
+    const ledger = (next.modules.stats as { ledger: unknown[] }).ledger;
+    expect(ledger).toHaveLength(10);
+    expect(stats.snapshot(next, config).at(-1)).toContain("Coffee 14");
+    expect(stats.snapshot(next, config).at(-1)).not.toContain("Milk");
+  });
+
   it("repeats the status figures and what is carried as engine truth", () => {
     const { config, modules, state } = testSetup();
     const stats = modules.find((m) => m.id === "stats");

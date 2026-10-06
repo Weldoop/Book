@@ -53,8 +53,17 @@ every chapter summary is prefixed with the range it covers, written by code from
 ### Energy moves with the clock
 
 A bounded stat may declare `per_hour` and `per_skip_hour`. Hours of `clock.advance` drain it; hours
-of `clock.skip` restore it. A turn where the GM already credited the stat was rest and is not
-drained. Uplands energy is -4 an hour awake and +12 an hour asleep.
+of `clock.skip` restore it. A turn where the GM already moved the stat is the GM's call on those
+hours, a nap or three hours of brambles, and the rule adds nothing on top. Uplands energy is -4 an
+hour awake and +12 an hour asleep.
+
+### Money keeps its own log
+
+Each currency `stat.add` is appended to a ledger on the stats module with the clock it happened
+at, capped at ten lines. The state snapshot shows it: `Money so far: Sat 3 Oct 11:15 -£2.50 cash
+Milk and bread; Mon 5 Oct 21:00 +£40.00 cash Shift wages`. An eighty-word chapter summary loses
+figures; the ledger does not, so "what did I spend on Saturday" is answered from the state, not
+from the archivist's prose. It costs about a dozen tokens a line.
 
 ### Highlights are names
 
@@ -69,6 +78,20 @@ Haiku 4.5 caches nothing under a 4,096-token prefix; Sonnet 4.x caches from 1,02
 kept under 1,800 tokens on purpose, so on Haiku the static blocks are billed in full every turn.
 The play CLI says so once at the end of a session that got no cache reads. The prefix is not padded
 to reach the floor.
+
+### Two sessions of play
+
+The first dollar of play after the above (44 turns on Haiku) and a second thirty-cent session
+(34 turns) added these rules, each from a logged failure:
+
+- A tier pointed at another model is priced at that model's family rate when no price is set.
+- A stated clock equal to the turn-start clock is the start of the turn, not a contradiction.
+- A trip stops at `and`, `then`, or a comma, and "have a look" is a purpose, not a place.
+- A priced charge needs buying language or the figure somewhere in the turn; pouring Owen's milk is
+  not buying milk. A spend that pays someone back is not a purchase of what it names.
+- A new person is created before the ops that refer to them, whatever order the GM wrote.
+- "You and me went to the corner shop on Saturday" is a recollection; `at` is not inferred from it.
+- Overdue notices speak to the player in plain words, not in op syntax.
 
 ## Consequences
 

@@ -48,43 +48,53 @@ function mapId(state: State, created: Set<string>, value: unknown, remap: Map<st
   return hit;
 }
 
-/** entity.create of someone already in the save becomes facts on that person. The rest of the delta follows the id. */
+/**
+ * entity.create of someone already in the save becomes facts on that person. The rest of the delta follows the id.
+ * New people are created before anything refers to them, whatever order the GM wrote the ops in.
+ */
 function remapEntities(state: State, draft: TurnDraft): void {
   const remap = new Map<string, string>();
   const created = new Set<string>();
-  const out: unknown[] = [];
+  for (const op of draft.delta) {
+    const rec = asRec(op);
+    if (!rec || rec.op !== "entity.create" || typeof rec.id !== "string" || state.entities[rec.id]) continue;
+    const hit = resolveEntityId(state, rec.id);
+    const existing = hit ? state.entities[hit] : undefined;
+    if (hit && existing && (rec.type === undefined || rec.type === existing.type)) remap.set(rec.id, hit);
+    else created.add(rec.id);
+  }
+  const head: unknown[] = [];
+  const rest: unknown[] = [];
   for (const op of draft.delta) {
     const rec = asRec(op);
     if (!rec) {
-      out.push(op);
+      rest.push(op);
       continue;
     }
-    if (rec.op === "entity.create" && typeof rec.id === "string" && !state.entities[rec.id]) {
-      const hit = resolveEntityId(state, rec.id);
+    if (rec.op === "entity.create" && typeof rec.id === "string") {
+      const hit = remap.get(rec.id);
       const existing = hit ? state.entities[hit] : undefined;
-      if (hit && existing && (rec.type === undefined || rec.type === existing.type)) {
-        remap.set(rec.id, hit);
+      if (hit && existing) {
         for (const fact of Array.isArray(rec.facts) ? rec.facts : []) {
           if (typeof fact === "string" && fact.trim() && !existing.facts.some((f) => f.text === fact)) {
-            out.push({ op: "entity.fact.add", id: hit, fact, importance: 2 });
+            rest.push({ op: "entity.fact.add", id: hit, fact, importance: 2 });
           }
         }
         if (typeof rec.location === "string" && existing.type === "person") {
-          out.push({ op: "entity.move", id: hit, location: rec.location });
+          rest.push({ op: "entity.move", id: hit, location: rec.location });
         }
         continue;
       }
-      created.add(rec.id);
-      out.push(op);
+      (created.has(rec.id) ? head : rest).push(op);
       continue;
     }
     for (const field of ["id", "owner", "a", "b", "location"]) {
       if (field in rec) rec[field] = mapId(state, created, rec[field], remap);
     }
     if (Array.isArray(rec.entities)) rec.entities = rec.entities.map((value) => mapId(state, created, value, remap));
-    out.push(op);
+    rest.push(op);
   }
-  draft.delta = out;
+  draft.delta = [...head, ...rest];
   if (draft.at && !state.entities[draft.at] && !created.has(draft.at)) {
     const hit = resolveEntityId(state, draft.at);
     if (hit && state.entities[hit]?.type === "place") draft.at = hit;
@@ -169,8 +179,9 @@ function softenItems(state: State, config: Config, draft: TurnDraft): void {
 
 const LOCATIVE = String.raw`\b(?:in|into|inside|at|to|through to|down to|up to|back to|out to|over to|across to|round to)\s+(?:the\s+|your\s+|my\s+|his\s+|her\s+|their\s+|our\s+)?`;
 
-/** A sentence about a plan, a listing, or a message is not where the player stands. */
-const ELSEWHERE = /\b(?:tomorrow|tonight|later|next|last|yesterday|shift|job|listed|advert|text|message|about|remember|used to|mention|plan|booked|interview)\b/i;
+/** A sentence about a plan, a listing, a message, or an earlier day is not where the player stands. */
+const ELSEWHERE =
+  /\b(?:tomorrow|tonight|later|next|last|yesterday|earlier|ago|went|were|was|had|did|shift|job|listed|advert|text|message|about|remember|used to|mention|plan|booked|interview|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i;
 
 /**
  * The sentence has the player in it ("you head", "you find Owen in the kitchen") and is not

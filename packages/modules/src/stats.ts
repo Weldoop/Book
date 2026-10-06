@@ -1,8 +1,22 @@
+import { humanTime } from "@book/engine";
 import type { Config, Module, Op, State, StatDef, Violation } from "@book/schema";
+
+/** One currency movement, dated by the clock it happened at. */
+export interface LedgerEntry {
+  clock: string;
+  key: string;
+  amount: number;
+  reason: string;
+}
 
 export interface StatsState {
   values: Record<string, number>;
+  /** The most recent currency movements, so "what did I spend on Saturday" has an answer the GM cannot invent. */
+  ledger?: LedgerEntry[];
 }
+
+/** Lines kept and shown. Each is about a dozen tokens; summaries lose figures, this does not. */
+export const LEDGER_CAP = 10;
 
 const round2 = (n: number): number => Math.round(n * 100) / 100;
 
@@ -45,6 +59,21 @@ function clamp(def: StatDef, value: number): number {
     if (def.max !== undefined) v = Math.min(def.max, v);
   }
   return round2(v);
+}
+
+/** "Money so far: Sat 3 Oct 11:15 -£2.50 cash milk and bread; Mon 5 Oct 21:00 +£40.00 cash shift wages". */
+export function ledgerLines(stats: StatsState, config: Config): string {
+  const entries = (stats.ledger ?? []).slice(-LEDGER_CAP);
+  if (entries.length === 0) return "";
+  const parts = entries.map((entry) => {
+    const def = statDef(config, entry.key);
+    const amount = def ? formatStat(def, Math.abs(entry.amount)) : String(Math.abs(entry.amount));
+    const key = def && (def.label ?? def.key) !== "" ? ` ${(def.label ?? def.key).toLowerCase()}` : "";
+    const reason = entry.reason ? ` ${entry.reason}` : "";
+    const when = humanTime(entry.clock).replace(/ \d{4},/, "");
+    return `${when} ${entry.amount < 0 ? "-" : "+"}${amount}${key}${reason}`;
+  });
+  return `Money so far: ${parts.join("; ")}`;
 }
 
 export const statsModule: Module = {
@@ -94,6 +123,11 @@ export const statsModule: Module = {
     const stats = (s.modules.stats as StatsState | undefined) ?? { values: {} };
     const current = stats.values[op.key] ?? def.start;
     stats.values[op.key] = clamp(def, op.op === "stat.add" ? current + op.amount : op.value);
+    if (def.type === "currency" && op.op === "stat.add" && op.amount !== 0) {
+      const ledger = stats.ledger ?? [];
+      ledger.push({ clock: s.clock.now, key: op.key, amount: round2(op.amount), reason: (op.reason ?? "").trim() });
+      stats.ledger = ledger.slice(-LEDGER_CAP);
+    }
     s.modules.stats = stats;
     return s;
   },
@@ -106,9 +140,12 @@ export const statsModule: Module = {
   due: () => [],
 
   snapshot(state, config) {
-    const values = statsOf(state).values;
-    const parts = config.stats.map((def) => `${shownStat(def)}: ${formatStat(def, values[def.key] ?? def.start)}`);
-    return parts.length ? [`Stats: ${parts.join(" | ")}`] : [];
+    const stats = statsOf(state);
+    const parts = config.stats.map((def) => `${shownStat(def)}: ${formatStat(def, stats.values[def.key] ?? def.start)}`);
+    const lines = parts.length ? [`Stats: ${parts.join(" | ")}`] : [];
+    const ledger = ledgerLines(stats, config);
+    if (ledger) lines.push(ledger);
+    return lines;
   },
 
   truth(state, config) {
