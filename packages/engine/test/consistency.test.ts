@@ -517,6 +517,75 @@ describe("travel and place", () => {
     expect(inBed.violations).toEqual([]);
   });
 
+  it("reads the clock from the scene, not from a message stamp, an appointment, or quoted words", () => {
+    const cfg = config();
+    const clockOf = (narration: string, minutes = 10) =>
+      validateDraft(fresh(), cfg, modules, draft({ narration, delta: [{ op: "clock.advance", minutes }] }), "I look.").violations.filter(
+        (v) => v.code === "clock_mismatch",
+      );
+    expect(clockOf("A text from mum, sent at 08:47 this morning, asks if you are eating.")).toEqual([]);
+    expect(clockOf("A notification from Priya sits at the top, timestamped 14:22 this afternoon.")).toEqual([]);
+    expect(clockOf("Priya's message reads: 'Tuesday 14:30 work? The Waterfront Cafe. Let me know.' Tuesday, 2:30 PM. That's solid.")).toEqual([]);
+    expect(clockOf("The interview is tomorrow at 14:00, so you lay out a shirt.")).toEqual([]);
+    expect(clockOf("The inspection window opens at 10:00; you have time.")).toEqual([]);
+    expect(clockOf("At 10:04, a sharp knock.")[0]?.message).toContain("10:04");
+    expect(clockOf("By 12:15 you're filing out into the corridor with everyone else.")[0]?.message).toContain("12:15");
+  });
+
+  it("reads six o'clock, half seven, and quarter to nine as clock times", () => {
+    const cfg = config();
+    const mismatch = (narration: string, at = "2026-10-03T09:00") => {
+      const state = fresh();
+      state.clock.now = at;
+      return validateDraft(state, cfg, modules, draft({ narration, delta: [{ op: "clock.advance", minutes: 10 }] }), "I read.").violations.find(
+        (v) => v.code === "clock_mismatch",
+      );
+    };
+    expect(mismatch("The pages turn steadily. By six o'clock your eyes are tired.", "2026-10-03T16:24")?.message).toContain("18:00");
+    expect(mismatch("You surface at half seven, groggy.")?.message).toContain("07:30");
+    expect(mismatch("It is quarter to nine when the kettle clicks.")?.message).toContain("08:45");
+    expect(mismatch("Owen has two essays due by Thursday and three quid for chips.")).toBeUndefined();
+    expect(mismatch("Tomos says the pub does a quiz at eight o'clock tonight.")).toBeUndefined();
+  });
+
+  it("stops the place name where the company, the time, or the errand starts, and lets a suggestion stay put", () => {
+    const cfg = config();
+    const home = validateDraft(
+      fresh(),
+      cfg,
+      modules,
+      draft({ narration: "You walk back with Tomos and talk about the inspection.", at: "shared-house" }),
+      "Walk back to the house with Tomos and ask him about the inspection on Monday",
+    );
+    expect(home.violations).toEqual([]);
+    const bedState = fresh();
+    bedState.entities.room!.aliases = ["bedroom"];
+    const bed = validateDraft(
+      bedState,
+      cfg,
+      modules,
+      draft({ narration: "The film ends and you head up.", at: "room" }),
+      "Put on a comedy and watch it with them, then head up to bed around eleven",
+    );
+    expect(bed.violations).toEqual([]);
+    const pub = validateDraft(
+      fresh(),
+      cfg,
+      modules,
+      draft({ narration: "Tomos shakes his head. 'Early one for me, mate.' Owen has an essay. You stay in the kitchen." }),
+      "Suggest we go to the pub tonight to celebrate the garden, my shout for the first round",
+    );
+    expect(pub.violations).toEqual([]);
+    const asked = validateDraft(
+      fresh(),
+      cfg,
+      modules,
+      draft({ narration: "Tomos shrugs. You stay in the kitchen." }),
+      "Go to the pub tonight",
+    );
+    expect(asked.violations.map((v) => v.code)).toContain("arrived_elsewhere");
+  });
+
   it("does not treat a person still at a table as a refused trip", () => {
     const cfg = config();
     const narration = "You step back inside. Cerys is still at the table, tea cooling in front of her.";

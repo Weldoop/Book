@@ -87,10 +87,25 @@ function wordCovers(word: string, dest: string): boolean {
   return PLACE_TAIL.has(word.slice(dest.length));
 }
 
+/**
+ * The place ends where the company, the time, or the errand starts: "the house with Tomos",
+ * "bed around eleven", "the pub tonight", "the shop for a cob" are the house, the bed, the pub, the shop.
+ */
+const DEST_TAIL =
+  /\b(?:again|and|then|if|but|so|while|when|please|for|as|with|without|around|about|at|by|before|after|until|till|tonight|tomorrow|today|later|now|this|next|early|first|quickly|soon|once|via|instead|anyway)\b|\bto\b|\d/;
+
 function cleanDestination(raw: string): string {
-  // "for", "as" and a second "to" are the errand or the next clause ("the shop for a cob", "the coop as I leave"), not the place.
-  const cut = raw.split(/\b(?:again|and|then|if|but|so|while|when|please|for|as)\b|\bto\b/)[0] ?? raw;
+  const cut = raw.split(DEST_TAIL)[0] ?? raw;
   return norm(cut).replace(/^(?:the|a|an)\s+/, "");
+}
+
+/** A line that floats the trip as an idea for others: "suggest we go to the pub", "ask if they fancy the pub". */
+const PROPOSAL =
+  /\b(?:suggest|suggests|suggested|suggesting|propose|proposing|fancy|fancies|shall we|what about|how about|ask(?:s|ed|ing)? (?:if|whether)|see if|wonder(?:s|ed|ing)? (?:if|whether)|invite|offer(?:s|ed)? to|up for|anyone (?:want|fancy)|whether to|should we|maybe we)\b/i;
+
+function isProposal(input: string, index: number): boolean {
+  const clause = input.slice(0, index).split(/[.!?\n]/).pop() ?? "";
+  return PROPOSAL.test(clause);
 }
 
 function isPlaceDestination(dest: string): boolean {
@@ -134,9 +149,11 @@ function destinationHits(input: string, config: Config): DestHit[] {
   const hits: DestHit[] = [];
   const scan = (pattern: RegExp | null) => {
     if (!pattern) return;
-    for (const match of input.toLowerCase().matchAll(pattern)) {
+    const text = input.toLowerCase();
+    for (const match of text.matchAll(pattern)) {
       const dest = cleanDestination(match[1] ?? "");
-      if (isPlaceDestination(dest) && match.index !== undefined) hits.push({ index: match.index, dest });
+      if (match.index === undefined || isProposal(text, match.index)) continue;
+      if (isPlaceDestination(dest)) hits.push({ index: match.index, dest });
     }
   };
   const travel = config.travel;
@@ -754,20 +771,120 @@ function checkItems(before: State, after: State, config: Config, draft: TurnDraf
   return out;
 }
 
-const PLAN_TIME = /\b(?:for|until|before|after|alarm|deadline|due|from)\s+$/i;
+const PLAN_TIME =
+  /\b(?:for|until|till|before|after|alarm|deadline|due|from|sent|timestamped|stamped|received|arrived|opens?|closes?|starts?|ends?|leaves?|departs?|arrives?|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|tonight|yesterday|earlier|later|next|last)\s+(?:at\s+)?(?:about\s+|around\s+|roughly\s+)?$/i;
 
-/** The last clock time the narration states as now. "Alarm for 08:00" is a plan, not the clock. */
-function statedClock(narration: string): { hours: number; minutes: number } | null {
+/** A sentence about a plan, a day, or a message: the time in it is not the clock unless it says so. */
+const NOT_NOW = /\b(?:tomorrow|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday|next week|interview|appointment|meeting|booked|deadline|text|texts|message|notification|timestamp|timestamped|sent|reply|replied)\b/i;
+const IS_MESSAGE = /\b(?:text|texts|message|notification|timestamp|timestamped|sent|reply|replied)\b/i;
+const CLOCK_NOW_HINT = /\b(?:now|it's|it is|reads?|shows|(?<!o')clock|watch)\b/i;
+
+/** The sentence a match sits in, so a quoted text message or a plan is judged as a whole. */
+function sentenceAround(text: string, index: number): string {
+  const before = text.slice(0, index);
+  const start = Math.max(before.lastIndexOf("."), before.lastIndexOf("!"), before.lastIndexOf("?"), before.lastIndexOf("\n"));
+  const rest = text.slice(index);
+  const stop = rest.search(/[.!?\n]/);
+  return text.slice(start + 1, stop < 0 ? text.length : index + stop);
+}
+
+/** The match sits inside quotation marks: a message or something somebody said. */
+function insideQuotes(text: string, index: number): boolean {
+  const before = text.slice(0, index);
+  const singles = (before.match(/(?<![a-z])'|'(?![a-z])/gi) ?? []).length;
+  const doubles = (before.match(/["\u201c\u201d]/g) ?? []).length;
+  return singles % 2 === 1 || doubles % 2 === 1;
+}
+
+/** The time is the clock of the scene: not a plan, not a message stamp, not somebody's quoted words. */
+function clockStatesNow(narration: string, index: number): boolean {
+  const before = narration.slice(Math.max(0, index - 24), index);
+  if (PLAN_TIME.test(before) || /\u00a3\s*$/.test(before)) return false;
+  if (insideQuotes(narration, index)) return false;
+  const sentence = sentenceAround(narration, index);
+  if (NOT_NOW.test(sentence)) return CLOCK_NOW_HINT.test(sentence) && !IS_MESSAGE.test(sentence);
+  return true;
+}
+
+const HOUR_WORD: Record<string, number> = {
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12,
+  midday: 12,
+  noon: 12,
+  midnight: 0,
+};
+
+const SPOKEN_CLOCK =
+  /\b(?:(half|quarter)\s+(?:(past|to)\s+)?)?(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|midday|noon|midnight|\d{1,2})(\s*o'?clock)?(?:\s+in the (morning|afternoon|evening))?\b/gi;
+
+function spokenToFace(match: RegExpMatchArray, nowHours: number | undefined): { hours: number; minutes: number } | null {
+  const word = (match[3] ?? "").toLowerCase();
+  let hours = /^\d+$/.test(word) ? Number(word) : HOUR_WORD[word];
+  if (hours === undefined || hours > 23) return null;
+  let minutes = 0;
+  const fraction = (match[1] ?? "").toLowerCase();
+  const direction = (match[2] ?? "").toLowerCase();
+  if (fraction === "quarter" && !direction) return null;
+  if (fraction) {
+    minutes = fraction === "half" ? 30 : 15;
+    if (direction === "to") {
+      hours = (hours + 23) % 24;
+      minutes = 60 - minutes;
+    }
+  }
+  const part = (match[5] ?? "").toLowerCase();
+  if (hours >= 1 && hours < 12) {
+    if (part === "afternoon" || part === "evening") hours += 12;
+    else if (part === "" && nowHours !== undefined) {
+      // No half of the day named: the reading nearer the clock wins, so "half seven" at 09:00 is the morning.
+      const gap = (face: number) => Math.min(Math.abs(face - nowHours), 24 - Math.abs(face - nowHours));
+      if (gap(hours + 12) < gap(hours)) hours += 12;
+    }
+  }
+  return { hours, minutes };
+}
+
+/**
+ * "By six o'clock", "half seven", "quarter to nine" are clock times too. Only a form with
+ * "o'clock", "half", or "quarter" is read, so "two essays" and "three quid" stay numbers.
+ * The current clock decides morning or afternoon when the sentence does not.
+ */
+function spokenClock(narration: string, now: string): { hours: number; minutes: number } | null {
+  let found: { hours: number; minutes: number } | null = null;
+  const face = clockFace(now);
+  for (const match of narration.matchAll(SPOKEN_CLOCK)) {
+    if (match.index === undefined || (!match[1] && !match[4])) continue;
+    if (!clockStatesNow(narration, match.index)) continue;
+    const parsed = spokenToFace(match, face?.hours);
+    if (parsed) found = parsed;
+  }
+  return found;
+}
+
+/**
+ * The last clock time the narration states as now. "Alarm for 08:00" is a plan, "sent at 08:47"
+ * is a stamp, "Tuesday 14:30 work?" is an appointment, and a time inside a text is quoted.
+ */
+function statedClock(narration: string, now: string): { hours: number; minutes: number } | null {
   let found: { hours: number; minutes: number } | null = null;
   for (const match of narration.matchAll(/\b(\d{1,2}):(\d{2})\b/g)) {
     const hours = Number(match[1]);
     const minutes = Number(match[2]);
     if (hours > 23 || minutes > 59 || match.index === undefined) continue;
-    const before = narration.slice(Math.max(0, match.index - 16), match.index);
-    if (PLAN_TIME.test(before) || /£\s*$/.test(before)) continue;
+    if (!clockStatesNow(narration, match.index)) continue;
     found = { hours, minutes };
   }
-  return found;
+  return found ?? spokenClock(narration, now);
 }
 
 function clockFace(iso: string): { hours: number; minutes: number } | null {
@@ -788,7 +905,7 @@ function pad(n: number): string {
 }
 
 function checkClock(before: State, after: State, config: Config, draft: TurnDraft): Violation[] {
-  const stated = statedClock(draft.narration);
+  const stated = statedClock(draft.narration, before.clock.now);
   const landed = clockFace(after.clock.now);
   if (!stated || !landed) return [];
   if (stated.hours === landed.hours && stated.minutes === landed.minutes) return [];
