@@ -133,20 +133,45 @@ function namedWeekdays(text: string): number[] {
   return found;
 }
 
+/** The next date on or after `now` that falls on `weekday` (Sunday = 0). The clock has no timezone. */
+function nextDateOn(now: string, weekday: number): string {
+  const [year, month, day] = now.slice(0, 10).split("-").map(Number);
+  if (!year || !month || !day) return "";
+  const current = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  const add = (weekday - current + 7) % 7;
+  const next = new Date(Date.UTC(year, month - 1, day + add));
+  const y = next.getUTCFullYear();
+  const m = String(next.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(next.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function dateList(parts: string[]): string {
+  if (parts.length <= 1) return parts[0] ?? "";
+  return `${parts.slice(0, -1).join(", ")}, or ${parts.at(-1)}`;
+}
+
 /**
  * A thread that names a weekday has to fall on that weekday.
  * Monday in the text cannot be stored as the following Wednesday.
+ * The message names the next date, so a repair can change the due date.
  */
-export function weekdayMismatch(text: string, due: string | undefined): string | null {
+export function weekdayMismatch(text: string, due: string | undefined, now?: string): string | null {
   const named = namedWeekdays(text);
   if (named.length === 0) return null;
   const title = (name: string) => name.slice(0, 1).toUpperCase() + name.slice(1);
   const label = named.map((index) => title(WEEKDAYS[index] ?? "")).join(" and ");
-  if (!due) return `the thread names ${label} but has no due date. Set due to that weekday.`;
+  const dates = named.map((index) => {
+    const name = title(WEEKDAYS[index] ?? "");
+    const date = now ? nextDateOn(now, index) : "";
+    return date ? `${name} ${date}` : name;
+  });
+  const when = dateList(dates);
+  if (!due) return `the thread names ${label} but has no due date. Set due to ${when}.`;
   const actual = weekdayIndex(due);
   if (actual < 0 || named.includes(actual)) return null;
   const day = WEEKDAYS[actual] ?? "unknown";
-  return `the thread names ${label} but ${due.slice(0, 10)} is a ${title(day)}. Set due to that weekday.`;
+  return `the thread names ${label} but ${due.slice(0, 10)} is a ${title(day)}. Set due to ${when}.`;
 }
 
 function contentWords(text: string): Set<string> {

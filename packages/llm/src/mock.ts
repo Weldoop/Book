@@ -33,13 +33,38 @@ function playerText(content: string): string {
   return labelled?.[1] ?? content;
 }
 
-const TRIP =
-  /\b(?:walk|head|go|travel|ride|drive|hurry|set off)\b[^.]{0,40}?\b(?:to|towards|toward|into)\s+(?:the\s+|a\s+|an\s+)?([a-z][a-z' -]{2,40})/gi;
+const DEST_STOP = "and|then|if|but|so|while|when|please|for|as|again|to";
+const DEST = `(?:the\\s+|a\\s+|an\\s+)?([a-z][a-z']*(?:\\s+(?!${DEST_STOP}\\b)[a-z][a-z']*){0,5})`;
 
-const LEAVE_TRIP =
-  /\b(?:leave|left)\s+(?:to|towards|toward|into)\s+(?:the\s+|a\s+|an\s+)?([a-z][a-z' -]{2,40})/gi;
+const TRIP = new RegExp(
+  `\\b(?:walk|head|go|travel|ride|drive|hurry|set off)\\b[^.]{0,40}?\\b(?:to|towards|toward|into)\\s+${DEST}`,
+  "gi",
+);
 
-const PURPOSE = new Set(["ask", "buy", "call", "charge", "check", "find", "get", "grab", "look", "meet", "pick", "read", "say", "see", "tell", "text", "watch"]);
+const LEAVE_TRIP = new RegExp(`\\b(?:leave|left)\\s+(?:to|towards|toward|into)\\s+${DEST}`, "gi");
+
+const PURPOSE = new Set([
+  "ask",
+  "buy",
+  "call",
+  "charge",
+  "check",
+  "find",
+  "get",
+  "grab",
+  "look",
+  "meet",
+  "pick",
+  "read",
+  "say",
+  "see",
+  "tell",
+  "text",
+  "watch",
+  "sleep",
+  "rest",
+  "nap",
+]);
 
 function tripDestination(input: string): string | null {
   const hits: { index: number; dest: string }[] = [];

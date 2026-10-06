@@ -33,6 +33,32 @@ export function liftHiddenNotes(draft: TurnDraft): TurnDraft {
   return { ...draft, narration, notes: [...(draft.notes ?? []), ...lifted] };
 }
 
+/** The first sentence of the narration, capped, so a missing beat does not cost a model call. */
+function beatFromNarration(narration: string): string {
+  const flat = narration.replace(/\s+/g, " ").trim();
+  const sentence = flat.split(/(?<=[.!?])\s/)[0] ?? flat;
+  return sentence.trim().split(/\s+/).filter(Boolean).slice(0, 20).join(" ");
+}
+
+/**
+ * A reply that is already one JSON object keeps its delta.
+ * A missing beat is filled from the narration. A focus sentence is dropped.
+ * Neither is a repair.
+ */
+function prepareDraft(value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const draft = { ...(value as Record<string, unknown>) };
+  if (typeof draft.focus_next === "string") delete draft.focus_next;
+  const beat = typeof draft.beat === "string" ? draft.beat.trim() : "";
+  const narration = typeof draft.narration === "string" ? draft.narration.trim() : "";
+  const deltaOk = draft.delta === undefined || Array.isArray(draft.delta);
+  if (!beat && narration && deltaOk) {
+    const filled = beatFromNarration(narration);
+    if (filled) draft.beat = filled;
+  }
+  return draft;
+}
+
 export function parseDraftText(text: string): ParsedDraft {
   let value: unknown;
   try {
@@ -40,7 +66,7 @@ export function parseDraftText(text: string): ParsedDraft {
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "invalid JSON" };
   }
-  const parsed = TurnDraftSchema.safeParse(value);
+  const parsed = TurnDraftSchema.safeParse(prepareDraft(value));
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
     return { ok: false, error: `${issue?.path.join(".") || "draft"}: ${issue?.message ?? "invalid"}` };

@@ -355,6 +355,52 @@ describe("travel and place", () => {
     expect(validateDraft(fresh(), cfg, modules, draft(), "Look around").violations).toEqual([]);
   });
 
+  it("hears the kitchen after the house, and does not treat sleep as a place", () => {
+    const cfg = config();
+    const input = "I walk back to the house and go into the kitchen.";
+    const narration = "The kitchen is empty, the fridge humming to itself.";
+    const missed = validateDraft(fresh(), cfg, modules, draft({ narration }), input);
+    const travel = missed.violations.find((v) => v.code === "arrived_elsewhere");
+    expect(travel?.message).toContain('go to "kitchen"');
+    expect(travel?.message).not.toContain('go to "house"');
+
+    const arrived = validateDraft(
+      fresh(),
+      cfg,
+      modules,
+      draft({ narration, delta: [{ op: "entity.move", id: "player", location: "kitchen" }] }),
+      input,
+    );
+    expect(arrived.violations).toEqual([]);
+
+    const sleep = validateDraft(
+      fresh(),
+      cfg,
+      modules,
+      draft({ narration: "You pull the duvet up and sleep." }),
+      "I go to sleep.",
+    );
+    expect(sleep.violations).toEqual([]);
+
+    const bedState = fresh();
+    const room = bedState.entities.room;
+    if (!room) throw new Error("room missing");
+    bedState.entities.bed = { ...room, id: "bed", name: "Your bed", aliases: [] };
+    const missedBed = validateDraft(bedState, cfg, modules, draft({ narration: "You stay in the room." }), "I go to bed");
+    expect(missedBed.violations.find((v) => v.code === "arrived_elsewhere")?.message).toContain('go to "bed"');
+    const inBed = validateDraft(
+      bedState,
+      cfg,
+      modules,
+      draft({
+        narration: "You get into bed.",
+        delta: [{ op: "entity.move", id: "player", location: "bed" }],
+      }),
+      "I go to bed",
+    );
+    expect(inBed.violations).toEqual([]);
+  });
+
   it("does not treat a person still at a table as a refused trip", () => {
     const cfg = config();
     const narration = "You step back inside. Cerys is still at the table, tea cooling in front of her.";
@@ -454,6 +500,69 @@ describe("catalog items", () => {
       "Buy another pair of gloves",
     );
     expect(another.violations).toEqual([]);
+  });
+
+  it("does not buy the phone, the wallet, or a coffee table, and a price is not a quantity", () => {
+    const cfg: Config = {
+      ...config(),
+      items: [
+        ...config().items,
+        { id: "phone", name: "Phone (cracked corner)", keeps: true },
+        { id: "wallet", name: "Wallet", price: 12, keeps: true },
+        { id: "coffee", name: "Takeaway coffee", price: 2.6 },
+        { id: "chicken-lettuce-sandwich", name: "Chicken and lettuce sandwich", price: 2.5 },
+      ],
+    };
+    const state = fresh();
+    const inv = state.modules.inventory as { owners: Record<string, Record<string, number>> };
+    inv.owners.player = { ...inv.owners.player, phone: 1, wallet: 1 };
+    delete inv.owners.player["sausage-egg-cob"];
+
+    const lunch = validateDraft(
+      state,
+      cfg,
+      modules,
+      draft({
+        narration:
+          "You grab a chicken and lettuce sandwich for £2.50, pay from your wallet, and find a quiet corner with a coffee table.",
+        delta: [
+          { op: "stat.add", key: "money", amount: -2.5, reason: "Chicken and lettuce sandwich" },
+          { op: "inventory.add", owner: "player", item: "chicken-lettuce-sandwich", qty: 1 },
+        ],
+      }),
+      "Buy a sandwich",
+    );
+    expect(lunch.violations).toEqual([]);
+
+    const menu = validateDraft(
+      state,
+      cfg,
+      modules,
+      draft({
+        narration: "A board lists a sandwich, crisps, drink for £5.99. You grab a sausage and egg cob.",
+        delta: [
+          { op: "stat.add", key: "money", amount: -4.2, reason: "Sausage and egg cob" },
+          { op: "inventory.add", owner: "player", item: "sausage-egg-cob", qty: 1 },
+        ],
+      }),
+      "Buy a cob",
+    );
+    expect(menu.violations).toEqual([]);
+
+    const pint = validateDraft(
+      fresh(),
+      cfg,
+      modules,
+      draft({
+        narration: "You pay £4.50 for a pint of lager.",
+        delta: [
+          { op: "stat.add", key: "money", amount: -4.5, reason: "Pint of lager" },
+          { op: "inventory.add", owner: "player", item: "pint", qty: 1 },
+        ],
+      }),
+      "Buy a pint",
+    );
+    expect(pint.violations).toEqual([]);
   });
 
   it("treats setting a cob down as letting a good go, and leaves gear that is only set down", () => {
@@ -662,6 +771,7 @@ describe("duplicate threads", () => {
     expect(wednesday.violations[0]?.code).toBe("weekday_mismatch");
     expect(wednesday.violations[0]?.message).toContain("Monday");
     expect(wednesday.violations[0]?.message).toContain("Wednesday");
+    expect(wednesday.violations[0]?.message).toContain("2026-10-05");
 
     const monday = processOps(fresh(), config(), [coreModule], [
       { op: "thread.open", kind: "commitment", text: "The inspection is on Monday morning", due: "2026-10-05T10:00" },

@@ -52,6 +52,25 @@ describe("playTurn", () => {
     expect(res.suggestions).toBeUndefined();
   });
 
+  it("fills a missing beat from the narration and drops a focus sentence", async () => {
+    const llm = scripted({
+      turn: [
+        JSON.stringify({
+          narration: "Rain taps the window. The kettle clicks.",
+          delta: [],
+          focus_next: "Monday morning the agent comes",
+        }),
+      ],
+    });
+    const { rt, store } = await setup(llm);
+    const res = await playTurn(rt, "s1", "Look around");
+    expect(res.outcome).toBe("ok");
+    expect(llm.calls.map((c) => c.purpose)).toEqual(["turn"]);
+    const state = await store.loadSave("s1");
+    expect(state.beats[0]?.text).toBe("Rain taps the window.");
+    expect(state.focus_next).toEqual([]);
+  });
+
   it("returns three suggested actions and drops a fourth", async () => {
     const llm = scripted({
       turn: [

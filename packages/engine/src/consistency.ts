@@ -2,7 +2,12 @@ import type { Config, Op, State, TurnDraft, Violation } from "@book/schema";
 import { catalogItems } from "./catalog.ts";
 import { playerLocation } from "./core.ts";
 
-const DEST = String.raw`(?:the\s+|a\s+|an\s+)?([a-z][a-z' -]{2,40})`;
+/**
+ * A place name stops at the next clause. "the house and go into the kitchen" is two places,
+ * and the last one is the kitchen. A comma is already outside this pattern.
+ */
+const DEST_STOP = "and|then|if|but|so|while|when|please|for|as|again|to";
+const DEST = String.raw`(?:the\s+|a\s+|an\s+)?([a-z][a-z']*(?:\s+(?!${DEST_STOP}\b)[a-z][a-z']*){0,5})`;
 
 /**
  * A refused trip says the player has not left. "Cerys is still at the table" is not that:
@@ -46,6 +51,9 @@ const PURPOSE = new Set([
   "watch",
 ]);
 
+/** "Go to sleep" is rest, not a destination. "Go to bed" still is, once a bed exists. */
+const NOT_A_PLACE = new Set(["sleep", "rest", "nap"]);
+
 const NEGATED = /\b(?:can't|cannot|don't|do not|didn't|did not|won't|will not|never|not)\s*$/i;
 
 /** A direction, not a destination, unless the book actually names a place that. */
@@ -87,7 +95,7 @@ function cleanDestination(raw: string): string {
 
 function isPlaceDestination(dest: string): boolean {
   const first = dest.split(" ")[0] ?? "";
-  return dest.length >= 3 && !PURPOSE.has(first);
+  return dest.length >= 3 && !PURPOSE.has(first) && !NOT_A_PLACE.has(first);
 }
 
 function isLocalStep(dest: string, local: string[]): boolean {
@@ -270,6 +278,47 @@ interface Mention {
   phrase: string;
 }
 
+/**
+ * Words that can sit beside an item without becoming part of its name.
+ * "The cob" is the cob. "Quiet corner" and "coffee table" are not.
+ */
+const NEAR_WORD = new Set([
+  "the",
+  "a",
+  "an",
+  "my",
+  "your",
+  "his",
+  "her",
+  "their",
+  "our",
+  "this",
+  "that",
+  "some",
+  "of",
+  "and",
+  "for",
+  "with",
+  "from",
+  "to",
+  "on",
+  "in",
+  "at",
+  "it",
+  "up",
+  "down",
+  "away",
+  "out",
+  "off",
+  "over",
+  "back",
+  "here",
+  "there",
+  "now",
+  "too",
+  "aside",
+]);
+
 /** The last word of a name, when no other item ends with it. "Cob" is the sausage cob. "Milk" is shared, so it is not. */
 function uniqueNameTails(items: { id: string; name: string }[]): Map<string, string> {
   const owner = new Map<string, string>();
@@ -287,20 +336,56 @@ function uniqueNameTails(items: { id: string; name: string }[]): Map<string, str
   return owner;
 }
 
+function wordBeside(text: string, index: number, direction: -1 | 1): string {
+  const slice = direction < 0 ? text.slice(0, index) : text.slice(index);
+  const match = direction < 0 ? /([a-z][a-z']*)\W*$/i.exec(slice) : /^\W*([a-z][a-z']*)/i.exec(slice);
+  return match?.[1]?.toLowerCase() ?? "";
+}
+
+function nameWords(name: string): Set<string> {
+  return new Set(norm(name).split(" ").filter(Boolean));
+}
+
+function besideOk(word: string, words: Set<string>): boolean {
+  return word.length === 0 || NEAR_WORD.has(word) || words.has(word);
+}
+
+/** A single word of the name does not continue into a different noun: "coffee table". */
+function followingFits(text: string, end: number, name: string): boolean {
+  return besideOk(wordBeside(text, end, 1), nameWords(name));
+}
+
+/** "Cracked corner" is the phone. "Quiet corner" is not. "The cob" still is. */
+function tailFits(text: string, start: number, end: number, name: string): boolean {
+  const words = nameWords(name);
+  return besideOk(wordBeside(text, start, -1), words) && besideOk(wordBeside(text, end, 1), words);
+}
+
 function findMentions(narration: string, items: { id: string; name: string }[]): Mention[] {
   const text = narration.toLowerCase();
   const hits: Mention[] = [];
   const tails = uniqueNameTails(items);
   for (const item of items) {
-    const phrases = new Set(itemPhrases(item));
-    const tail = norm(item.name).split(" ").at(-1) ?? "";
-    if (tails.get(tail) === item.id) phrases.add(tail);
-    for (const phrase of phrases) {
+    for (const phrase of itemPhrases(item)) {
       const re = new RegExp(`\\b${escapeRegExp(phrase)}\\b`, "g");
+      const single = !phrase.includes(" ");
       for (const match of text.matchAll(re)) {
         if (match.index === undefined) continue;
-        hits.push({ id: item.id, name: item.name, start: match.index, end: match.index + phrase.length, phrase });
+        const start = match.index;
+        const end = start + phrase.length;
+        if (single && !followingFits(text, end, item.name)) continue;
+        hits.push({ id: item.id, name: item.name, start, end, phrase });
       }
+    }
+    const tail = norm(item.name).split(" ").at(-1) ?? "";
+    if (tails.get(tail) !== item.id) continue;
+    const re = new RegExp(`\\b${escapeRegExp(tail)}\\b`, "g");
+    for (const match of text.matchAll(re)) {
+      if (match.index === undefined) continue;
+      const start = match.index;
+      const end = start + tail.length;
+      if (!tailFits(text, start, end, item.name)) continue;
+      hits.push({ id: item.id, name: item.name, start, end, phrase: tail });
     }
   }
   hits.sort((a, b) => {
@@ -388,17 +473,26 @@ const QTY_WORD: Record<string, number> = {
   hundred: 100,
 };
 
-/** The last explicit count in the words just before an item. One, when the player did not say. */
+/** The last explicit count in the words just before an item. One, when the player did not say. A price such as £2.50 is not a count. */
 function wantedQty(window: string): number {
   let qty = 1;
   const re =
     /\b(\d+|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|dozen|twenty|thirty|forty|fifty|sixty|hundred)\b/gi;
   for (const match of window.matchAll(re)) {
     const raw = match[0].toLowerCase();
+    const at = match.index ?? 0;
+    if (/^\d+$/.test(raw) && (window[at - 1] === "." || window[at + raw.length] === ".")) continue;
     const n = /^\d+$/.test(raw) ? Number(raw) : QTY_WORD[raw];
     if (n && n > 0 && n < 10000) qty = n;
   }
   return qty;
+}
+
+/** The verb has to sit in the same sentence as the item, and close to it. The line above does not count. */
+function clauseBefore(text: string, start: number): string {
+  const prior = text.slice(0, start);
+  const sentence = prior.split(/[.!?\n]/).pop() ?? prior;
+  return sentence.slice(-40);
 }
 
 const ITEM_SKIP = new Set(["of", "the", "and", "for", "with", "from"]);
@@ -482,7 +576,7 @@ function checkItems(before: State, after: State, config: Config, draft: TurnDraf
   const text = draft.narration.toLowerCase();
   const byId = new Map<string, { name: string; pay: boolean; release: boolean; wanted: number; again: boolean; consume: boolean; put: boolean; setDown: boolean }>();
   for (const mention of findMentions(draft.narration, catalog)) {
-    const window = text.slice(Math.max(0, mention.start - 60), mention.start);
+    const window = clauseBefore(text, mention.start);
     const row = byId.get(mention.id) ?? {
       name: mention.name,
       pay: false,
@@ -526,6 +620,7 @@ function checkItems(before: State, after: State, config: Config, draft: TurnDraf
     }
     if (!row.pay || !item) continue;
     const held = heldQty(before, player, id);
+    if (item.keeps === true && held >= 1 && !row.again) continue;
     const fresh = row.again || row.wanted > held;
     if (!fresh && held >= 1) {
       if (addedQty(applied, player, id) > 0 && !owned.has(id)) {

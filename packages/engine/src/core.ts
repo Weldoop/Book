@@ -146,7 +146,7 @@ export const coreModule: Module = {
           out.push(bad("due_in_past", `Op ${index}: thread due time ${op.due} is already in the past.`, index));
         }
         {
-          const weekday = weekdayMismatch(op.text, op.due);
+          const weekday = weekdayMismatch(op.text, op.due, state.clock.now);
           if (weekday) out.push(bad("weekday_mismatch", `Op ${index}: ${weekday}`, index));
         }
         {
