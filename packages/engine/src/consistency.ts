@@ -156,22 +156,6 @@ export function tripDestination(input: string, config: Config): string | null {
   return destinationHits(input, config).at(-1)?.dest ?? null;
 }
 
-/**
- * The last place the narration walks the player into. "Dai heads to the pub" is his trip.
- * "You head into the kitchen" is the player's.
- */
-function narrationDestination(narration: string, config: Config): string | null {
-  const hits = destinationHits(narration, config).filter((hit) => playerSpoke(narration, hit.index));
-  return hits.at(-1)?.dest ?? null;
-}
-
-function playerSpoke(original: string, index: number): boolean {
-  const sentence = (original.slice(Math.max(0, index - 40), index).split(/[.!?\n]/).pop() ?? "").trim();
-  if (/\byou\b/i.test(sentence)) return true;
-  if (/[A-Za-z]{2,}$/.test(sentence) && !/\byou$/i.test(sentence)) return false;
-  return !/\b(?:he|she|they)\b/i.test(sentence);
-}
-
 export function isTravelRefusal(narration: string): boolean {
   return new RegExp(REFUSAL.source, "i").test(narration);
 }
@@ -236,9 +220,7 @@ function notADestination(state: State, dest: string): boolean {
 function checkTravel(before: State, after: State, config: Config, draft: TurnDraft, input: string, applied: Op[]): Violation[] {
   const stops = new Set<string>();
   const asked = tripDestination(input, config);
-  const told = narrationDestination(draft.narration, config);
   if (asked) stops.add(asked);
-  if (told) stops.add(told);
   const out: Violation[] = [];
   for (const dest of stops) {
     const missed = missedStop(before, after, config, draft, applied, dest, dest === asked);
@@ -284,8 +266,43 @@ function missedStop(
   return violation(
     "fixable",
     "arrived_elsewhere",
-    `${lead} entity.move them to a place whose name matches "${dest}", creating it with entity.create in this delta if it does not exist, and set "at" to that place id.`,
+    `${lead} Set "at" to the place id for "${dest}". The engine creates that place when the save does not have it and moves the player there this turn.`,
   );
+}
+
+function placeTitle(id: string): string {
+  return id.replace(/[_-]+/g, " ").replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
+}
+
+function isCreate(op: unknown, id: string): boolean {
+  if (!op || typeof op !== "object") return false;
+  const rec = op as { op?: unknown; id?: unknown; type?: unknown };
+  return rec.op === "entity.create" && rec.id === id && (rec.type === undefined || rec.type === "place");
+}
+
+function isMove(op: unknown, id: string, location: string): boolean {
+  if (!op || typeof op !== "object") return false;
+  const rec = op as { op?: unknown; id?: unknown; location?: unknown };
+  return rec.op === "entity.move" && rec.id === id && rec.location === location;
+}
+
+/**
+ * The GM sets `at` to the place the player is in. The engine creates that place when it is new
+ * and moves the player there on this turn. Narration verbs are not how a move is detected.
+ */
+export function materializeAt(state: State, config: Config, draft: TurnDraft): void {
+  const id = draft.at;
+  if (!id) return;
+  const known = state.entities[id];
+  if (known && known.type !== "place") return;
+  const delta = draft.delta;
+  if (!known && !delta.some((op) => isCreate(op, id))) {
+    delta.unshift({ op: "entity.create", id, type: "place", name: placeTitle(id) });
+  }
+  const player = config.player_id;
+  if (!delta.some((op) => isMove(op, player, id)) && state.entities[player]?.location !== id) {
+    delta.push({ op: "entity.move", id: player, location: id });
+  }
 }
 
 function pluralize(word: string): string {
@@ -759,12 +776,11 @@ function clockFace(iso: string): { hours: number; minutes: number } | null {
   return { hours: Number(match[1]), minutes: Number(match[2]) };
 }
 
+/** Signed minutes from the clock face to the stated face. Negative means that time is already past today. */
 function minutesUntil(from: string, hours: number, minutes: number): number {
   const face = clockFace(from);
   if (!face) return -1;
-  let delta = hours * 60 + minutes - (face.hours * 60 + face.minutes);
-  if (delta < 0) delta += 24 * 60;
-  return delta;
+  return hours * 60 + minutes - (face.hours * 60 + face.minutes);
 }
 
 function pad(n: number): string {
@@ -780,13 +796,14 @@ function checkClock(before: State, after: State, config: Config, draft: TurnDraf
   const now = `${pad(landed.hours)}:${pad(landed.minutes)}`;
   const mins = minutesUntil(before.clock.now, stated.hours, stated.minutes);
   const cap = Math.max(config.time.max_skip_minutes, config.time.max_per_turn);
+  const date = before.clock.now.slice(0, 10);
   let exact: string;
   if (mins === 0) {
-    exact = ` The clock was already ${label}. Leave it there, or name the later time and put those minutes in the delta.`;
+    exact = ` The clock was already ${label}. Leave it there, or name the other time and put it in the delta.`;
   } else if (mins > 0 && mins <= cap) {
     exact = ` From ${before.clock.now.slice(11)}, clock.advance ${mins} minutes lands on ${label}.`;
   } else {
-    exact = ` That time is not a forward step within ${cap} minutes. Narrate the clock the delta actually sets, and put the exact minutes in clock.advance or clock.skip.`;
+    exact = ` clock.set {"now":"${date}T${label}"} lands on ${label}, including a time already past.`;
   }
   return [
     violation(
@@ -818,13 +835,42 @@ function mentionsAmount(narration: string, amount: number): boolean {
   return false;
 }
 
+/** The narration told the player this cost nothing, so the engine balance stays. */
+function saysFree(narration: string): boolean {
+  return (
+    /\b(?:costs?|costing)\s+nothing\b/i.test(narration) ||
+    /\b(?:for free|free of charge|no charge|without paying)\b/i.test(narration) ||
+    /\b(?:didn't|did not|doesn't|does not)\s+cost\b/i.test(narration)
+  );
+}
+
+function chargeKeys(config: Config): Set<string> {
+  return new Set(config.stats.filter((stat) => stat.type === "currency").map((stat) => stat.key));
+}
+
+function checkNarratedCharge(config: Config, draft: TurnDraft, applied: Op[]): Violation[] {
+  if (!saysFree(draft.narration)) return [];
+  const keys = chargeKeys(config);
+  const hit = applied.map((op) => asCharge(op, keys)).filter((op): op is { key: string; amount: number } => op !== null);
+  if (hit.length === 0) return [];
+  const which = [...new Set(hit.map((item) => item.key))].join(", ");
+  return [
+    violation(
+      "fixable",
+      "free_charge",
+      `The narration says this cost nothing. Remove the negative stat.add on ${which} so the engine keeps that balance.`,
+    ),
+  ];
+}
+
 /**
  * A repair may fix a move or a clock. It may not add a charge the narration never stated
- * and the original delta never contained.
+ * and the original delta never contained. A narration that says the cost was nothing drops the charge.
  */
 export function dropInventedCharges(original: unknown[], next: unknown[], narration: string, config: Config): unknown[] {
-  const keys = new Set(config.stats.filter((stat) => stat.type === "currency").map((stat) => stat.key));
+  const keys = chargeKeys(config);
   if (keys.size === 0) return next;
+  if (saysFree(narration)) return next.filter((op) => !asCharge(op, keys));
   const prior = original.map((op) => asCharge(op, keys)).filter((op): op is { key: string; amount: number } => op !== null);
   return next.filter((op) => {
     const charge = asCharge(op, keys);
@@ -847,6 +893,7 @@ export function consistencyViolations(
     ...checkAt(after, config, draft),
     ...checkTravel(before, after, config, draft, input, applied),
     ...checkClock(before, after, config, draft),
+    ...checkNarratedCharge(config, draft, applied),
     ...checkItems(before, after, config, draft, applied),
   ];
 }

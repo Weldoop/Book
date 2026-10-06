@@ -160,6 +160,13 @@ describe("uk-life specifics", () => {
       profile: "light",
       status_line: ["turn", "cash", "bank", "health", "energy", "location", "time"],
     });
+    expect(config.seed.entities.filter((entity) => entity.type === "person" && entity.id !== "player").map((entity) => entity.id)).toEqual([
+      "1",
+      "2",
+      "3",
+      "4",
+    ]);
+    expect(config.events.scheduled.find((event) => event.id === "bins-out")?.entities).toContain("1");
     expect(config.opening?.pinned ?? []).toEqual([]);
     expect(config.opening?.cast?.map((person) => person.name)).toEqual([
       "Nia Davies",

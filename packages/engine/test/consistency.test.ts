@@ -335,22 +335,15 @@ describe("travel and place", () => {
     expect(stepped.violations.map((v) => v.code)).toContain("arrived_elsewhere");
   });
 
-  it("checks at only when the draft sets it", () => {
+  it("moves the player when the draft sets at, and leaves a turn with no at where it is", () => {
     const cfg = config();
-    const wrong = validateDraft(fresh(), cfg, modules, draft({ at: "kitchen" }), "Look around");
-    expect(wrong.violations.map((v) => v.code)).toEqual(["location_mismatch"]);
+    const told = draft({ at: "kitchen" });
+    expect(validateDraft(fresh(), cfg, modules, told, "Look around").violations).toEqual([]);
+    const moved = applyDraft(fresh(), cfg, modules, told, { input: "Look around", due: [] });
+    expect(moved.entities.player?.location).toBe("kitchen");
 
-    const right = validateDraft(
-      fresh(),
-      cfg,
-      modules,
-      draft({
-        at: "kitchen",
-        delta: [{ op: "entity.move", id: "player", location: "kitchen" }],
-      }),
-      "Look around",
-    );
-    expect(right.violations).toEqual([]);
+    const notAPlace = validateDraft(fresh(), cfg, modules, draft({ at: "player" }), "Look around");
+    expect(notAPlace.violations.map((v) => v.code)).toEqual(["location_mismatch"]);
 
     expect(validateDraft(fresh(), cfg, modules, draft(), "Look around").violations).toEqual([]);
   });
@@ -389,7 +382,14 @@ describe("travel and place", () => {
       draft({ narration: "You head into the kitchen and fill the kettle." }),
       "I look around.",
     );
-    expect(wandered.violations.find((v) => v.code === "arrived_elsewhere")?.message).toContain("entity.create");
+    expect(wandered.violations.filter((v) => v.code === "arrived_elsewhere")).toEqual([]);
+
+    const settled = draft({ narration: "You settle in the living room.", at: "living-room" });
+    const settledCheck = validateDraft(fresh(), cfg, modules, settled, "I look around.");
+    expect(settledCheck.violations).toEqual([]);
+    const settledState = applyDraft(fresh(), cfg, modules, settled, { input: "I look around.", due: [] });
+    expect(settledState.entities.player?.location).toBe("living-room");
+    expect(settledState.entities["living-room"]?.name).toBe("Living Room");
 
     const followed = validateDraft(
       fresh(),
@@ -419,7 +419,7 @@ describe("travel and place", () => {
       draft({ narration: "You head into the library and take a desk." }),
       "I look around.",
     );
-    expect(library.violations.find((v) => v.code === "arrived_elsewhere")?.message).toContain("library");
+    expect(library.violations.filter((v) => v.code === "arrived_elsewhere")).toEqual([]);
 
     const onTime = validateDraft(
       fresh(),
@@ -456,6 +456,47 @@ describe("travel and place", () => {
       "I set an alarm.",
     );
     expect(alarm.violations.filter((v) => v.code === "clock_mismatch")).toEqual([]);
+
+    const earlier = validateDraft(
+      fresh(),
+      cfg,
+      modules,
+      draft({
+        narration: "The clock reads 08:00.",
+        delta: [{ op: "clock.set", now: "2026-10-03T08:00" }],
+      }),
+      "I look around.",
+    );
+    expect(earlier.violations).toEqual([]);
+    const earlierState = applyDraft(
+      fresh(),
+      cfg,
+      modules,
+      draft({ narration: "The clock reads 08:00.", delta: [{ op: "clock.set", now: "2026-10-03T08:00" }] }),
+      { input: "I look around.", due: [] },
+    );
+    expect(earlierState.clock.now).toBe("2026-10-03T08:00");
+
+    const toldEarlier = validateDraft(
+      fresh(),
+      cfg,
+      modules,
+      draft({ narration: "The clock reads 08:00.", delta: [{ op: "clock.advance", minutes: 1 }] }),
+      "I look around.",
+    );
+    expect(toldEarlier.violations.find((v) => v.code === "clock_mismatch")?.message).toContain("clock.set");
+
+    const free = validateDraft(
+      fresh(),
+      cfg,
+      modules,
+      draft({
+        narration: "The switch costs nothing.",
+        delta: [{ op: "stat.add", key: "money", amount: -12.5, reason: "plan" }],
+      }),
+      "I look around.",
+    );
+    expect(free.violations.find((v) => v.code === "free_charge")?.message).toContain("money");
 
     const bedState = fresh();
     const room = bedState.entities.room;

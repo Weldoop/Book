@@ -8,6 +8,8 @@ export interface ProcessedOps {
   /** Minutes from clock.advance only; clock.skip is capped separately and excluded. */
   minutes: number;
   skipped: number;
+  /** True when clock.set landed the clock on an exact time, so a minimum step must not nudge it. */
+  anchored: boolean;
 }
 
 function ownerOf(modules: Module[], op: Op): Module | undefined {
@@ -33,6 +35,7 @@ export function processOps(state: State, config: Config, modules: Module[], rawO
   let current = state;
   let minutes = 0;
   let skipped = 0;
+  let anchored = false;
 
   rawOps.forEach((raw, index) => {
     const parsed = OpSchema.safeParse(canonicalizeRaw(config, raw));
@@ -65,6 +68,7 @@ export function processOps(state: State, config: Config, modules: Module[], rawO
     }
     if (op.op === "clock.advance") minutes += op.minutes;
     if (op.op === "clock.skip") skipped += op.minutes;
+    if (op.op === "clock.set") anchored = true;
     current = owner.applyOp(op, current, config);
     applied.push(op);
   });
@@ -81,5 +85,5 @@ export function processOps(state: State, config: Config, modules: Module[], rawO
     });
   }
 
-  return { state: current, applied, violations, minutes, skipped };
+  return { state: current, applied, violations, minutes, skipped, anchored };
 }

@@ -17,8 +17,8 @@ export async function openBook(rt: Runtime, saveId: string): Promise<TurnResult 
   const saved = await rt.store.loadSave(saveId);
   if (saved.turn !== 0) return null;
 
-  const frame = stripCast(saved, rt.config);
-  const instruction = openingInstruction(rt.config);
+  const frame = prepareCast(saved, rt.config);
+  const instruction = openingInstruction(rt.config, frame);
   const ctx = buildTurnContext({
     config: rt.config,
     state: frame,
@@ -120,19 +120,28 @@ export async function openBook(rt: Runtime, saveId: string): Promise<TurnResult 
   };
 }
 
-function openingInstruction(config: Config): string {
+function openingInstruction(config: Config, state: State): string {
   return [
     `The book opens. This is the first chapter of ${config.meta.title}, not the whole story.`,
     config.meta.premise ? `The book is this: ${config.meta.premise}` : "",
-    "Deal 3 or 4 adults who are not already in this save. Invent them. Create each with entity.create before anything refers to them. Do not recreate a person who was removed.",
+    castLine(config, state),
     pinnedLine(config),
     'Tag a person "unmet" when they are not in the player\'s current room. Do not name an unmet person in the narration, and do not treat them as present.',
     'If someone mentions a place the player has not entered, entity.create it in this same delta with the tag "unvisited".',
-    'Open 1 or 2 threads with thread.open and set scale to "major". These are the long matters of the first chapter. Put the people and places each one turns on in entities. At least one is due in the future. Do not make the world\'s calendar the only goal.',
+    'Open 1 or 2 threads with thread.open and set scale to "major". These are the long matters of the first chapter. Put the people and places each one turns on in entities, using the id already on them. At least one is due in the future. Do not make the world\'s calendar the only goal.',
     "The narration is the player's first moment. Do not decide their feelings, words or actions, and do not list the cast.",
     "Other people know only what they have seen, heard, or been told.",
     `The player character id is "${config.player_id}".`,
   ].join(" ");
+}
+
+function castLine(config: Config, state: State): string {
+  const slots = slotPeople(config, state);
+  if (slots.length === 0) {
+    return "Deal 3 or 4 adults who are not already in this save. Invent them. Create each with entity.create before anything refers to them. Do not recreate a person who was removed.";
+  }
+  const listed = slots.map((person) => `${person.name} is ${person.id}`).join("; ");
+  return `These people are already in the save. A thread or event names them by id, not by a new name: ${listed}. Do not create a second copy.`;
 }
 
 function pinnedLine(config: Config): string {
@@ -140,23 +149,37 @@ function pinnedLine(config: Config): string {
   const people = ids
     .map((id) => config.seed.entities.find((entity) => entity.id === id && entity.type === "person"))
     .filter((entity): entity is NonNullable<typeof entity> => entity !== undefined);
-  if (people.length === 0) return "No character is pinned. Do not keep a seeded housemate by recreating their name.";
+  if (people.length === 0) {
+    if ((config.opening?.cast ?? []).length > 0) return "No character is pinned. The names already on these ids are this story's names.";
+    return "No character is pinned. Do not keep a seeded housemate by recreating their name.";
+  }
   return `These people are pinned by the book and stay: ${people.map((person) => `${person.name} (${person.id})`).join(", ")}. Do not create a second copy of them.`;
 }
 
-/** A scene the player can read when the model opening cannot be accepted. People come from the book's cast pool. */
+/** A scene the player can read when the model opening cannot be accepted. */
 function fallbackDraft(state: State, config: Config, modules: Module[]): TurnDraft {
   const placeId = state.entities[config.player_id]?.location ?? undefined;
   const place = placeId ? state.entities[placeId] : undefined;
+  const where = place?.name ?? "the room";
+  const here = placeId
+    ? Object.values(state.entities).find((entity) => entity.type === "person" && entity.id !== config.player_id && entity.location === placeId)
+    : undefined;
+  if (here) {
+    const narration = `The morning is already moving in ${where}. ${here.name} is here, mid-thought, and the rest of the house is somewhere else.`;
+    return acceptScene(state, config, modules, where, narration, [
+      { op: "clock.advance", minutes: 1 },
+      openingThread(state, here.name, here.id),
+    ]);
+  }
+
   const dealt = dealCast(state.rng_seed, config.opening?.cast ?? []).filter((person) => !state.entities[person.id]);
   const present = placeId ? dealt[0] : undefined;
   const rest = present ? dealt.slice(1) : dealt;
-  const where = place?.name ?? "the room";
   const narration = present
     ? `The morning is already moving in ${where}. ${present.name} is here, mid-thought, and the rest of the house is somewhere else.`
     : config.meta.premise.trim() || `The morning is already moving in ${where}. Nothing has been decided yet.`;
   const delta: TurnDraft["delta"] = [{ op: "clock.advance", minutes: 1 }];
-  if (present) {
+  if (present && placeId) {
     delta.unshift({
       op: "entity.create",
       id: present.id,
@@ -176,17 +199,23 @@ function fallbackDraft(state: State, config: Config, modules: Module[]): TurnDra
       facts: person.facts.length > 0 ? person.facts : ["Not in the room yet."],
     });
   }
-  if (present) {
-    const due = `${addMinutes(state.clock.now, 24 * 60).slice(0, 10)}T18:00`;
-    delta.push({
-      op: "thread.open",
-      kind: "commitment",
-      text: `${present.name} is waiting on an answer about money before tomorrow evening.`,
-      due,
-      entities: [present.id],
-      scale: "major",
-    });
-  }
+  if (present) delta.push(openingThread(state, present.name, present.id));
+  return acceptScene(state, config, modules, where, narration, delta);
+}
+
+function openingThread(state: State, name: string, id: string): TurnDraft["delta"][number] {
+  const due = `${addMinutes(state.clock.now, 24 * 60).slice(0, 10)}T18:00`;
+  return {
+    op: "thread.open",
+    kind: "commitment",
+    text: `${name} is waiting on an answer about money before tomorrow evening.`,
+    due,
+    entities: [id],
+    scale: "major",
+  };
+}
+
+function acceptScene(state: State, config: Config, modules: Module[], where: string, narration: string, delta: TurnDraft["delta"]): TurnDraft {
   const draft: TurnDraft = {
     narration,
     delta,
@@ -198,6 +227,52 @@ function fallbackDraft(state: State, config: Config, modules: Module[]): TurnDra
     return { narration: quiet, delta: [{ op: "clock.advance", minutes: 1 }], beat: "The day starts." };
   }
   return draft;
+}
+
+function slotPeople(config: Config, state: State): { id: string; name: string }[] {
+  return config.seed.entities
+    .filter((entity) => entity.type === "person" && entity.id !== config.player_id && state.entities[entity.id])
+    .map((entity) => ({ id: entity.id, name: state.entities[entity.id]?.name ?? entity.name }));
+}
+
+function prepareCast(state: State, config: Config): State {
+  if ((config.opening?.cast ?? []).length > 0) return renameSlots(state, config);
+  return stripCast(state, config);
+}
+
+function shuffledNames(seed: number, names: string[]): string[] {
+  const ranked = names.map((name, index) => ({ name, rank: (seed + index * 97) % 1009 }));
+  ranked.sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name));
+  return ranked.map((row) => row.name);
+}
+
+/** Keeps each seeded person on their id and gives this save a new name. Threads still name the id. */
+function renameSlots(state: State, config: Config): State {
+  const next = structuredClone(state);
+  const pinned = new Set(config.opening?.pinned ?? []);
+  const slots = config.seed.entities.filter(
+    (entity) => entity.type === "person" && entity.id !== config.player_id && next.entities[entity.id] && !pinned.has(entity.id),
+  );
+  const names = shuffledNames(
+    next.rng_seed,
+    (config.opening?.cast ?? []).map((person) => person.name),
+  );
+  for (const [index, slot] of slots.entries()) {
+    const entity = next.entities[slot.id];
+    const name = names[index];
+    if (!entity || !name) continue;
+    entity.name = name;
+    entity.aliases = [];
+  }
+  const placeId = next.entities[config.player_id]?.location;
+  const already =
+    !!placeId &&
+    Object.values(next.entities).some((entity) => entity.type === "person" && entity.id !== config.player_id && entity.location === placeId);
+  const first = slots[0] ? next.entities[slots[0].id] : undefined;
+  if (placeId && first && !already) first.location = placeId;
+  next.threads = [];
+  next.focus_next = next.focus_next.filter((id) => next.entities[id]);
+  return next;
 }
 
 function dealCast(seed: number, cast: { id: string; name: string; facts: string[] }[]): { id: string; name: string; facts: string[] }[] {

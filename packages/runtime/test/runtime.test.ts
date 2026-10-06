@@ -93,6 +93,25 @@ describe("playTurn", () => {
     expect(state.entities.player?.location).toBe("kitchen");
   });
 
+  it("drops a charge when the narration says it cost nothing", async () => {
+    const llm = scripted({
+      turn: [draft([{ op: "stat.add", key: "cash", amount: -12.5, reason: "plan" }, { op: "clock.advance", minutes: 1 }], "The switch costs nothing.")],
+      delta_repair: [
+        JSON.stringify({
+          delta: [
+            { op: "stat.add", key: "cash", amount: -12.5, reason: "plan" },
+            { op: "clock.advance", minutes: 1 },
+          ],
+          beat: "The switch costs nothing.",
+        }),
+      ],
+    });
+    const { rt, store } = await setup(llm);
+    const res = await playTurn(rt, "s1", "I look around");
+    expect(res.outcome).toBe("repaired");
+    expect(statsOf(await store.loadSave("s1")).values.cash).toBe(15);
+  });
+
   it("marks a new name in bold for the next turn and leaves a known name plain", async () => {
     const llm = scripted({
       turn: [
@@ -411,6 +430,10 @@ describe("openBook", () => {
     const state = await store.loadSave("s1");
     expect(state.turn).toBe(1);
     expect(state.entities.cerys).toBeUndefined();
+    expect(state.entities["1"]?.id).toBe("1");
+    expect(state.entities["3"]?.id).toBe("3");
+    expect(state.entities["1"]?.name).not.toBe("Dai");
+    expect(state.entities["3"]?.name).not.toBe("Cerys");
     expect(state.entities["rowan-hale"]?.tags).toContain("unmet");
     expect(state.entities["sam-okonkwo"]).toBeTruthy();
     expect(state.entities["priya-shah"]).toBeTruthy();
@@ -430,11 +453,13 @@ describe("openBook", () => {
     const state = await store.loadSave("s1");
     expect(state.turn).toBe(1);
     expect(state.entities.cerys).toBeUndefined();
+    expect(state.entities["1"]?.location).toBe("player-room");
+    expect(state.threads.some((thread) => thread.entities.includes("1"))).toBe(true);
     const named = names.filter((name) => opened?.narration.includes(name));
     expect(named).toHaveLength(1);
-    const unmet = Object.values(state.entities).filter((entity) => entity.tags.includes("unmet"));
-    expect(unmet.length).toBeGreaterThan(0);
-    for (const person of unmet) expect(opened?.narration).not.toContain(person.name);
+    expect(named[0]).toBe(state.entities["1"]?.name);
+    const others = Object.values(state.entities).filter((entity) => entity.type === "person" && entity.id !== "1" && entity.id !== "player");
+    for (const person of others) expect(opened?.narration).not.toContain(person.name);
 
     await newGame(rt, "other-house");
     const other = await openBook(rt, "other-house");
@@ -444,15 +469,16 @@ describe("openBook", () => {
   });
 
   it("keeps a pinned character and still deals someone new", async () => {
-    const pinned = ConfigSchema.parse({ ...config, opening: { ...config.opening, pinned: ["cerys"] } });
+    const pinned = ConfigSchema.parse({ ...config, opening: { ...config.opening, pinned: ["3"] } });
     const llm = scripted({ opening: ["nope"], rewrite_repair: ["still nope"] });
     const { rt, store } = await setup(llm, { config: pinned });
     const opened = await openBook(rt, "s1");
     const state = await store.loadSave("s1");
-    expect(state.entities.cerys?.name).toBe("Cerys");
-    expect(state.entities.dai).toBeUndefined();
+    expect(state.entities["3"]?.name).toBe("Cerys");
+    expect(state.entities["1"]?.name).not.toBe("Dai");
     expect(opened?.narration).not.toContain("Dai");
-    expect(Object.values(state.entities).some((entity) => entity.id !== "cerys" && entity.id !== "player" && entity.type === "person")).toBe(true);
+    expect(opened?.narration).not.toContain("Cerys");
+    expect(Object.values(state.entities).some((entity) => entity.id !== "3" && entity.id !== "player" && entity.type === "person")).toBe(true);
   });
 
   it("refuses an opening that names someone the player has not met, and still starts the chapter", async () => {
@@ -468,7 +494,7 @@ describe("openBook", () => {
     const { rt, store } = await setup(llm);
     const opened = await openBook(rt, "s1");
     expect(opened?.narration).not.toContain("Rowan");
-    expect((await store.loadSave("s1")).entities.cerys).toBeUndefined();
+    expect((await store.loadSave("s1")).entities["3"]?.name).not.toBe("Cerys");
     expect((await store.loadSave("s1")).turn).toBe(1);
   });
 
@@ -477,6 +503,6 @@ describe("openBook", () => {
     const { rt, store } = await setup(new MockProvider(), { config: rest });
     expect(await openBook(rt, "s1")).toBeNull();
     expect((await store.loadSave("s1")).turn).toBe(0);
-    expect((await store.loadSave("s1")).entities.cerys).toBeTruthy();
+    expect((await store.loadSave("s1")).entities["3"]?.name).toBe("Cerys");
   });
 });

@@ -9,6 +9,8 @@ export const OpSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("clock.advance"), minutes: z.number().int().min(0) }),
   // A deliberate long skip (sleep, travel, waiting). Capped by `time.max_skip_minutes`, not `max_per_turn`.
   z.object({ op: z.literal("clock.skip"), minutes: z.number().int().min(1), reason: z.string().min(1) }),
+  /** An exact local time, including one already past. A time-travel book uses this to go backward. */
+  z.object({ op: z.literal("clock.set"), now: LocalDateTimeSchema }),
   z.object({
     op: z.literal("entity.create"),
     id: IdSchema,

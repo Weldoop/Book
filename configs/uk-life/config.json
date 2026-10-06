@@ -202,7 +202,7 @@
         "text": "Bin night. The wheelie bins need to be at the kerb before the Monday morning collection, and the recycling is in the wrong bin again.",
         "entities": [
           "shared-house",
-          "dai"
+          "1"
         ]
       },
       {
@@ -556,7 +556,7 @@
         ]
       },
       {
-        "id": "dai",
+        "id": "1",
         "type": "person",
         "name": "Dai",
         "location": "shared-house",
@@ -568,7 +568,7 @@
         ]
       },
       {
-        "id": "marcus",
+        "id": "2",
         "type": "person",
         "name": "Marcus",
         "location": "shared-house",
@@ -580,7 +580,7 @@
         ]
       },
       {
-        "id": "cerys",
+        "id": "3",
         "type": "person",
         "name": "Cerys",
         "location": "kitchen",
@@ -592,7 +592,7 @@
         ]
       },
       {
-        "id": "mrs-pugh",
+        "id": "4",
         "type": "person",
         "name": "Mrs Pugh",
         "aliases": [
@@ -703,22 +703,22 @@
     "relationships": [
       {
         "a": "player",
-        "b": "dai",
+        "b": "1",
         "value": 40
       },
       {
         "a": "player",
-        "b": "marcus",
+        "b": "2",
         "value": 35
       },
       {
         "a": "player",
-        "b": "cerys",
+        "b": "3",
         "value": 30
       },
       {
         "a": "player",
-        "b": "mrs-pugh",
+        "b": "4",
         "value": 10
       }
     ]

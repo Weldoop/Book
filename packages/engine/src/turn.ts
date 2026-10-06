@@ -10,7 +10,7 @@ import {
   type TurnKind,
   type Violation,
 } from "@book/schema";
-import { consistencyViolations } from "./consistency.ts";
+import { consistencyViolations, materializeAt } from "./consistency.ts";
 import { selectHighlights } from "./highlights.ts";
 import { syncPresence } from "./core.ts";
 import { forgetMemories } from "./memory.ts";
@@ -109,6 +109,7 @@ export function validateDraft(
   draft: TurnDraft,
   input = "",
 ): ValidationResult {
+  materializeAt(state, config, draft);
   const processed = processOps(withThreadContact(state, config, input), config, modules, draft.delta);
   const warnings: string[] = [];
   const words = draft.narration.trim().split(/\s+/).length;
@@ -233,6 +234,7 @@ function withThreadContact(state: State, config: Config, input: string): State {
 
 /** Applies a draft that has already passed validation. Pure: returns the next state. */
 export function applyDraft(state: State, config: Config, modules: Module[], draft: TurnDraft, ctx: ApplyContext): State {
+  materializeAt(state, config, draft);
   const processed = processOps(withThreadContact(state, config, ctx.input), config, modules, draft.delta);
   if (processed.violations.length > 0) {
     throw new Error("applyDraft called with a draft that fails validation");
@@ -240,7 +242,7 @@ export function applyDraft(state: State, config: Config, modules: Module[], draf
   let next = processed.state;
   const turn = state.turn + 1;
 
-  if (processed.skipped === 0 && processed.minutes < config.time.min_per_action) {
+  if (!processed.anchored && processed.skipped === 0 && processed.minutes < config.time.min_per_action) {
     next = { ...next, clock: { now: addMinutes(next.clock.now, config.time.min_per_action - processed.minutes) } };
   }
 

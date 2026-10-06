@@ -62,6 +62,7 @@ export const coreModule: Module = {
   ops: [
     "clock.advance",
     "clock.skip",
+    "clock.set",
     "entity.create",
     "entity.move",
     "entity.fact.add",
@@ -192,6 +193,9 @@ export const coreModule: Module = {
         break;
       case "clock.skip":
         s.clock.now = addMinutes(s.clock.now, op.minutes);
+        break;
+      case "clock.set":
+        s.clock.now = op.now;
         break;
       case "entity.create":
         s.entities[op.id] = {

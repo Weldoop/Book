@@ -992,10 +992,16 @@ engine, and its model-authored status line had already drifted within a single s
     opening picks three from the book's pool. A closed scene prints a chapter title. Up to four new
     names are bold for the player and marked for the next turn. See ADR 0020.
 
+56. The GM sets `at` to the place the player is in. The engine creates that place when it is new and
+    moves the player on that turn. A travel verb in the narration is not how a move is found.
+    `clock.set` may land earlier than now. A narration that says something cost nothing does not
+    keep a charge. Uplands people are slots `1` to `4`; each new story gives them new names, and
+    events keep the slot id. A pinned person keeps the book's name. See ADR 0021.
+
 ### Build status (6 Oct 2026)
 
 Phase 0 (contracts) and Phase 1 (core build) are implemented, plus the fixes from the live sessions
-and the ADR 0005, 0006, 0007, 0008, 0009, 0010, 0011, 0012, 0013, 0014, 0015, 0016, 0017, 0018, 0019 and 0020 changes; 425 tests pass.
+and the ADR 0005, 0006, 0007, 0008, 0009, 0010, 0011, 0012, 0013, 0014, 0015, 0016, 0017, 0018, 0019, 0020 and 0021 changes; 426 tests pass.
 
 | Area | State |
 |---|---|
@@ -1021,6 +1027,7 @@ and the ADR 0005, 0006, 0007, 0008, 0009, 0010, 0011, 0012, 0013, 0014, 0015, 00
 | Shorter contract, room matches the sentence (ADR 0018) | done; exercised with the mock, not yet against a real model |
 | Missing beat filled in code, truer place and item checks (ADR 0019) | done; exercised with the mock, not yet against a real model |
 | Place, clock, repair charges, opening scene, chapter title, bold names (ADR 0020) | done; exercised with the mock, not yet against a real model |
+| Place from `at`, a clock that can go back, no charge when it cost nothing, cast slots (ADR 0021) | done; exercised with the mock, not yet against a real model |
 | Real-model benchmark (Phase 2) | three short live sessions played; full golden-session benchmark not yet run |
 | `need` / attention-miss handling, delta-first experiment results | not yet implemented / not yet measured |
 | Nuxt UI, Supabase, hosted trial, wizard | later phases |

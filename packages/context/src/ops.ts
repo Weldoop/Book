@@ -10,6 +10,7 @@ const WHEN = "YYYY-MM-DDTHH:mm";
 /** Hand-written signatures. Field names must match OpSchema in packages/schema/src/delta.ts. */
 export const OP_FIELDS: Record<OpName, readonly Field[]> = {
   "clock.advance": [["minutes", "int>=0"]],
+  "clock.set": [["now", WHEN]],
   "clock.skip": [
     ["minutes", "int>=1"],
     ["reason", "str"],
@@ -80,6 +81,7 @@ export const OP_FIELDS: Record<OpName, readonly Field[]> = {
 
 export const CORE_OPS: OpName[] = [
   "clock.advance",
+  "clock.set",
   "entity.create",
   "entity.move",
   "entity.fact.add",

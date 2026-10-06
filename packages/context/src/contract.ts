@@ -56,7 +56,7 @@ const HARSHNESS: Record<string, string> = {
 /** Travel sentences from this book's own words. A book with no journeys and no local steps adds none. */
 export function travelLines(config: Config): string[] {
   const lines = [
-    '- If the narration stops in a place, entity.move and set "at". entity.create it first when the save has no such place. Tag it "unvisited" until entered. A person is not a destination. Town, outside, upstairs, downstairs, inside, and home are not, unless the sheet names that place.',
+    '- Set "at" to the player\'s place id. The engine creates it if new and moves them this turn. A person, town, outside, upstairs, downstairs, inside, or home is not a place unless the sheet names it.',
   ];
   const journeys = config.travel.journeys;
   const local = config.travel.local;
@@ -89,7 +89,7 @@ export function fateText(config: Config): string {
 
 export function timeText(config: Config): string {
   const lines = [
-    `- Elapsed time is clock.advance (minutes) or clock.skip with a reason, up to ${config.time.max_skip_minutes} minutes. A stated time is where the minutes land. Do not skip past something urgent.`,
+    `- Elapsed time is clock.advance (minutes) or clock.skip with a reason, up to ${config.time.max_skip_minutes} minutes. A stated time is the clock. clock.set may be earlier. Do not skip past something urgent.`,
   ];
   if (config.time.max_skip_minutes === 0) lines.push("- This character does not skip time. Play the hours through.");
   if (config.time.rest_note) lines.push(`- Rest in this world: ${config.time.rest_note}`);
@@ -143,7 +143,7 @@ function purchaseLines(config: Config, modules: Module[]): string[] {
   return [
     "- Gear is kept. Goods are used in the scene. Copy the id. A bag, a receipt, or an envelope is narration. Do not create it and do not add it.",
     "- A new thing the save must remember is item.create this turn (keeps true for gear, a price when sold), then inventory.add. A good eaten, drunk, handed over, or set down is inventory.remove that turn. Gear stays until it is lost.",
-    `- A purchase is inventory.add of that one catalog item to "${config.player_id}" and stat.add of its price as a negative amount on "${key}". An item on that line is already bought. Charge the figure the narration states, a whole unit, or narrate the refusal.`,
+    `- A purchase is inventory.add of that one catalog item to "${config.player_id}" and stat.add of its price as a negative amount on "${key}". An item on that line is already bought. Charge the stated figure, a whole unit, or narrate the refusal. Nothing is no stat.add.`,
   ];
 }
 
