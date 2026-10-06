@@ -137,6 +137,8 @@ The validator still does not invent ops from prose. If the narration buys a cata
 
 That last rule exists because a model that has just seen six turns of “you are in the kitchen” will keep you in the kitchen even after a committed move. The save is the book; the window is colour.
 
+Before validation, a deterministic tidy pass (ADR 0022) fixes what needs no judgement: an entity id the model wrote for someone already in the save is mapped to that slot, a new person is created before the ops that name them, a thread kind the schema does not know becomes a goal, an op about a good the book never tracked is dropped, and `at` is filled from the one place the player is put in when the GM left it out. The pass never invents a change from a verb; it saves the cheap repair call for cases that need language.
+
 ### Context stays flat on purpose
 
 Each part of the prompt has a hard token cap. Over-budget parts are trimmed by importance, then recency. The player’s input is never trimmed. Total target is under 5k, independent of how long the game has run or how big the world is.
@@ -154,6 +156,8 @@ From hot to cold: private GM notes → verbatim window → per-turn beats → ch
 Compaction is how long-term memory in the save gets written. There is no separate memory service. It fires when the GM sets `scene_ended` and enough beats have accumulated, with a beat-count backstop if a scene never closes. On a forced mid-scene compact, the live scene stays in the window: forgetting who walked in two turns ago is the failure a player actually feels.
 
 The archivist gets a code-written state block, not a licence to copy live balances or unused nicknames. A failed chapter write is held for a few turns rather than retried every turn. Notes never enter this pipeline, so a secret the GM told only itself cannot be laundered into canon.
+
+Figures the archivist would lose are kept by code: each chapter summary carries the clock range it covers, and the stats module keeps a dated log of the last ten money movements in the state snapshot. Energy drains with the clock (per hour awake, restored per hour of `clock.skip`) unless the GM has already priced the stretch, so the GM is not asked to remember to tire the player.
 
 A person’s facts are their memory. The GM writes one short fact per witness, on the turn they saw, heard, or were told something that would change a later scene. Importance 1 lapses after a day, 2 after a week, 3 (a fight) stays. A turn that *says* they will remember, and stores nothing, still stands — next time, they do not remember. The engine does not invent the fact from the prose.
 
@@ -200,9 +204,9 @@ pnpm book play --config configs/uk-life/config.json --provider mock
 
 ## What is done, and what is not
 
-Phase 0 (contracts) and Phase 1 (core build) are implemented, including the playtest-driven ADRs through 0015. Tests run on the mock provider.
+Phase 0 (contracts) and Phase 1 (core build) are implemented, including the playtest-driven ADRs through 0022. Tests run on the mock provider.
 
-Measured on the mock golden replay, per-turn input stays flat (a little over 3k after the later contract additions, still under the 5k target). Mock replies are short, so the baseline’s growth is understated; the real comparison is the Phase 2 benchmark on a live model, which has not been run in full. Short live sessions drove most of the later ADRs.
+Measured on the mock golden replay, per-turn input stays flat (a little over 3k after the later contract additions, still under the 5k target). Live Haiku sessions of 34 and 44 turns held at about 4.9k input tokens a turn, flat across chapter writes, at roughly $0.008 a turn; about a quarter of turns needed a cheap repair call and one in thirty was rolled back. Mock replies are short, so the baseline’s growth is understated; the real comparison is the Phase 2 benchmark on a live model, which has not been run in full. Short live sessions drove most of the later ADRs.
 
 Not in this repository yet: `need` / attention-miss handling as a second call, a measured delta-first streaming experiment, the Nuxt UI, Supabase, hosted trial, and the creator wizard. The wizard, when it exists, is meant to emit this config — prose cards over the string-valued parts, countable parts staying structured — not to invent a new kind of stat.
 
