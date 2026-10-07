@@ -174,6 +174,35 @@ export function weekdayMismatch(text: string, due: string | undefined, now?: str
   return `the thread names ${label} but ${due.slice(0, 10)} is a ${title(day)}. Set due to ${when}.`;
 }
 
+/**
+ * The due date a thread that names one weekday should carry: the next date on that weekday, at the
+ * time of day the GM wrote. Nothing when the text names no weekday, two weekdays, or already fits.
+ */
+export function weekdayDue(text: string, due: string | undefined, now: string): string | undefined {
+  if (!due) return undefined;
+  const named = namedWeekdays(text);
+  const weekday = named[0];
+  if (named.length !== 1 || weekday === undefined) return undefined;
+  const actual = weekdayIndex(due);
+  if (actual < 0 || actual === weekday) return undefined;
+  const date = nextDateOn(now, weekday);
+  return date ? `${date}${due.slice(10)}` : undefined;
+}
+
+/** "Sat 3 Oct is 2026-10-03, Sun 4 Oct is 2026-10-04, ..." for the week ahead, so a named day lands on its date. */
+export function weekAheadLine(now: string): string {
+  const [year, month, day] = now.slice(0, 10).split("-").map(Number);
+  if (!year || !month || !day) return "";
+  const parts: string[] = [];
+  for (let add = 0; add < 7; add++) {
+    const d = new Date(Date.UTC(year, month - 1, day + add));
+    const name = WEEKDAYS[d.getUTCDay()] ?? "";
+    const label = add === 0 ? "today" : add === 1 ? "tomorrow" : name.slice(0, 1).toUpperCase() + name.slice(1);
+    parts.push(`${label} ${d.toISOString().slice(0, 10)}`);
+  }
+  return `Dates: ${parts.join(", ")}.`;
+}
+
 function contentWords(text: string): Set<string> {
   const out = new Set<string>();
   for (const raw of text.toLowerCase().split(/[^a-z0-9]+/)) {

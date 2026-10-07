@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ConfigSchema, type Config, type Module, type Op, type State, type TurnDraft, type Violation } from "@book/schema";
-import { applyDraft, coreModule, createInitialState, processOps, validateDraft } from "../src/index.ts";
+import { applyDraft, coreModule, createInitialState, processOps, validateDraft, weekAheadLine } from "../src/index.ts";
 
 function config(): Config {
   return ConfigSchema.parse({
@@ -1038,6 +1038,21 @@ describe("duplicate threads", () => {
       { op: "thread.open", kind: "commitment", text: "The inspection is on Monday morning", due: "2026-10-05T10:00" },
     ]);
     expect(monday.violations).toEqual([]);
+  });
+
+  it("moves a named weekday onto its date before validation, and leaves two weekdays to the repair", () => {
+    const d = draft({
+      delta: [{ op: "thread.open", kind: "commitment", text: "The inspection is on Monday morning", due: "2026-10-07T10:00" }],
+    });
+    expect(validateDraft(fresh(), config(), [coreModule], d).violations).toEqual([]);
+    expect((d.delta[0] as { due: string }).due).toBe("2026-10-05T10:00");
+    const two = draft({
+      delta: [{ op: "thread.open", kind: "commitment", text: "Shifts Monday and Wednesday", due: "2026-10-09T17:00" }],
+    });
+    expect(validateDraft(fresh(), config(), [coreModule], two).violations.map((v) => v.code)).toEqual(["weekday_mismatch"]);
+    expect(weekAheadLine("2026-10-03T09:21")).toBe(
+      "Dates: today 2026-10-03, tomorrow 2026-10-04, Monday 2026-10-05, Tuesday 2026-10-06, Wednesday 2026-10-07, Thursday 2026-10-08, Friday 2026-10-09.",
+    );
   });
 
   it("does not inject a due-event thread that repeats an open one", () => {

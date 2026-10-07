@@ -1,7 +1,8 @@
 import type { Config, Entity, State, TurnDraft } from "@book/schema";
 import { catalogItems } from "./catalog.ts";
 import { playerLocation } from "./core.ts";
-import { duplicateOpenThread } from "./threads.ts";
+import { duplicateOpenThread, weekdayDue } from "./threads.ts";
+import { correctRelativeTimes } from "./reltime.ts";
 
 type Rec = Record<string, unknown>;
 
@@ -123,6 +124,7 @@ function lenientThreads(state: State, draft: TurnDraft): void {
       }
       if (rec.scale !== undefined && (typeof rec.scale !== "string" || !THREAD_SCALES.has(rec.scale))) delete rec.scale;
       if (typeof rec.text === "string") {
+        if (typeof rec.due === "string") rec.due = weekdayDue(rec.text, rec.due, state.clock.now) ?? rec.due;
         const due = typeof rec.due === "string" ? rec.due : undefined;
         const dup = duplicateOpenThread(state.threads, rec.text, due, state.clock.now);
         if (dup) {
@@ -179,6 +181,9 @@ function softenItems(state: State, config: Config, draft: TurnDraft): void {
 
 const LOCATIVE = String.raw`\b(?:in|into|inside|at|to|through to|down to|up to|back to|out to|over to|across to|round to)\s+(?:the\s+|your\s+|my\s+|his\s+|her\s+|their\s+|our\s+)?`;
 
+/** "You head inside", "you go downstairs", "you slip back home": a bare alias after a verb of going. */
+const GOING = String.raw`\b(?:head|heads|go|goes|get|gets|step|steps|slip|slips|walk|walks|come|comes|climb|climbs|wander|wanders|hurry|hurries|run|runs|drift|drifts|retreat|retreats|duck|ducks|make your way|trudge|trudges|pad|pads)\s+(?:back\s+|straight\s+|on\s+)?`;
+
 /** A sentence about a plan, a listing, a message, or an earlier day is not where the player stands. */
 const ELSEWHERE =
   /\b(?:tomorrow|tonight|later|next|last|yesterday|earlier|ago|went|were|was|had|did|shift|job|listed|advert|text|message|about|remember|used to|mention|plan|booked|interview|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i;
@@ -195,7 +200,10 @@ function placeNamed(narration: string, place: Entity): boolean {
   const sentences = narration.split(/(?<=[.!?])\s+|\n+/);
   return sentences.some((sentence) => {
     if (!/\byou\b/i.test(sentence) || ELSEWHERE.test(sentence)) return false;
-    return names.some((name) => new RegExp(`${LOCATIVE}${escapeRegExp(name).replace(/\s+/g, "\\s+")}\\b`, "i").test(sentence));
+    return names.some((name) => {
+      const word = escapeRegExp(name).replace(/\s+/g, "\\s+");
+      return new RegExp(`(?:${LOCATIVE}|${GOING})${word}\\b`, "i").test(sentence);
+    });
   });
 }
 
@@ -231,10 +239,12 @@ export function inferAt(state: State, config: Config, draft: TurnDraft): void {
  * Deterministic tidying of a draft before validation. Nothing here reads a verb to invent a change:
  * it maps a name the model wrote for someone already in the save, fills a schema default,
  * drops an op about a good the save never tracked, and reads the place the sentence sits in.
+ * The one edit to prose is a distance to a dated thread ("five hours away") corrected by the clock.
  */
 export function normalizeDraft(state: State, config: Config, draft: TurnDraft): void {
   remapEntities(state, draft);
   lenientThreads(state, draft);
   softenItems(state, config, draft);
   inferAt(state, config, draft);
+  correctRelativeTimes(state, draft);
 }

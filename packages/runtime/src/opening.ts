@@ -1,4 +1,4 @@
-import { addMinutes, applyDraft, validateDraft } from "@book/engine";
+import { addMinutes, applyDraft, validateDraft, weekAheadLine } from "@book/engine";
 import { buildRepairContext, buildTurnContext } from "@book/context";
 import { renderView } from "@book/modules";
 import type { Attempt, Config, Module, State, TurnDraft, TurnRecord, Violation } from "@book/schema";
@@ -131,6 +131,7 @@ function openingInstruction(config: Config, state: State): string {
     'Open 1 or 2 threads with thread.open and set scale to "major". These are the long matters of the first chapter. Put the people and places each one turns on in entities, using the id already on them. At least one is due in the future. Do not make the world\'s calendar the only goal.',
     "The narration is the player's first moment. Do not decide their feelings, words or actions, and do not list the cast.",
     "Other people know only what they have seen, heard, or been told.",
+    weekAheadLine(state.clock.now),
     `The player character id is "${config.player_id}".`,
   ].join(" ");
 }
