@@ -133,7 +133,7 @@ export const statsModule: Module = {
   },
 
   promptFragment: () =>
-    "STATS: The engine owns all numbers. Spend or gain with stat.add (negative amount to spend, include a short reason). The key is the id in brackets in STATE, never the label. Never state a stat value that is not in STATE. Each currency stat is its own balance: notes come off cash, a card comes off bank, when the book has those stats. Do not move money by changing how many wallets the player carries. A currency stat can never go below zero: if the player cannot afford one unit, narrate that they cannot and do not take a smaller sum.",
+    "STATS: stat.add with a negative amount spends; give a short reason. A currency never goes below zero: if they cannot afford one unit, narrate that and take nothing.",
 
   focus: () => [],
 
