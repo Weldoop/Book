@@ -18,8 +18,13 @@ const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", 
 
 const QTY = String.raw`(?:${Object.keys(SMALL).join("|")}|\d{1,2})`;
 const UNIT = String.raw`(minutes?|hours?|days?)`;
-/** "five hours away", "ten minutes left", "two days to go", "three hours from now". */
-const DISTANCE = new RegExp(String.raw`\b(${QTY})\s+${UNIT}\s+(?=(?:away|off|left|to go|from now)\b)`, "gi");
+/** A count of time that is not a duration spent: "for three hours", "two hours ago", "an hour's walk" are left alone. */
+const COUNT = new RegExp(
+  String.raw`(?<!\b(?:for|every|spent|spend|took|takes|take|last|another|after|about an?)\s)\b(${QTY})\s+${UNIT}\b(?!\s*(?:ago|earlier|late|later|of|'s|long|straight|solid|each|or so\s+ago))`,
+  "gi",
+);
+/** The sentence measures time to something: "away", "left", "until", "gives you", "to do something". */
+const DISTANCE_CUE = /\b(?:away|off|left|to go|from now|until|till|before|gives? (?:you|us|me)|you(?:'ve)? (?:got|have)|we(?:'ve)? (?:got|have)|leaves (?:you|us)|to (?:do|get|sort|clear|shift|fix|make|find|save|spare|kill))\b/i;
 /** "in a few hours", "in an hour", "in half an hour", "in a couple of hours", "in ten minutes" (as a forecast, not a plan). */
 const IN_SOME = new RegExp(
   String.raw`\bin\s+(?:(a few|a couple of|several|half an|${QTY})\s+${UNIT}|(an hour or two|a day or two))\b(?!\s+(?:ago|earlier))`,
@@ -74,7 +79,7 @@ function sentenceBounds(text: string, index: number): [number, number] {
   return [start, rest < 0 ? text.length : index + rest];
 }
 
-/** The one open dated thread this sentence is about, or nothing. */
+/** The one open dated thread this stretch of text is about, or nothing. */
 function threadFor(sentence: string, threads: readonly Thread[]): Thread | undefined {
   const hits = threads.filter((t) => t.status === "open" && t.due && sharedContentWords(sentence, t.text) >= 2);
   return hits.length === 1 ? hits[0] : undefined;
@@ -84,6 +89,11 @@ function toMinutes(qty: string, unit: string): number {
   const n = SMALL[qty.toLowerCase()] ?? Number(qty);
   const u = unit.toLowerCase();
   return u.startsWith("minute") ? n : u.startsWith("hour") ? n * 60 : n * 24 * 60;
+}
+
+/** Within three quarters of an hour, or a fifth of the stated span, is the model rounding, not wrong. */
+function nearEnough(actual: number, stated: number): boolean {
+  return Math.abs(actual - stated) <= Math.max(45, stated * 0.2);
 }
 
 function count(n: number): string {
@@ -136,7 +146,9 @@ export function correctRelativeTimes(state: State, draft: TurnDraft): string[] {
   const consider = (index: number, length: number, replace: (thread: Thread, minutes: number) => string | null) => {
     if (insideQuotes(narration, index)) return;
     const [s, e] = sentenceBounds(narration, index);
-    const thread = threadFor(narration.slice(s, e), state.threads);
+    // "The inspection's Monday at ten. That gives you 38 hours": the matter is often in the sentence before.
+    const [ps] = s > 0 ? sentenceBounds(narration, s - 1) : [s];
+    const thread = threadFor(narration.slice(ps, e), state.threads);
     if (!thread?.due) return;
     const minutes = diffMinutes(thread.due, now);
     if (minutes <= 0) return;
@@ -144,14 +156,19 @@ export function correctRelativeTimes(state: State, draft: TurnDraft): string[] {
     if (text !== null) patches.push({ start: index, end: index + length, text });
   };
 
-  for (const m of narration.matchAll(DISTANCE)) {
+  for (const m of narration.matchAll(COUNT)) {
     if (m.index === undefined) continue;
     const qty = m[1] ?? "";
     const unit = m[2] ?? "";
-    consider(m.index, m[0].length, (_thread, minutes) => {
+    const [s, e] = sentenceBounds(narration, m.index);
+    if (!DISTANCE_CUE.test(narration.slice(s, e))) continue;
+    // "roughly 38 hours" is replaced whole, so the result is not "roughly about two days".
+    const hedge = /\b(?:roughly|about|around|nearly|almost|some|just under|just over)\s+$/i.exec(narration.slice(0, m.index));
+    const start = hedge ? m.index - hedge[0].length : m.index;
+    consider(start, m.index + m[0].length - start, (_thread, minutes) => {
       const stated = toMinutes(qty, unit);
-      if (Math.abs(minutes - stated) <= Math.max(45, stated * 0.35)) return null;
-      return `${spanWords(minutes)} `;
+      if (nearEnough(minutes, stated)) return null;
+      return spanWords(minutes);
     });
   }
   for (const m of narration.matchAll(IN_SOME)) {
@@ -163,8 +180,7 @@ export function correctRelativeTimes(state: State, draft: TurnDraft): string[] {
       if (range) {
         if (minutes >= range[0] && minutes <= range[1]) return null;
       } else {
-        const stated = toMinutes(vague, unit);
-        if (Math.abs(minutes - stated) <= Math.max(45, stated * 0.35)) return null;
+        if (nearEnough(minutes, toMinutes(vague, unit))) return null;
       }
       return whenWords(now, thread.due ?? now, minutes);
     });

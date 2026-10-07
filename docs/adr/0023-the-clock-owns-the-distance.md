@@ -17,12 +17,15 @@ The owner also asked whether the contract could be generated from the config to 
 
 ### A distance to a deadline is the clock's to state
 
-A sentence that shares two content words with exactly one open thread that has a due date, and
-is not inside quotation marks, has its relative time checked against that due date measured from
-the clock the delta lands on. "Five hours away" that should be ten becomes "about ten hours away".
-"In a few hours" that is tomorrow becomes "tomorrow"; "this afternoon" that is Monday becomes
-"on Monday". A count within 45 minutes or 35 percent stands. A passed deadline, a sentence about
-no thread or two threads, and quoted speech are left alone.
+A sentence that shares two content words (with the sentence before it) with exactly one open
+thread that has a due date, and is not inside quotation marks, has its relative time checked
+against that due date measured from the clock the delta lands on. "Five hours away" that should
+be ten becomes "about ten hours away"; "gives you roughly 38 hours" that is two days becomes
+"gives you about two days". "In a few hours" that is tomorrow becomes "tomorrow"; "this afternoon"
+that is Monday becomes "on Monday". A count is read only in a sentence that measures time to
+something (away, left, until, gives you, to do), never a duration spent ("for three hours", "two
+hours ago"). A count within 45 minutes or a fifth of itself stands. A passed deadline, a sentence
+about no thread or two threads, and quoted speech are left alone.
 
 This is the one place the engine edits prose. The alternative was a strong rewrite call for a
 number, and the number is code's. It runs in the tidy pass, before validation, so the window,
@@ -36,6 +39,14 @@ common room, lounge) and gives the house the aliases home, inside, indoors, down
 and the front door; the bedroom gains upstairs. The back garden is no longer inside the house, so
 coming in from it is a move. The contract line stands: these are not places unless the sheet
 names them, and now the sheet does.
+
+### A round trip ends where it started
+
+"Go out to the garden, then head back inside" and "walk to the corner shop, then walk home" asked
+the validator for the garden and the shop, and a narration that correctly came home was rolled
+back or rewritten. A return leg after the last destination (a verb of going, then back, home,
+inside, or indoors) is the end of the trip. Home and inside are checked against the place the book
+names for them, and anywhere inside that place counts; a bare "back" is not checked.
 
 ### A named weekday lands on its date before validation
 
@@ -78,6 +89,12 @@ priced good is in scope would save 100 to 200 tokens on quiet turns at no cache 
 which caches nothing under 4,096 tokens, but it is not measured and is left for the benchmark.
 
 ## Consequences
+
+A twelve-turn smoke session on Haiku after these rules: the opening passed on the first call for
+the first time (every earlier session repaired its weekday), both round trips that rolled back
+or were rewritten on the old code passed clean on the new, "upstairs" and "the front room" moved
+the player, and Haiku wrote "roughly 38 hours" to a Monday 10:00 inspection on a Saturday at 09:53;
+that sentence is now corrected to "about two days".
 
 A wrong distance to a deadline is corrected without a call. Inside and home move the player.
 The opening no longer spends a repair on the calendar. The prefix is 84 tokens shorter. At the

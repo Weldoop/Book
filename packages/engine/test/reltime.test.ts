@@ -53,6 +53,16 @@ describe("relative times against dated threads", () => {
     expect(notes).toEqual(['"five hours" -> "about ten hours"']);
   });
 
+  it("reads 'gives you 38 hours' with the matter in the sentence before, and leaves a duration spent alone", () => {
+    const s = state(inspection);
+    s.clock.now = "2026-10-03T09:53";
+    const d = draft("The inspection of the house is Monday at ten. That gives you roughly 38 hours to do something about the garden. You spent two hours on it last week.");
+    correctRelativeTimes(s, d);
+    expect(d.narration).toBe(
+      "The inspection of the house is Monday at ten. That gives you about two days to do something about the garden. You spent two hours on it last week.",
+    );
+  });
+
   it("measures from the clock the delta lands on", () => {
     const d = draft("The shift at Derek's corner shop is two hours away.", [{ op: "clock.advance", minutes: 480 }]);
     correctRelativeTimes(state(shift), d);
