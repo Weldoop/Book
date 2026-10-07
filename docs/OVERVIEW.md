@@ -137,7 +137,7 @@ The validator still does not invent ops from prose. If the narration buys a cata
 
 That last rule exists because a model that has just seen six turns of “you are in the kitchen” will keep you in the kitchen even after a committed move. The save is the book; the window is colour.
 
-Before validation, a deterministic tidy pass (ADR 0022) fixes what needs no judgement: an entity id the model wrote for someone already in the save is mapped to that slot, a new person is created before the ops that name them, a thread kind the schema does not know becomes a goal, an op about a good the book never tracked is dropped, and `at` is filled from the one place the player is put in when the GM left it out. The pass never invents a change from a verb; it saves the cheap repair call for cases that need language.
+Before validation, a deterministic tidy pass (ADR 0022) fixes what needs no judgement: an entity id the model wrote for someone already in the save is mapped to that slot, a new person is created before the ops that name them, a thread kind the schema does not know becomes a goal, an op about a good the book never tracked is dropped, and `at` is filled from the one place the player is put in when the GM left it out. The pass never invents a change from a verb; it saves the cheap repair call for cases that need language. Its one edit to prose is a distance to a dated thread ("five hours away", "in a few hours") corrected against the clock (ADR 0023).
 
 ### Context stays flat on purpose
 
@@ -204,7 +204,7 @@ pnpm book play --config configs/uk-life/config.json --provider mock
 
 ## What is done, and what is not
 
-Phase 0 (contracts) and Phase 1 (core build) are implemented, including the playtest-driven ADRs through 0022. Tests run on the mock provider.
+Phase 0 (contracts) and Phase 1 (core build) are implemented, including the playtest-driven ADRs through 0023. Tests run on the mock provider.
 
 Measured on the mock golden replay, per-turn input stays flat (a little over 3k after the later contract additions, still under the 5k target). Live Haiku sessions of 34 and 44 turns held at about 4.9k input tokens a turn, flat across chapter writes, at roughly $0.008 a turn; about a quarter of turns needed a cheap repair call and one in thirty was rolled back. Mock replies are short, so the baseline’s growth is understated; the real comparison is the Phase 2 benchmark on a live model, which has not been run in full. Short live sessions drove most of the later ADRs.
 

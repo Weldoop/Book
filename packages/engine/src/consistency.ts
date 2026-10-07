@@ -179,6 +179,7 @@ function verbPattern(verbs: string[], prepositions: string, span: number): RegEx
 
 interface DestHit {
   index: number;
+  end: number;
   dest: string;
 }
 
@@ -190,7 +191,7 @@ function destinationHits(input: string, config: Config): DestHit[] {
     for (const match of text.matchAll(pattern)) {
       const dest = cleanDestination(match[1] ?? "");
       if (match.index === undefined || isProposal(text, match.index)) continue;
-      if (isPlaceDestination(dest)) hits.push({ index: match.index, dest });
+      if (isPlaceDestination(dest)) hits.push({ index: match.index, end: match.index + match[0].length, dest });
     }
   };
   const travel = config.travel;
@@ -271,16 +272,53 @@ function notADestination(state: State, dest: string): boolean {
   return VAGUE_DEST.has(norm(dest)) && !knownPlace(state, dest);
 }
 
-function checkTravel(before: State, after: State, config: Config, draft: TurnDraft, input: string, applied: Op[]): Violation[] {
-  const stops = new Set<string>();
-  const asked = tripDestination(input, config);
-  if (asked) stops.add(asked);
-  const out: Violation[] = [];
-  for (const dest of stops) {
-    const missed = missedStop(before, after, config, draft, applied, dest, dest === asked);
-    if (missed) out.push(missed);
+/** "then head back inside", "and walk home", "come back": the trip ends where it started, not at the outing. */
+const RETURN_LEG =
+  /\b(?:head|heads|go|goes|get|gets|walk|walks|come|comes|run|runs|slip|slips|return|returns|make my way|make your way)\s+(?:straight\s+)?(?:back(?:\s+(?:home|inside|indoors|in|to the house))?|home|inside|indoors)\b(?!\s+(?:door|garden|room|seat|of|pocket|then|out))/i;
+
+function returnLeg(input: string, afterIndex: number): string | null {
+  const tail = input.slice(afterIndex);
+  const match = RETURN_LEG.exec(tail);
+  if (!match) return null;
+  const word = match[0].toLowerCase();
+  if (/\b(?:home|house)\b/.test(word)) return "home";
+  if (/\b(?:inside|indoors|in)\b/.test(word)) return "inside";
+  return "back";
+}
+
+function withinPlace(state: State, id: string | null, target: string): boolean {
+  let current = id ? state.entities[id] : undefined;
+  const seen = new Set<string>();
+  while (current && !seen.has(current.id)) {
+    if (current.id === target) return true;
+    seen.add(current.id);
+    current = current.location ? state.entities[current.location] : undefined;
   }
-  return out;
+  return false;
+}
+
+function checkTravel(before: State, after: State, config: Config, draft: TurnDraft, input: string, applied: Op[]): Violation[] {
+  const hits = destinationHits(input, config);
+  const last = hits.at(-1);
+  if (!last) return [];
+  const back = returnLeg(input, last.end);
+  if (back) {
+    // The outing is not where they end up. "Home" or "inside" is checked against the place the book names for it.
+    const target = Object.values(before.entities).find((e) => e.type === "place" && placeMatches(e.name, e.aliases, e.id, back));
+    if (!target || back === "back") return [];
+    const end = playerLocation(after, config);
+    if (withinPlace(after, end, target.id) || isTravelRefusal(draft.narration)) return [];
+    const here = end ? `${after.entities[end]?.name ?? end} [${end}]` : "nowhere";
+    return [
+      violation(
+        "fixable",
+        "arrived_elsewhere",
+        `The player asked to come back ${back} after "${last.dest}" but the narration leaves them at ${here}. Set "at" to '${target.id}' or a place inside it, and entity.move the player there.`,
+      ),
+    ];
+  }
+  const missed = missedStop(before, after, config, draft, applied, last.dest, true);
+  return missed ? [missed] : [];
 }
 
 function missedStop(

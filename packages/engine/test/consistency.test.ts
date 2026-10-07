@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ConfigSchema, type Config, type Module, type Op, type State, type TurnDraft, type Violation } from "@book/schema";
-import { applyDraft, coreModule, createInitialState, processOps, validateDraft } from "../src/index.ts";
+import { applyDraft, coreModule, createInitialState, processOps, validateDraft, weekAheadLine } from "../src/index.ts";
 
 function config(): Config {
   return ConfigSchema.parse({
@@ -231,6 +231,44 @@ describe("travel and place", () => {
       "I suggest the pub",
     );
     expect(suggestion.violations).toEqual([]);
+  });
+
+  it("reads 'then walk home' as the end of a round trip, checked against the place the book calls home", () => {
+    const cfg = config();
+    const house = cfg.seed.entities.find((e) => e.id === "shared-house")!;
+    house.aliases = ["home", "inside"];
+    const kitchen = cfg.seed.entities.find((e) => e.id === "kitchen")!;
+    kitchen.location = "shared-house";
+    const start = createInitialState(cfg, modules, "s1");
+    start.entities.player = { ...start.entities.player!, location: "kitchen" };
+
+    const home = validateDraft(
+      start,
+      cfg,
+      modules,
+      draft({ narration: "You finish up and let yourself back into the house. The kitchen is quiet.", at: "kitchen" }),
+      "Walk to the pub and buy a pint, then walk home",
+    );
+    expect(home.violations).toEqual([]);
+
+    const stayed = validateDraft(
+      start,
+      cfg,
+      modules,
+      draft({ narration: "You stay at the bar.", delta: [{ op: "entity.move", id: "player", location: "pub" }] }),
+      "Go to the pub, then head back inside",
+    );
+    expect(stayed.violations.map((v) => v.code)).toEqual(["arrived_elsewhere"]);
+    expect(stayed.violations[0]?.message).toContain("come back inside");
+
+    const outing = validateDraft(
+      start,
+      cfg,
+      modules,
+      draft({ narration: "You walk down to the seafront. The bay is grey." }),
+      "Walk to the seafront and come back",
+    );
+    expect(outing.violations).toEqual([]);
   });
 
   it("stops a trip at the place and leaves the errand out of the destination", () => {
@@ -1038,6 +1076,21 @@ describe("duplicate threads", () => {
       { op: "thread.open", kind: "commitment", text: "The inspection is on Monday morning", due: "2026-10-05T10:00" },
     ]);
     expect(monday.violations).toEqual([]);
+  });
+
+  it("moves a named weekday onto its date before validation, and leaves two weekdays to the repair", () => {
+    const d = draft({
+      delta: [{ op: "thread.open", kind: "commitment", text: "The inspection is on Monday morning", due: "2026-10-07T10:00" }],
+    });
+    expect(validateDraft(fresh(), config(), [coreModule], d).violations).toEqual([]);
+    expect((d.delta[0] as { due: string }).due).toBe("2026-10-05T10:00");
+    const two = draft({
+      delta: [{ op: "thread.open", kind: "commitment", text: "Shifts Monday and Wednesday", due: "2026-10-09T17:00" }],
+    });
+    expect(validateDraft(fresh(), config(), [coreModule], two).violations.map((v) => v.code)).toEqual(["weekday_mismatch"]);
+    expect(weekAheadLine("2026-10-03T09:21")).toBe(
+      "Dates: today 2026-10-03, tomorrow 2026-10-04, Monday 2026-10-05, Tuesday 2026-10-06, Wednesday 2026-10-07, Thursday 2026-10-08, Friday 2026-10-09.",
+    );
   });
 
   it("does not inject a due-event thread that repeats an open one", () => {

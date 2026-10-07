@@ -1,6 +1,6 @@
 {
   "id": "uk-life",
-  "version": 1,
+  "version": 2,
   "meta": {
     "title": "Uplands: A Student Life",
     "tone": "grounded, dry, British",
@@ -492,7 +492,14 @@
         "name": "The house on the Uplands road",
         "aliases": [
           "the house",
-          "the student house"
+          "the student house",
+          "home",
+          "inside",
+          "indoors",
+          "downstairs",
+          "the hall",
+          "the hallway",
+          "the front door"
         ],
         "facts": [
           "A rented shared student house in Uplands, Swansea, let through a letting agency.",
@@ -508,7 +515,8 @@
         "name": "Your room",
         "aliases": [
           "my room",
-          "bedroom"
+          "bedroom",
+          "upstairs"
         ],
         "location": "shared-house",
         "facts": [
@@ -531,6 +539,24 @@
         ]
       },
       {
+        "id": "living-room",
+        "type": "place",
+        "name": "The living room",
+        "aliases": [
+          "front room",
+          "common room",
+          "lounge",
+          "sitting room"
+        ],
+        "location": "shared-house",
+        "facts": [
+          "Sofa, a coffee table nobody wipes, the telly, and whoever is avoiding their room."
+        ],
+        "tags": [
+          "common-room"
+        ]
+      },
+      {
         "id": "bathroom",
         "type": "place",
         "name": "The bathroom",
@@ -547,11 +573,12 @@
         "type": "place",
         "name": "The back garden",
         "aliases": [
-          "garden"
+          "garden",
+          "outside",
+          "out the back"
         ],
-        "location": "shared-house",
         "facts": [
-          "Overgrown with brambles and a tired fence and bench; there is a shed or outhouse for storage."
+          "Behind the house on the Uplands road. Overgrown with brambles and a tired fence and bench; there is a shed or outhouse for storage."
         ],
         "tags": [
           "outdoors"

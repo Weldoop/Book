@@ -19,11 +19,12 @@ export function outputFormatText(order: OutputOrder, config?: Config): string {
     order === "delta_first"
       ? "Write the keys in this order: delta, beat, narration (the delta is checked first)."
       : "Write the keys in this order: narration, delta, beat.";
+  const check = config && !config.dice ? "" : ' "check" only with the fate die,';
   const lines = [
     "OUTPUT",
     "Reply with a single JSON object only. No prose, no code fences.",
     "Write the narration once, inside the JSON. Never write the story as plain text as well.",
-    'Optional keys: "focus_next", "need", "check" only with the fate die, "scene_ended" with "chapter_title", "at" where travel stops, "highlights" (up to 4 new names), "suggested_actions" (up to 3 short offers).',
+    `Optional keys: "focus_next", "need",${check} "scene_ended" with "chapter_title", "at" where travel stops, "highlights" (up to 4 new names), "suggested_actions" (up to 3 short offers).`,
   ];
   if (config?.notes.enabled) lines.push('Optional "notes": short private strings (see NOTES).');
   lines.push(keys);
@@ -71,10 +72,11 @@ export function travelLines(config: Config): string[] {
 }
 
 export function fateText(config: Config): string {
+  if (!config.dice) return "- Hard work costs something: spend the stat for it with stat.add. When an action fails or half-works, give a concrete in-world reason the player can see.";
   const lines = [
     "- A risky action uses the supplied FATE DIE. Hard work spends energy with stat.add. Set \"check\" when you use the die.",
   ];
-  if (config.dice?.visible) {
+  if (config.dice.visible) {
     lines.push("- The player sees the roll, so a low roll must visibly go wrong and a high roll must visibly go well.");
     if (config.dice.stat_modifier) {
       lines.push('- Name the stat the check leans on in "check".stat. A strong stat should carry a middling roll; a weak one should not.');
