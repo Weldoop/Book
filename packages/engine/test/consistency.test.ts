@@ -233,6 +233,44 @@ describe("travel and place", () => {
     expect(suggestion.violations).toEqual([]);
   });
 
+  it("reads 'then walk home' as the end of a round trip, checked against the place the book calls home", () => {
+    const cfg = config();
+    const house = cfg.seed.entities.find((e) => e.id === "shared-house")!;
+    house.aliases = ["home", "inside"];
+    const kitchen = cfg.seed.entities.find((e) => e.id === "kitchen")!;
+    kitchen.location = "shared-house";
+    const start = createInitialState(cfg, modules, "s1");
+    start.entities.player = { ...start.entities.player!, location: "kitchen" };
+
+    const home = validateDraft(
+      start,
+      cfg,
+      modules,
+      draft({ narration: "You finish up and let yourself back into the house. The kitchen is quiet.", at: "kitchen" }),
+      "Walk to the pub and buy a pint, then walk home",
+    );
+    expect(home.violations).toEqual([]);
+
+    const stayed = validateDraft(
+      start,
+      cfg,
+      modules,
+      draft({ narration: "You stay at the bar.", delta: [{ op: "entity.move", id: "player", location: "pub" }] }),
+      "Go to the pub, then head back inside",
+    );
+    expect(stayed.violations.map((v) => v.code)).toEqual(["arrived_elsewhere"]);
+    expect(stayed.violations[0]?.message).toContain("come back inside");
+
+    const outing = validateDraft(
+      start,
+      cfg,
+      modules,
+      draft({ narration: "You walk down to the seafront. The bay is grey." }),
+      "Walk to the seafront and come back",
+    );
+    expect(outing.violations).toEqual([]);
+  });
+
   it("stops a trip at the place and leaves the errand out of the destination", () => {
     const shop = validateDraft(
       fresh(),
