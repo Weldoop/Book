@@ -26,7 +26,8 @@ function config(): Config {
         { id: "player", type: "person", name: "You", location: "room" },
         { id: "1", type: "person", name: "Tomos Reed", location: "kitchen" },
         { id: "2", type: "person", name: "Aisha Khan", location: "shared-house" },
-        { id: "shared-house", type: "place", name: "The house on the Uplands road", aliases: ["the house"] },
+        { id: "shared-house", type: "place", name: "The house on the Uplands road", aliases: ["the house", "inside", "home"] },
+        { id: "garden", type: "place", name: "The back garden", aliases: ["garden", "outside"] },
         { id: "room", type: "place", name: "Your room", location: "shared-house" },
         { id: "kitchen", type: "place", name: "The kitchen", location: "shared-house" },
         { id: "living-room", type: "place", name: "The living room", location: "shared-house" },
@@ -214,6 +215,22 @@ describe("the place the sentence sits in", () => {
     const recalled = draft({ narration: "Aisha glances up. 'You and me went to the kitchen on Saturday. That's about it.'" });
     inferAt(fresh(), config(), recalled);
     expect(recalled.at).toBeUndefined();
+  });
+
+  it("hears a bare alias after a verb of going, so inside and home are places the book names", () => {
+    const state = fresh();
+    state.entities.player!.location = "garden";
+    const inside = draft({ narration: "You wipe the shears and head inside, scratched and tired." });
+    inferAt(state, config(), inside);
+    expect(inside.at).toBe("shared-house");
+    const home = draft({ narration: "You finish the pint and walk home through the quiet streets." });
+    const atPub = fresh();
+    atPub.entities.player!.location = "pub";
+    inferAt(atPub, config(), home);
+    expect(home.at).toBe("shared-house");
+    const already = draft({ narration: "You head inside to the kettle." });
+    inferAt(fresh(), config(), already);
+    expect(already.at).toBeUndefined();
   });
 
   it("moves the player when the inferred place passes through the turn", () => {

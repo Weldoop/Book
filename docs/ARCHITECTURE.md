@@ -1006,10 +1006,17 @@ engine, and its model-authored status line had already drifted within a single s
     Beats carry the clock and chapter summaries carry their date range. A bounded stat may drain
     with hours awake and recover with sleep. Highlights are names, marked once. See ADR 0022.
 
-### Build status (6 Oct 2026)
+58. A distance to a dated thread in the prose ("five hours away", "in a few hours") is corrected
+    against the clock the delta lands on; this is the one prose edit the engine makes. A bare alias
+    after a verb of going names a place. A thread naming one weekday lands on that weekday's date
+    before validation, and the opening prompt lists the week ahead. The contract is measured per
+    part and the module fragments no longer repeat RULES; the stats module keeps a dated money
+    log. See ADR 0023.
+
+### Build status (7 Oct 2026)
 
 Phase 0 (contracts) and Phase 1 (core build) are implemented, plus the fixes from the live sessions
-and the ADR 0005, 0006, 0007, 0008, 0009, 0010, 0011, 0012, 0013, 0014, 0015, 0016, 0017, 0018, 0019, 0020, 0021 and 0022 changes; 446 tests pass.
+and the ADR 0005 through 0023 changes; 461 tests pass.
 
 | Area | State |
 |---|---|
@@ -1036,7 +1043,8 @@ and the ADR 0005, 0006, 0007, 0008, 0009, 0010, 0011, 0012, 0013, 0014, 0015, 00
 | Missing beat filled in code, truer place and item checks (ADR 0019) | done; exercised with the mock, not yet against a real model |
 | Place, clock, repair charges, opening scene, chapter title, bold names (ADR 0020) | done; exercised with the mock, not yet against a real model |
 | Place from `at`, a clock that can go back, no charge when it cost nothing, cast slots (ADR 0021) | done; played live for 69 turns on Haiku 4.5 |
-| Validators that read less prose, the normalize pass, dated memory, energy drift, name-only highlights (ADR 0022) | done; mock-tested, live run pending |
+| Validators that read less prose, the normalize pass, dated memory, energy drift, name-only highlights (ADR 0022) | done; played live for 44 and 34 turns on Haiku 4.5 (60 ok, 15 repaired, 4 rolled back) |
+| Deadline distances by the clock, inside/home as places, weekday dates in code, measured contract (ADR 0023) | done; mock-tested, live run pending |
 | Real-model benchmark (Phase 2) | three short live sessions played; full golden-session benchmark not yet run |
 | `need` / attention-miss handling, delta-first experiment results | not yet implemented / not yet measured |
 | Nuxt UI, Supabase, hosted trial, wizard | later phases |

@@ -9,3 +9,4 @@ export * from "./turn.ts";
 export { dropInventedCharges } from "./consistency.ts";
 export { selectHighlights } from "./highlights.ts";
 export * from "./catalog.ts";
+export { weekAheadLine, weekdayDue } from "./threads.ts";

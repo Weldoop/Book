@@ -140,7 +140,7 @@ export const inventoryModule: Module = {
   },
 
   promptFragment: () =>
-    "INVENTORY: The world sheet lists gear (kept) and goods (for the scene). Copy those ids. A bag, a receipt, or an envelope is narration: do not create it. Something the save must remember that is not on the sheet is item.create in this turn (keeps true for gear, a price when it is sold), then inventory.add. A good that is eaten, drunk, or handed over is inventory.remove in that same turn. Buying one item also needs stat.add of its price. ENGINE NOW Carrying is the bag from the whole save. Gear already on that line is not bought again. Never entity.move an item onto a person. A currency balance is a stat, never a quantity of an object.",
+    "INVENTORY: Carrying in ENGINE NOW is the bag from the whole save; gear on it is not bought again. Never entity.move an item onto a person.",
 
   focus: () => [],
   due: () => [],
