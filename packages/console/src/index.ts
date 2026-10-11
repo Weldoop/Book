@@ -1,4 +1,4 @@
-export { FileSessionLog, readLatestSession, replaySessionLog, sessionLogFromEnv, shownLines, MAX_SHOWN_CHARS, MAX_SHOWN_LINES } from "./log.ts";
+export { FileSessionLog, readLatestSession, replaySessionLog, resumeRoot, sessionLogFromEnv, shownLines, MAX_SHOWN_CHARS, MAX_SHOWN_LINES } from "./log.ts";
 export type { LoggedHistory, LoggedTurn, ResumedConsole, SessionLog } from "./log.ts";
 export { findGame, listGames } from "./games.ts";
 export type { GameCard } from "./games.ts";
@@ -7,4 +7,5 @@ export type { ConsoleLine, Presented } from "./lines.ts";
 export { handleTurn, newSaveId, MAX_INPUT_CHARS } from "./turn.ts";
 export type { HandleOptions, SyncOk, TurnBody, TurnErr, TurnOk, TurnResponse } from "./turn.ts";
 export { readSettings, route, serve, tokenOk, MAX_BODY_BYTES } from "./http.ts";
+export { bundledResumeDir, consoleEnv } from "./entry.ts";
 export type { ConsoleSettings, RouteRequest, RouteResult } from "./http.ts";

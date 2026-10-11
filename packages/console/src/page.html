@@ -315,32 +315,40 @@ form.addEventListener("submit", (event) => {
   }
   go(text.trim() || "...");
 });
+function applySaved(saved) {
+  session = {
+    game: saved.game,
+    lines: saved.lines,
+    suggestions: [],
+    state: saved.state,
+    spentUsd: typeof saved.spentUsd === "number" ? saved.spentUsd : 0,
+    ended: false,
+    status: "",
+    title: saved.title || "",
+  };
+  const status = session.lines.slice().reverse().find((line) => line.kind === "status");
+  if (status) session.status = status.text;
+  persist();
+  paint();
+}
+async function fetchSaved() {
+  const res = await fetch("/api/resume", {
+    headers: token() ? { authorization: "Bearer " + token() } : {},
+  });
+  const data = await res.json();
+  const saved = data && data.session;
+  if (!res.ok || !saved || !saved.state || !Array.isArray(saved.lines)) return null;
+  return saved;
+}
 async function resumeLatest() {
   logEl.textContent = "…";
   try {
-    const res = await fetch("/api/resume", {
-      headers: token() ? { authorization: "Bearer " + token() } : {},
-    });
-    const data = await res.json();
-    const saved = data && data.session;
-    if (!res.ok || !saved || !saved.state || !Array.isArray(saved.lines)) {
+    const saved = await fetchSaved();
+    if (!saved) {
       showPicker();
       return;
     }
-    session = {
-      game: saved.game,
-      lines: saved.lines,
-      suggestions: [],
-      state: saved.state,
-      spentUsd: typeof saved.spentUsd === "number" ? saved.spentUsd : 0,
-      ended: false,
-      status: "",
-      title: saved.title || "",
-    };
-    const status = session.lines.slice().reverse().find((line) => line.kind === "status");
-    if (status) session.status = status.text;
-    persist();
-    paint();
+    applySaved(saved);
   } catch {
     showPicker("The storyteller is unavailable right now. Try again in a moment.");
   }
@@ -352,6 +360,14 @@ if (!session || !session.state || !Array.isArray(session.lines)) {
 } else {
   paint();
   syncLog();
+  // A newer snapshot in the deploy replaces an older copy of the same game.
+  // A phone that has already played further keeps its own turns.
+  fetchSaved().then((saved) => {
+    if (busy || !saved || !session || !session.state) return;
+    const remoteTurn = typeof saved.state.turn === "number" ? saved.state.turn : -1;
+    const localTurn = typeof session.state.turn === "number" ? session.state.turn : -1;
+    if (saved.game === session.game && remoteTurn > localTurn) applySaved(saved);
+  }).catch(() => {});
 }
 </script>
 </body>

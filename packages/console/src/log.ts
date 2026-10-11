@@ -271,3 +271,15 @@ export function sessionLogFromEnv(env: Record<string, string | undefined>): Sess
   if (!raw) return undefined;
   return new FileSessionLog(raw);
 }
+
+/**
+ * Where `/api/resume` reads. A writable log wins so local play stays on
+ * `.book-console`. `BOOK_CONSOLE_RESUME` is the read-only copy shipped in the
+ * Vercel bundle; turns must not append there.
+ */
+export function resumeRoot(env: Record<string, string | undefined>): string | undefined {
+  const log = env.BOOK_CONSOLE_LOG?.trim();
+  if (log) return log;
+  const resume = env.BOOK_CONSOLE_RESUME?.trim();
+  return resume || undefined;
+}

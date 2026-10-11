@@ -4,7 +4,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { createProvider } from "@book/llm";
 import type { LLMProvider } from "@book/schema";
 import { listGames } from "./games.ts";
-import { readLatestSession, sessionLogFromEnv } from "./log.ts";
+import { readLatestSession, resumeRoot, sessionLogFromEnv } from "./log.ts";
 import { handleTurn } from "./turn.ts";
 import type { TurnBody } from "./turn.ts";
 
@@ -105,7 +105,7 @@ export async function route(req: RouteRequest): Promise<RouteResult> {
       return json(500, { ok: false, error: err instanceof Error ? err.message : "The console is not configured." });
     }
     if (!tokenOk(req.headers.authorization, settings.token)) return json(401, { ok: false, error: "Wrong token." });
-    const root = req.env.BOOK_CONSOLE_LOG?.trim();
+    const root = resumeRoot(req.env);
     const session = root ? await readLatestSession(root) : null;
     return { status: 200, contentType: JSON_TYPE, body: method === "HEAD" ? "" : JSON.stringify({ ok: true, session }) };
   }

@@ -1,0 +1,1817 @@
+{
+  "version": 1,
+  "save_id": "phone20261011064938f6f580",
+  "config_id": "uk-life",
+  "config_version": 2,
+  "turn": 360,
+  "clock": {
+    "now": "2026-10-06T18:50"
+  },
+  "rng_seed": 1690785409,
+  "entities": {
+    "1": {
+      "id": "1",
+      "type": "person",
+      "name": "Nia Davies",
+      "aliases": [],
+      "location": "westbourne",
+      "facts": [
+        {
+          "text": "Housemate. Sociable, practical, easy-going, fond of pool.",
+          "importance": 2,
+          "turn": 23,
+          "expires": "2026-10-10T10:29"
+        },
+        {
+          "text": "Helped tidy common rooms and garden unprompted for Monday's letting agent inspection.",
+          "importance": 2,
+          "turn": 101,
+          "expires": "2026-10-11T10:49"
+        },
+        {
+          "text": "Invited Nathan to a free pub quiz Tuesday at the Westbourne, run by friend Cerys. Prize is a £50 bar tab split among six. Nathan claimed 'bit of everything' as specialist subject.",
+          "importance": 2,
+          "turn": 101,
+          "expires": "2026-10-11T10:49"
+        },
+        {
+          "text": "Accompanied Nathan to the Green Awning Café on Sunday morning. Observed his camera sale pitch closely; offered tactical advice beforehand; found the con entertaining rather than critical.",
+          "importance": 2,
+          "turn": 101,
+          "expires": "2026-10-11T10:49"
+        },
+        {
+          "text": "Kissed Nathan on the sofa during the documentary, Monday evening. Seemed to like it.",
+          "importance": 2,
+          "turn": 262,
+          "expires": "2026-10-12T18:51"
+        },
+        {
+          "text": "Chose Swansea for marine biology and to escape her sixth-form cohort who went to Cardiff or Bristol",
+          "importance": 2,
+          "turn": 276,
+          "expires": "2026-10-12T21:20"
+        },
+        {
+          "text": "Confirmed attending the Westbourne pub quiz tonight via group chat",
+          "importance": 1,
+          "turn": 320,
+          "expires": "2026-10-07T11:46"
+        },
+        {
+          "text": "Shelf fell in her room Tuesday afternoon — box of books for charity. Heading to BHF later.",
+          "importance": 1,
+          "turn": 331,
+          "expires": "2026-10-07T15:10"
+        },
+        {
+          "text": "Nathan fixed the shelf bracket in her room — rawlplugs, Blu-Tack, spirit level and all.",
+          "importance": 2,
+          "turn": 342,
+          "expires": "2026-10-13T16:05"
+        }
+      ],
+      "tags": [
+        "housemate"
+      ],
+      "last_touched": 360
+    },
+    "2": {
+      "id": "2",
+      "type": "person",
+      "name": "Tomos Reed",
+      "aliases": [],
+      "location": "westbourne",
+      "facts": [
+        {
+          "text": "Housemate. Practical and hard-working, keeps odd hours around a job.",
+          "importance": 2,
+          "turn": 0
+        },
+        {
+          "text": "(while you were away) Tomos returned from a late shift and noticed the house was already being tidied, so he tackled the garden weeds and swept the path.",
+          "importance": 2,
+          "turn": 54,
+          "expires": "2026-10-11T02:21"
+        },
+        {
+          "text": "Agreed to mention Nathan to his warehouse line manager for casual work; told him to register with Pertemps first",
+          "importance": 2,
+          "turn": 166,
+          "expires": "2026-10-11T20:29"
+        },
+        {
+          "text": "Nathan has registered with Pertemps; interested in warehouse, labouring, and event stewarding",
+          "importance": 2,
+          "turn": 241,
+          "expires": "2026-10-12T15:28"
+        },
+        {
+          "text": "(while you were away) Texted his warehouse line manager about Nathan during his shift, though hasn't heard back yet.",
+          "importance": 1,
+          "turn": 281,
+          "expires": "2026-10-07T07:00"
+        },
+        {
+          "text": "Told Nathan rent is £280 each per month, due the 8th by standing order. First electric bill end of October, broadband split four ways.",
+          "importance": 2,
+          "turn": 311,
+          "expires": "2026-10-13T11:14"
+        },
+        {
+          "text": "Told Nathan to budget around £40/month on top of rent for utilities — electric roughly £30–35 each, broadband £4 each, gas covered by landlord.",
+          "importance": 2,
+          "turn": 312,
+          "expires": "2026-10-13T11:15"
+        },
+        {
+          "text": "Confirmed attending the Westbourne pub quiz tonight via group chat",
+          "importance": 1,
+          "turn": 320,
+          "expires": "2026-10-07T11:46"
+        }
+      ],
+      "tags": [
+        "housemate"
+      ],
+      "last_touched": 360
+    },
+    "3": {
+      "id": "3",
+      "type": "person",
+      "name": "Aisha Khan",
+      "aliases": [],
+      "location": "westbourne",
+      "facts": [
+        {
+          "text": "Sketty buyer confirmed collection in Uplands after 3pm on Tuesday 6 Oct at £30",
+          "importance": 2,
+          "turn": 328,
+          "expires": "2026-10-13T12:32"
+        },
+        {
+          "text": "Sketty buyer confirmed collection anytime after 3pm on Tuesday 6 Oct",
+          "importance": 2,
+          "turn": 326,
+          "expires": "2026-10-13T12:30"
+        },
+        {
+          "text": "(while you were away) Stayed up late drafting the Marketplace listings for mixer, processor, radio, and binoculars, finishing them just before midnight.",
+          "importance": 2,
+          "turn": 281,
+          "expires": "2026-10-13T07:00"
+        },
+        {
+          "text": "Promised to have Marketplace listings for mixer, processor, radio, and binoculars up by Tuesday morning",
+          "importance": 2,
+          "turn": 252,
+          "expires": "2026-10-12T17:27"
+        },
+        {
+          "text": "Helped Nathan assess and buy a Kenwood food processor from BHF for £6; agreed to list it alongside the mixer, radio, and binoculars",
+          "importance": 2,
+          "turn": 251,
+          "expires": "2026-10-12T17:02"
+        },
+        {
+          "text": "Agreed to draft Marketplace listings for the mixer, radio, and binoculars; takes 10% of any sale above the top of the estimated range",
+          "importance": 2,
+          "turn": 231,
+          "expires": "2026-10-12T13:54"
+        },
+        {
+          "text": "Agreed to join the pub quiz at the Westbourne on Tuesday evening.",
+          "importance": 2,
+          "turn": 150,
+          "expires": "2026-10-11T16:05"
+        },
+        {
+          "text": "(while you were away) Aisha woke at her usual early hour and cleaned the kitchen thoroughly, keen to make a good impression before the inspection.",
+          "importance": 2,
+          "turn": 54,
+          "expires": "2026-10-11T02:21"
+        },
+        {
+          "text": "Housemate. Early riser, drinks tea, studies something involving a lot of reading.",
+          "importance": 2,
+          "turn": 23,
+          "expires": "2026-10-10T10:29"
+        },
+        {
+          "text": "Nathan gave her a fiver as a cut for selling the Kenwood mixer via Marketplace",
+          "importance": 1,
+          "turn": 354,
+          "expires": "2026-10-07T18:05"
+        },
+        {
+          "text": "Confirmed attending the Westbourne pub quiz tonight via group chat",
+          "importance": 1,
+          "turn": 320,
+          "expires": "2026-10-07T11:46"
+        },
+        {
+          "text": "Listed Harrington jacket at £25 and charcoal wool overcoat at £35 on Marketplace, sizing estimated from cut",
+          "importance": 1,
+          "turn": 319,
+          "expires": "2026-10-07T11:29"
+        }
+      ],
+      "tags": [
+        "housemate"
+      ],
+      "last_touched": 360
+    },
+    "4": {
+      "id": "4",
+      "type": "person",
+      "name": "Owen Price",
+      "aliases": [],
+      "location": null,
+      "facts": [
+        {
+          "text": "Elderly neighbour next door with a well-kept front garden and a cat.",
+          "importance": 2,
+          "turn": 0
+        }
+      ],
+      "tags": [
+        "neighbour"
+      ],
+      "last_touched": 1
+    },
+    "player": {
+      "id": "player",
+      "type": "person",
+      "name": "Nathan",
+      "aliases": [
+        "weldo"
+      ],
+      "location": "westbourne",
+      "facts": [
+        {
+          "text": "First-year business student; lectures begin Monday 10 Oct. Goes by Nathan with adults; 'weldo' with housemates and friends.",
+          "importance": 2,
+          "turn": 196,
+          "expires": "2026-10-12T10:44"
+        },
+        {
+          "text": "Cleared Barry's garden for £50. Bought Zenit camera and Harris tweed blazer from BHF for £20 total; sold Zenit to Film Shooter for £38, blazer to Dylan for £45.",
+          "importance": 2,
+          "turn": 196,
+          "expires": "2026-10-12T10:44"
+        },
+        {
+          "text": "Plans to bring provisional driving licence, printed bank statement, and tenancy agreement to Pertemps Wind Street branch before noon for Right to Work check.",
+          "importance": 2,
+          "turn": 196,
+          "expires": "2026-10-12T10:44"
+        },
+        {
+          "text": "Claimed 'bit of everything' as specialist subject for Tuesday pub quiz at Westbourne; team includes Nia, Tomos, Aisha, Rhys; one spot remains.",
+          "importance": 2,
+          "turn": 196,
+          "expires": "2026-10-12T10:44"
+        }
+      ],
+      "tags": [
+        "player",
+        "student"
+      ],
+      "last_touched": 360
+    },
+    "shared-house": {
+      "id": "shared-house",
+      "type": "place",
+      "name": "The house on the Uplands road",
+      "aliases": [
+        "the house",
+        "the student house",
+        "home",
+        "inside",
+        "indoors",
+        "downstairs",
+        "the hall",
+        "the hallway",
+        "the front door"
+      ],
+      "location": null,
+      "facts": [
+        {
+          "text": "Rented shared student house in Uplands, Swansea, let through a letting agency.",
+          "importance": 2,
+          "turn": 81
+        },
+        {
+          "text": "Kitchen and shared living space on upper floor; back garden overgrown with brambles, tired fence, and bench; shed or outhouse for storage.",
+          "importance": 2,
+          "turn": 81
+        },
+        {
+          "text": "Letting agent inspection Monday 10 Oct 10:00. Rent instalment due end of week.",
+          "importance": 2,
+          "turn": 81
+        }
+      ],
+      "tags": [
+        "home"
+      ],
+      "last_touched": 69
+    },
+    "player-room": {
+      "id": "player-room",
+      "type": "place",
+      "name": "Your room",
+      "aliases": [
+        "my room",
+        "bedroom",
+        "upstairs"
+      ],
+      "location": "shared-house",
+      "facts": [
+        {
+          "text": "A small rented bedroom with a window onto the street and a calendar on the wall.",
+          "importance": 2,
+          "turn": 0
+        }
+      ],
+      "tags": [
+        "private"
+      ],
+      "last_touched": 0
+    },
+    "kitchen": {
+      "id": "kitchen",
+      "type": "place",
+      "name": "The kitchen",
+      "aliases": [],
+      "location": "shared-house",
+      "facts": [
+        {
+          "text": "Shared kitchen with a fridge everyone claims to label.",
+          "importance": 2,
+          "turn": 0
+        }
+      ],
+      "tags": [
+        "common-room"
+      ],
+      "last_touched": 1
+    },
+    "living-room": {
+      "id": "living-room",
+      "type": "place",
+      "name": "The living room",
+      "aliases": [
+        "front room",
+        "common room",
+        "lounge",
+        "sitting room"
+      ],
+      "location": "shared-house",
+      "facts": [
+        {
+          "text": "Sofa, a coffee table nobody wipes, the telly, and whoever is avoiding their room.",
+          "importance": 2,
+          "turn": 0
+        }
+      ],
+      "tags": [
+        "common-room"
+      ],
+      "last_touched": 1
+    },
+    "bathroom": {
+      "id": "bathroom",
+      "type": "place",
+      "name": "The bathroom",
+      "aliases": [],
+      "location": "shared-house",
+      "facts": [
+        {
+          "text": "Shared bathroom with a shower of unpredictable temperature.",
+          "importance": 2,
+          "turn": 0
+        }
+      ],
+      "tags": [
+        "common-room"
+      ],
+      "last_touched": 0
+    },
+    "back-garden": {
+      "id": "back-garden",
+      "type": "place",
+      "name": "The back garden",
+      "aliases": [
+        "garden",
+        "outside",
+        "out the back"
+      ],
+      "location": null,
+      "facts": [
+        {
+          "text": "Behind the house on the Uplands road; overgrown with brambles and a tired fence and bench; shed or outhouse for storage",
+          "importance": 2,
+          "turn": 11
+        }
+      ],
+      "tags": [
+        "outdoors"
+      ],
+      "last_touched": 1
+    },
+    "letting-agent": {
+      "id": "letting-agent",
+      "type": "faction",
+      "name": "The letting agency",
+      "aliases": [
+        "the agents"
+      ],
+      "location": null,
+      "facts": [
+        {
+          "text": "Manages the tenancy and sends a representative to inspect common rooms and the garden.",
+          "importance": 2,
+          "turn": 0
+        }
+      ],
+      "tags": [
+        "landlord"
+      ],
+      "last_touched": 0
+    },
+    "custody-suite": {
+      "id": "custody-suite",
+      "type": "place",
+      "name": "Swansea Central custody suite",
+      "aliases": [
+        "the cells",
+        "custody"
+      ],
+      "location": null,
+      "facts": [
+        {
+          "text": "A booking desk, a corridor of concrete cells and a smell of floor cleaner. Belongings are bagged and logged on arrival.",
+          "importance": 2,
+          "turn": 0
+        }
+      ],
+      "tags": [
+        "institution"
+      ],
+      "last_touched": 0
+    },
+    "hospital-ward": {
+      "id": "hospital-ward",
+      "type": "place",
+      "name": "Morriston Hospital, assessment ward",
+      "aliases": [
+        "the ward",
+        "hospital"
+      ],
+      "location": null,
+      "facts": [
+        {
+          "text": "A curtained bay, a blood pressure cuff and a plastic jug of water. Discharge depends on someone coming to collect you.",
+          "importance": 2,
+          "turn": 0
+        }
+      ],
+      "tags": [
+        "institution"
+      ],
+      "last_touched": 0
+    },
+    "cerys": {
+      "id": "cerys",
+      "type": "person",
+      "name": "Cerys",
+      "aliases": [],
+      "location": null,
+      "facts": [
+        {
+          "text": "Runs the pub quiz at the Westbourne on Tuesday evenings",
+          "importance": 2,
+          "turn": 11,
+          "expires": "2026-10-10T09:38"
+        },
+        {
+          "text": "Friend of Nia Davies",
+          "importance": 2,
+          "turn": 9,
+          "expires": "2026-10-10T09:38"
+        }
+      ],
+      "tags": [
+        "unmet"
+      ],
+      "last_touched": 9
+    },
+    "westbourne": {
+      "id": "westbourne",
+      "type": "place",
+      "name": "The Westbourne",
+      "aliases": [],
+      "location": null,
+      "facts": [
+        {
+          "text": "Pub up the road from the shared house in Uplands; hosts a Tuesday evening pub quiz at 7pm, entry free, prize is a £50 bar tab",
+          "importance": 2,
+          "turn": 11
+        }
+      ],
+      "tags": [],
+      "last_touched": 9
+    },
+    "uplands-area": {
+      "id": "uplands-area",
+      "type": "place",
+      "name": "Uplands area, near Hanover Street",
+      "aliases": [
+        "hanover street",
+        "barry's house",
+        "off hanover street"
+      ],
+      "location": null,
+      "facts": [],
+      "tags": [],
+      "last_touched": 21
+    },
+    "barry": {
+      "id": "barry",
+      "type": "person",
+      "name": "Barry",
+      "aliases": [],
+      "location": "barrys-garden",
+      "facts": [
+        {
+          "text": "Has player's number saved as 'Garden Lad'; said he'd pass it on to neighbours if odd jobs come up.",
+          "importance": 2,
+          "turn": 31,
+          "expires": "2026-10-10T14:25"
+        }
+      ],
+      "tags": [
+        "contact",
+        "employer"
+      ],
+      "last_touched": 30
+    },
+    "barrys-garden": {
+      "id": "barrys-garden",
+      "type": "place",
+      "name": "Barry's back garden, off Hanover Street",
+      "aliases": [],
+      "location": "uplands-area",
+      "facts": [],
+      "tags": [],
+      "last_touched": 24
+    },
+    "shops": {
+      "id": "shops",
+      "type": "place",
+      "name": "The shops",
+      "aliases": [],
+      "location": null,
+      "facts": [],
+      "tags": [],
+      "last_touched": 35
+    },
+    "uplands-crescent": {
+      "id": "uplands-crescent",
+      "type": "place",
+      "name": "Uplands Crescent",
+      "aliases": [],
+      "location": "uplands-area",
+      "facts": [
+        {
+          "text": "A curved residential crescent in Uplands, Swansea, with a café with a green awning",
+          "importance": 2,
+          "turn": 85
+        }
+      ],
+      "tags": [],
+      "last_touched": 85
+    },
+    "green-awning-cafe": {
+      "id": "green-awning-cafe",
+      "type": "place",
+      "name": "The Green Awning Café",
+      "aliases": [
+        "the café",
+        "the green café",
+        "the coffee place"
+      ],
+      "location": "uplands-crescent",
+      "facts": [
+        {
+          "text": "Narrow café on Uplands Crescent with a green awning and steamed-up windows. Film Shooters group meets here informally on Sunday mornings.",
+          "importance": 2,
+          "turn": 101
+        }
+      ],
+      "tags": [],
+      "last_touched": 87
+    },
+    "film_shooter_1": {
+      "id": "film_shooter_1",
+      "type": "person",
+      "name": "Film Shooter",
+      "aliases": [],
+      "location": null,
+      "facts": [
+        {
+          "text": "Met Nathan at the Green Awning Café on Uplands Crescent. Bought a Zenit 35mm camera for £38 using the inherited-camera cover story. Knowledgeable about camera specs and market values.",
+          "importance": 2,
+          "turn": 101,
+          "expires": "2026-10-11T10:49"
+        }
+      ],
+      "tags": [
+        "photographer"
+      ],
+      "last_touched": 100
+    },
+    "rhys": {
+      "id": "rhys",
+      "type": "person",
+      "name": "Rhys",
+      "aliases": [],
+      "location": null,
+      "facts": [
+        {
+          "text": "Tomos's coursemate. Sharp on sport and history. Bit competitive.",
+          "importance": 2,
+          "turn": 152
+        }
+      ],
+      "tags": [
+        "unmet"
+      ],
+      "last_touched": 164
+    },
+    "swansea-city-centre": {
+      "id": "swansea-city-centre",
+      "type": "place",
+      "name": "Swansea city centre",
+      "aliases": [],
+      "location": null,
+      "facts": [
+        {
+          "text": "About 20 minutes on the bus from Uplands",
+          "importance": 2,
+          "turn": 187
+        }
+      ],
+      "tags": [],
+      "last_touched": 187
+    },
+    "pertemps-wind-st": {
+      "id": "pertemps-wind-st",
+      "type": "place",
+      "name": "Pertemps, Wind Street",
+      "aliases": [],
+      "location": "swansea-city-centre",
+      "facts": [
+        {
+          "text": "Walk-ins welcome before noon",
+          "importance": 2,
+          "turn": 187
+        },
+        {
+          "text": "Will consider provisional licence paired with printed bank statement and tenancy agreement for Right to Work check",
+          "importance": 2,
+          "turn": 187
+        }
+      ],
+      "tags": [],
+      "last_touched": 187
+    },
+    "letting-agent-rep": {
+      "id": "letting-agent-rep",
+      "type": "person",
+      "name": "Letting Agent Representative",
+      "aliases": [
+        "the agent",
+        "the inspector"
+      ],
+      "location": "shared-house",
+      "facts": [
+        {
+          "text": "Here to conduct the periodic inspection of common rooms and garden",
+          "importance": 2,
+          "turn": 190
+        },
+        {
+          "text": "Submitted a satisfactory inspection report for the shared house; common rooms and garden in reasonable order",
+          "importance": 2,
+          "turn": 193,
+          "expires": "2026-10-12T10:35"
+        }
+      ],
+      "tags": [],
+      "last_touched": 224
+    },
+    "singleton-park-library": {
+      "id": "singleton-park-library",
+      "type": "place",
+      "name": "Singleton Park Library",
+      "aliases": [],
+      "location": null,
+      "facts": [],
+      "tags": [],
+      "last_touched": 199
+    },
+    "mixer-seller": {
+      "id": "mixer-seller",
+      "type": "person",
+      "name": "Mixer seller",
+      "aliases": [],
+      "location": "singleton-park-gates",
+      "facts": [],
+      "tags": [],
+      "last_touched": 210
+    },
+    "singleton-park-gates": {
+      "id": "singleton-park-gates",
+      "type": "place",
+      "name": "Singleton Park Gates",
+      "aliases": [],
+      "location": "singleton-park-library",
+      "facts": [
+        {
+          "text": "Main entrance to Singleton Park, a short walk from the library",
+          "importance": 2,
+          "turn": 207
+        }
+      ],
+      "tags": [],
+      "last_touched": 207
+    },
+    "market": {
+      "id": "market",
+      "type": "place",
+      "name": "Market",
+      "aliases": [],
+      "location": "singleton-park-gates",
+      "facts": [],
+      "tags": [],
+      "last_touched": 213
+    },
+    "pertemps-wind-st-interior": {
+      "id": "pertemps-wind-st-interior",
+      "type": "place",
+      "name": "Pertemps, Wind Street (inside)",
+      "aliases": [],
+      "location": "swansea-city-centre",
+      "facts": [],
+      "tags": [],
+      "last_touched": 238
+    },
+    "bhf-st-helens": {
+      "id": "bhf-st-helens",
+      "type": "place",
+      "name": "BHF Charity Shop, St Helen's Road",
+      "aliases": [
+        "BHF",
+        "the charity shop"
+      ],
+      "location": "swansea-city-centre",
+      "facts": [],
+      "tags": [],
+      "last_touched": 245
+    },
+    "st-helens-cafe": {
+      "id": "st-helens-cafe",
+      "type": "place",
+      "name": "St Helen's Road Café",
+      "aliases": [],
+      "location": "swansea-city-centre",
+      "facts": [
+        {
+          "text": "Small independent café on St Helen's Road, near the BHF",
+          "importance": 2,
+          "turn": 289
+        }
+      ],
+      "tags": [],
+      "last_touched": 289
+    },
+    "bhf-charity-shop": {
+      "id": "bhf-charity-shop",
+      "type": "place",
+      "name": "Bhf Charity Shop",
+      "aliases": [],
+      "location": null,
+      "facts": [
+        {
+          "text": "Manager agreed £15 for Harrington and wool overcoat; Nathan promised return custom",
+          "importance": 1,
+          "turn": 296
+        }
+      ],
+      "tags": [],
+      "last_touched": 296
+    },
+    "nia-room": {
+      "id": "nia-room",
+      "type": "place",
+      "name": "Nia Room",
+      "aliases": [],
+      "location": null,
+      "facts": [],
+      "tags": [],
+      "last_touched": 336
+    },
+    "uplands-crescent-coop": {
+      "id": "uplands-crescent-coop",
+      "type": "place",
+      "name": "Co-op, Uplands Crescent",
+      "aliases": [
+        "the Co-op",
+        "Co-op forecourt"
+      ],
+      "location": "shared-house",
+      "facts": [
+        {
+          "text": "Small Co-op on Uplands Crescent, five minutes walk from the shared house",
+          "importance": 2,
+          "turn": 351
+        }
+      ],
+      "tags": [],
+      "last_touched": 351
+    }
+  },
+  "threads": [
+    {
+      "id": "t1",
+      "kind": "goal",
+      "text": "Get through the first weeks without bouncing your bank account or losing the tenancy",
+      "due": "2026-10-17T23:59",
+      "status": "open",
+      "entities": [
+        "player",
+        "1",
+        "2",
+        "3",
+        "4",
+        "shared-house"
+      ],
+      "scale": "major",
+      "was_major": false,
+      "last_interacted_turn": 341,
+      "last_interacted_at": "2026-10-06T15:51",
+      "warm": true,
+      "reminders": 0,
+      "last_shown_turn": 360,
+      "opened_turn": 1
+    },
+    {
+      "id": "t2",
+      "kind": "commitment",
+      "text": "The letting agent's inspection is Monday morning — the common rooms and garden need to be presentable",
+      "due": "2026-10-05T10:00",
+      "status": "resolved",
+      "entities": [
+        "player",
+        "1",
+        "2",
+        "3",
+        "shared-house",
+        "back-garden",
+        "kitchen",
+        "living-room"
+      ],
+      "scale": "major",
+      "was_major": false,
+      "last_interacted_turn": 116,
+      "last_interacted_at": "2026-10-04T12:12",
+      "warm": true,
+      "reminders": 0,
+      "last_shown_turn": 121,
+      "opened_turn": 1,
+      "resolved_turn": 121
+    },
+    {
+      "id": "t3",
+      "kind": "callback",
+      "text": "Nia mentioned a pub quiz on Tuesday — could be worth going",
+      "due": "2026-10-06T19:00",
+      "status": "failed",
+      "entities": [
+        "1"
+      ],
+      "scale": "potential",
+      "was_major": false,
+      "last_interacted_turn": 1,
+      "last_interacted_at": "2026-10-03T09:20",
+      "expires": "2026-10-05T09:20",
+      "warm": false,
+      "reminders": 0,
+      "last_shown_turn": 1,
+      "opened_turn": 1,
+      "resolved_turn": 185
+    },
+    {
+      "id": "t4",
+      "kind": "commitment",
+      "text": "Barry is expecting you for a garden clearance off Hanover Street — £45 cash in hand, this morning",
+      "due": "2026-10-03T13:00",
+      "status": "resolved",
+      "entities": [
+        "barry"
+      ],
+      "scale": "potential",
+      "was_major": false,
+      "last_interacted_turn": 22,
+      "last_interacted_at": "2026-10-03T10:18",
+      "expires": "2026-10-05T10:17",
+      "warm": true,
+      "reminders": 0,
+      "last_shown_turn": 21,
+      "opened_turn": 21,
+      "resolved_turn": 29,
+      "resolved_at": "2026-10-03T14:05"
+    },
+    {
+      "id": "t5",
+      "kind": "commitment",
+      "text": "Sort the bins and recycling tonight before 20:00 — bins to the kerb, recycling in the right bags",
+      "due": "2026-10-04T20:00",
+      "status": "resolved",
+      "entities": [
+        "player",
+        "shared-house"
+      ],
+      "scale": "minor",
+      "was_major": false,
+      "last_interacted_turn": 113,
+      "last_interacted_at": "2026-10-04T11:22",
+      "warm": true,
+      "reminders": 0,
+      "last_shown_turn": 114,
+      "opened_turn": 69,
+      "resolved_turn": 115,
+      "resolved_at": "2026-10-04T12:12"
+    },
+    {
+      "id": "t6",
+      "kind": "debt",
+      "text": "Aisha and Nia owe their share of the house shop — roughly £7 each. Aisha said she'd transfer.",
+      "status": "resolved",
+      "entities": [
+        "player",
+        "1",
+        "3"
+      ],
+      "scale": "minor",
+      "was_major": false,
+      "last_interacted_turn": 129,
+      "last_interacted_at": "2026-10-04T14:01",
+      "warm": true,
+      "reminders": 0,
+      "last_shown_turn": 129,
+      "opened_turn": 129,
+      "resolved_turn": 129,
+      "resolved_at": "2026-10-04T14:01"
+    },
+    {
+      "id": "t7",
+      "kind": "goal",
+      "text": "Sell the paperback thriller at a second-hand bookshop",
+      "due": "2026-10-05T18:00",
+      "status": "resolved",
+      "entities": [
+        "player"
+      ],
+      "scale": "potential",
+      "was_major": false,
+      "last_interacted_turn": 142,
+      "last_interacted_at": "2026-10-04T15:43",
+      "expires": "2026-10-06T15:43",
+      "warm": false,
+      "reminders": 0,
+      "last_shown_turn": 142,
+      "opened_turn": 142,
+      "resolved_turn": 313
+    },
+    {
+      "id": "t8",
+      "kind": "goal",
+      "text": "Get a full team of five or six to the Westbourne pub quiz on Tuesday — Rhys still unconfirmed, room for one more",
+      "due": "2026-10-06T19:30",
+      "status": "open",
+      "entities": [
+        "player",
+        "1",
+        "2",
+        "3",
+        "rhys"
+      ],
+      "scale": "minor",
+      "was_major": false,
+      "last_interacted_turn": 164,
+      "last_interacted_at": "2026-10-04T20:25",
+      "warm": false,
+      "reminders": 0,
+      "last_shown_turn": 360,
+      "opened_turn": 152
+    },
+    {
+      "id": "t9",
+      "kind": "callback",
+      "text": "Someone from your course waved from across the road this morning — whatever they shouted was swallowed by traffic",
+      "due": "2026-10-06T23:59",
+      "status": "open",
+      "entities": [
+        "player"
+      ],
+      "scale": "potential",
+      "was_major": false,
+      "last_interacted_turn": 177,
+      "last_interacted_at": "2026-10-05T07:30",
+      "expires": "2026-10-07T07:30",
+      "warm": false,
+      "reminders": 0,
+      "last_shown_turn": 177,
+      "opened_turn": 177
+    },
+    {
+      "id": "t10",
+      "kind": "goal",
+      "text": "Complete Pertemps registration — need a passport or full driving licence for ID verification",
+      "status": "resolved",
+      "entities": [
+        "2"
+      ],
+      "scale": "major",
+      "was_major": false,
+      "last_interacted_turn": 187,
+      "last_interacted_at": "2026-10-05T09:45",
+      "warm": true,
+      "reminders": 0,
+      "last_shown_turn": 240,
+      "opened_turn": 185,
+      "resolved_turn": 241,
+      "resolved_at": "2026-10-05T15:28"
+    },
+    {
+      "id": "t11",
+      "kind": "debt",
+      "text": "Mobile plan renews at a higher rate unless the player switches or cancels.",
+      "status": "open",
+      "entities": [
+        "player"
+      ],
+      "scale": "minor",
+      "was_major": false,
+      "last_interacted_turn": 185,
+      "last_interacted_at": "2026-10-05T09:20",
+      "warm": false,
+      "reminders": 0,
+      "last_shown_turn": 276,
+      "opened_turn": 185
+    },
+    {
+      "id": "t12",
+      "kind": "goal",
+      "text": "Obtain printed tenancy agreement and bank statement for inspection",
+      "status": "resolved",
+      "entities": [
+        "2"
+      ],
+      "scale": "minor",
+      "was_major": false,
+      "last_interacted_turn": 196,
+      "last_interacted_at": "2026-10-05T10:43",
+      "warm": true,
+      "reminders": 0,
+      "last_shown_turn": 196,
+      "opened_turn": 188,
+      "resolved_turn": 196
+    },
+    {
+      "id": "t13",
+      "kind": "commitment",
+      "text": "The letting agent's inspection is under way; the common rooms and garden are being judged.",
+      "status": "resolved",
+      "entities": [
+        "letting-agent",
+        "shared-house",
+        "back-garden"
+      ],
+      "scale": "minor",
+      "was_major": false,
+      "last_interacted_turn": 192,
+      "last_interacted_at": "2026-10-05T10:15",
+      "warm": true,
+      "reminders": 0,
+      "last_shown_turn": 192,
+      "opened_turn": 190,
+      "resolved_turn": 193,
+      "resolved_at": "2026-10-05T10:35"
+    },
+    {
+      "id": "t14",
+      "kind": "commitment",
+      "text": "Meet mixer seller at Singleton Park gates at noon to buy Kenwood mixer for £8 cash",
+      "due": "2026-10-05T12:00",
+      "status": "failed",
+      "entities": [
+        "player"
+      ],
+      "scale": "minor",
+      "was_major": false,
+      "last_interacted_turn": 199,
+      "last_interacted_at": "2026-10-05T10:47",
+      "warm": true,
+      "reminders": 0,
+      "last_shown_turn": 208,
+      "opened_turn": 199,
+      "resolved_turn": 209
+    },
+    {
+      "id": "t15",
+      "kind": "goal",
+      "text": "Check the Kenwood KM200 at home and sell it on for a profit if it tests clean",
+      "status": "resolved",
+      "entities": [
+        "1"
+      ],
+      "scale": "minor",
+      "was_major": false,
+      "last_interacted_turn": 213,
+      "last_interacted_at": "2026-10-05T12:06",
+      "warm": true,
+      "reminders": 0,
+      "last_shown_turn": 224,
+      "opened_turn": 213,
+      "resolved_turn": 225,
+      "resolved_at": "2026-10-05T13:22"
+    },
+    {
+      "id": "t16",
+      "kind": "goal",
+      "text": "List the Kenwood mixer, Roberts Rambler, and Zenith binoculars for sale — all tested and working",
+      "status": "resolved",
+      "entities": [
+        "player"
+      ],
+      "scale": "minor",
+      "was_major": false,
+      "last_interacted_turn": 225,
+      "last_interacted_at": "2026-10-05T13:22",
+      "warm": true,
+      "reminders": 0,
+      "last_shown_turn": 225,
+      "opened_turn": 225,
+      "resolved_turn": 226,
+      "resolved_at": "2026-10-05T13:23"
+    },
+    {
+      "id": "t17",
+      "kind": "commitment",
+      "text": "Arrange handover of Kenwood mixer to Sketty buyer — £30 cash, collection today or tomorrow",
+      "status": "resolved",
+      "entities": [
+        "player",
+        "3"
+      ],
+      "scale": "minor",
+      "was_major": false,
+      "last_interacted_turn": 315,
+      "last_interacted_at": "2026-10-06T11:25",
+      "warm": true,
+      "reminders": 0,
+      "last_shown_turn": 351,
+      "opened_turn": 315,
+      "resolved_turn": 352,
+      "resolved_at": "2026-10-06T17:45"
+    },
+    {
+      "id": "t18",
+      "kind": "commitment",
+      "text": "Stick at 30",
+      "status": "resolved",
+      "entities": [],
+      "scale": "minor",
+      "was_major": false,
+      "last_interacted_turn": 328,
+      "last_interacted_at": "2026-10-06T12:33",
+      "warm": true,
+      "reminders": 0,
+      "last_shown_turn": 351,
+      "opened_turn": 328,
+      "resolved_turn": 352,
+      "resolved_at": "2026-10-06T17:45"
+    }
+  ],
+  "beats": [
+    {
+      "turn": 314,
+      "text": "Aisha has a £30 offer on the mixer from a Sketty buyer. She's waiting for Nathan's call — hold or accept.",
+      "clock": "2026-10-06T11:25"
+    },
+    {
+      "turn": 315,
+      "text": "Aisha messages the Sketty buyer accepting £30 cash; awaiting confirmation of collection time.",
+      "clock": "2026-10-06T11:26"
+    },
+    {
+      "turn": 316,
+      "text": "Aisha checks: radio watched but no messages, binoculars quiet, processor has one query about attachments. Sketty buyer still to confirm collection time.",
+      "clock": "2026-10-06T11:27"
+    },
+    {
+      "turn": 317,
+      "text": "Aisha confirms the jackets aren't listed yet and offers to add them.",
+      "clock": "2026-10-06T11:28"
+    },
+    {
+      "turn": 318,
+      "text": "t318: Aisha is mid-listing — she needs the overcoat size before she can post it.",
+      "clock": "2026-10-06T11:29"
+    },
+    {
+      "turn": 319,
+      "text": "Both jackets now listed. Aisha's done the work; Nathan just needs to wait for bites — and the Sketty buyer to confirm on the mixer.",
+      "clock": "2026-10-06T11:34"
+    },
+    {
+      "turn": 320,
+      "text": "You pull out your phone and type into the house group chat: 'Quiz tonight, Westbourne, 7:30 — everyone still in?'",
+      "clock": "2026-10-06T11:46"
+    },
+    {
+      "turn": 321,
+      "text": "Two eggs on toast, standing up in the kitchen with Tomos. Rhys still hasn't replied to the group chat.",
+      "clock": "2026-10-06T12:01"
+    },
+    {
+      "turn": 322,
+      "text": "Tomos points out Rhys is still dark, team technically at four confirmed plus one maybe — one spot remains open if Nathan can think of someone.",
+      "clock": "2026-10-06T12:02"
+    },
+    {
+      "turn": 323,
+      "text": "Nathan and Tomos continue discussing finding a fourth person for the flat.",
+      "clock": "2026-10-06T12:30"
+    },
+    {
+      "turn": 324,
+      "text": "Post goes out to the freshers' group — likes and noise immediately, one semi-serious reply asking which Westbourne. The spot may yet fill itself.",
+      "clock": "2026-10-06T12:35"
+    },
+    {
+      "turn": 325,
+      "text": "You clarify which Westbourne—the one on Uplands Road, top of the hill. The likes keep ticking on the group chat, but nobody's committed yet. It's only half twelve. Someone will show up, or you'll go in as five. Tomos rinses his mug. The kitchen smells of toast.",
+      "clock": "2026-10-06T12:30"
+    },
+    {
+      "turn": 326,
+      "text": "Sketty buyer is free after 3pm today — Aisha's waiting on Nathan to confirm a time and handover point.",
+      "clock": "2026-10-06T12:31"
+    },
+    {
+      "turn": 327,
+      "text": "Sketty buyer won't come to Uplands but offers £28 if Nathan delivers.",
+      "clock": "2026-10-06T12:32"
+    },
+    {
+      "turn": 328,
+      "text": "You type back: 'It's £30 collection — happy to meet somewhere in the middle if that helps, but Uplands is",
+      "clock": "2026-10-06T12:33"
+    },
+    {
+      "turn": 329,
+      "text": "Tomos points out Nathan has seven hours to kill before the 3pm buyer arrives. The quiz is tonight at 7pm at The Westbourne.",
+      "clock": "2026-10-06T15:00"
+    },
+    {
+      "turn": 330,
+      "text": "You unload the rucksack onto the kitchen table — mixer, food processor, radio, binoculars, both coats — and leave them",
+      "clock": "2026-10-06T15:05"
+    },
+    {
+      "turn": 331,
+      "text": "You head up.",
+      "clock": "2026-10-06T15:10"
+    },
+    {
+      "turn": 332,
+      "text": "Shelf bracket pulled out of the plaster in Nia's room. She's shrugging it off, blaming the landlord.",
+      "clock": "2026-10-06T15:13"
+    },
+    {
+      "turn": 333,
+      "text": "You lean past her and crouch by the wall.",
+      "clock": "2026-10-06T15:18"
+    },
+    {
+      "turn": 334,
+      "text": "You head back downstairs.",
+      "clock": "2026-10-06T15:23"
+    },
+    {
+      "turn": 335,
+      "text": "The cupboard under the stairs smells of old trainers and damp cardboard.",
+      "clock": "2026-10-06T15:28"
+    },
+    {
+      "turn": 336,
+      "text": "You grab the two loose rawlplugs and the hammer from the toolbox, leave Tomos to shove everything else back under",
+      "clock": "2026-10-06T15:32"
+    },
+    {
+      "turn": 337,
+      "text": "Plaster assessed — soft on the surface but solid underneath. Wider rawlplugs should grip if driven carefully.",
+      "clock": "2026-10-06T15:35"
+    },
+    {
+      "turn": 338,
+      "text": "'Anything to pack these out a bit?' you ask.",
+      "clock": "2026-10-06T15:38"
+    },
+    {
+      "turn": 339,
+      "text": "Rawlplugs seated. Waiting on Nia for the screws to refit the bracket.",
+      "clock": "2026-10-06T15:46"
+    },
+    {
+      "turn": 340,
+      "text": "Nia finds the screws in a small pot on her windowsill — of course she does.",
+      "clock": "2026-10-06T15:51"
+    },
+    {
+      "turn": 341,
+      "text": "Spirit level retrieved. Bracket confirmed level. Ready to drive the screws home.",
+      "clock": "2026-10-06T15:55"
+    },
+    {
+      "turn": 342,
+      "text": "You drive the first screw in slowly — the rawlplug grips, no spin, no wobble.",
+      "clock": "2026-10-06T16:05"
+    },
+    {
+      "turn": 343,
+      "text": "You collect the hammer and spirit level and tuck them under your arm, unhurried, like you're just tidying.",
+      "clock": "2026-10-06T16:10"
+    },
+    {
+      "turn": 344,
+      "text": "The room tells a coherent story: someone who knows who she is and doesn't need to announce it.",
+      "clock": "2026-10-06T16:11"
+    },
+    {
+      "turn": 345,
+      "text": "Nathan comments on Le Guin and the postcard; Nia warms slightly, mentions her nain near Stackpole. The chapel photo left alone.",
+      "clock": "2026-10-06T16:14"
+    },
+    {
+      "turn": 346,
+      "text": "Books back on the fixed shelf; Nia approves without saying so.",
+      "clock": "2026-10-06T16:22"
+    },
+    {
+      "turn": 347,
+      "text": "Nia straightens a spine that didn't need straightening.",
+      "clock": "2026-10-06T16:27"
+    },
+    {
+      "turn": 348,
+      "text": "Aisha messaged — buyer unconfirmed, she's chasing. Should hear before the quiz.",
+      "clock": "2026-10-06T16:30"
+    },
+    {
+      "turn": 349,
+      "text": "You gather the tools and head out, pulling Nia's door to behind you.",
+      "clock": "2026-10-06T17:15"
+    },
+    {
+      "turn": 350,
+      "text": "Aisha confirms the Sketty buyer can meet at 6pm outside the Co-op on Uplands Crescent. The letting agent has left. It's now 17:30.",
+      "clock": "2026-10-06T17:30"
+    },
+    {
+      "turn": 351,
+      "text": "Nathan and Aisha arrive at the Co-op forecourt with the mixer at 17:45, waiting for the Sketty buyer.",
+      "clock": "2026-10-06T17:45"
+    },
+    {
+      "turn": 352,
+      "text": "The Sketty buyer loads the mixer into his Focus, nods, and drives off. You and Aisha stand by the Co-op entrance as the evening settles in around you.",
+      "clock": "2026-10-06T17:55"
+    },
+    {
+      "turn": 353,
+      "text": "You fall into step beside Aisha, heading back up the Crescent.",
+      "clock": "2026-10-06T18:05"
+    },
+    {
+      "turn": 354,
+      "text": "Aisha pockets the fiver; drinks implied.",
+      "clock": "2026-10-06T18:08"
+    },
+    {
+      "turn": 355,
+      "text": "Nathan hints; Aisha deflects neatly and keeps walking.",
+      "clock": "2026-10-06T18:15"
+    },
+    {
+      "turn": 356,
+      "text": "Walked back in easy silence. Home before seven; quiz still on.",
+      "clock": "2026-10-06T18:25"
+    },
+    {
+      "turn": 357,
+      "text": "You take the stairs two at a time.",
+      "clock": "2026-10-06T18:30"
+    },
+    {
+      "turn": 358,
+      "text": "You clatter back downstairs.",
+      "clock": "2026-10-06T18:35"
+    },
+    {
+      "turn": 359,
+      "text": "Team assembled, no sixth confirmed. Heading out.",
+      "clock": "2026-10-06T18:38"
+    },
+    {
+      "turn": 360,
+      "text": "Team of five arrives at the Westbourne. Rhys waiting outside. Quiz imminent.",
+      "clock": "2026-10-06T18:50"
+    }
+  ],
+  "summaries": {
+    "chapters": [
+      "Sat 3 Oct 2026, 09:21 to Sat 3 Oct 2026, 09:38. Saturday morning. Nathan wakes in his bedroom to grey Swansea light. Nia arrives for company and tea, then recruits him for Nia's pub quiz team at the Westbourne on Tuesday—free entry, £50 bar tab prize split six ways. Nathan volunteers with 'bit of everything' as his subject. Nia accepts. He makes a remark on the way out. Aisha is in the kitchen.",
+      "Sat 3 Oct 2026, 09:43 to Sat 3 Oct 2026, 10:29. Nathan spends Saturday morning at home with Nia and Aisha. Over tea, he pitches the Tuesday pub quiz to Aisha (she deflects). He flicks through the local paper, spots a £45 cash-in-hand garden clearance job with Barry off Hanover Street, and agrees to meet him this morning. Nathan gathers his shears, bin bags, and gloves, then heads out.",
+      "Sat 3 Oct 2026, 10:41 to Sat 3 Oct 2026, 14:25. Nathan completes the garden clearance job for Barry, removing brambles and trellis from the property off Hanover Street. The work takes roughly two and a half hours; Barry approves halfway through. Job finished by 13:53, paid in full (£50 cash), and Nathan heads home through Uplands with the money in hand.",
+      "Sat 3 Oct 2026, 14:45 to Sat 3 Oct 2026, 16:58. Nathan showered and changed after garden work. He tidied mugs unprompted—Nia acknowledged it briefly. He shopped for oat milk with Nia's £2, then visited the British Heart Foundation charity shop before closing. Time-pressed, he bought a Zenit 35mm camera (£12) and Harris tweed blazer (£8) from volunteer Jean for £20 total. Now outside in cooling grey afternoon.",
+      "Sat 3 Oct 2026, 17:01 to Sun 4 Oct 2026, 02:21. Nathan bought oat milk and charity shop finds (Zenit camera £45, Harris tweed blazer £35), listing both on Marketplace at collection-only. Aisha offered practical photography advice without fuss, then helped him photograph and list the items. He made beans on toast, cleaned up, and headed to bed early Sunday morning.",
+      "Sun 4 Oct 2026, 02:23 to Sun 4 Oct 2026, 09:10. Nathan woke Sunday morning after a late night replying to Marketplace enquiries about his camera and blazer listings. He'd skimmed his business textbook around 2am, found his lecture timetable (starting Monday 10th), and caught a few hours' sleep. Two interested buyers await his responses.",
+      "Sun 4 Oct 2026, 08:30 to Sun 4 Oct 2026, 09:38. Sunday morning: Nathan wakes to find housemates already tidying for Monday's inspection. He replies to Marketplace buyers—blazer buyer keen for 11am meet at Uplands Crescent, camera buyer still silent. Nia invites him for coffee; he agrees. Tomos confirms Tuesday quiz attendance. Nathan discovers Swansea Film Shooters Facebook group (340 members) and volunteers to handle bin night.",
+      "Sun 4 Oct 2026, 09:41 to Sun 4 Oct 2026, 10:49. Nathan and Nia head to the Green Awning Café on Uplands Crescent to meet the Film Shooters group. Nathan uses the inherited-camera cover story to sell the Zenit to Film Shooter for £38. The sale succeeds despite a close technical question. Nia monitors the interaction without participating, offering tactical advice beforehand.",
+      "Sun 4 Oct 2026, 10:51 to Sun 4 Oct 2026, 13:08. Nathan sold the Harris tweed blazer to Dylan for £45 cash at Uplands Crescent on Sunday morning. Nia gave tactical feedback on the sale technique. Back home, Nathan completed bin and recycling tasks well ahead of Sunday 20:00 deadline. Tomos and Aisha finished remaining inspection prep (hoovering, shoes, bathroom grout, mouldy bench). Monday's letting agent inspection is now fully prepared.",
+      "Sun 4 Oct 2026, 13:13 to Sun 4 Oct 2026, 15:43. Sunday afternoon: Nathan, Nia, and Aisha shopped for shared groceries (£21 budgeted split). Back home by 14:01, Tomos was still at the kitchen table. Nathan checked the calendar—inspection Monday, quiz Tuesday, lectures 10th—and browsed Gumtree/Facebook Marketplace, sending three purchase offers (Canon AE-1 £10, tweed suit £10, Penguin Classics £5). Found a forgotten paperback. Inspection prep complete.",
+      "Sun 4 Oct 2026, 15:44 to Sun 4 Oct 2026, 20:05. Sunday evening. Nathan browses resale listings and sends an offer on Sketty cookbooks (£4, awaiting reply). Tomos sits with notes in the kitchen. Nia pre-reads modules and confirms quiz roster: Nathan, Nia, Tomos, Aisha locked in; Rhys pending (Tomos will text tonight); room for one more. Aisha proposes shared bolognese at eight; mince defrosted. Nathan studies business textbook through the afternoon, then joins Aisha as sous chef at the hob around 20:00.",
+      "Sun 4 Oct 2026, 20:15 to Mon 5 Oct 2026, 07:00. Sunday evening: Nathan cooks bolognese with Aisha and Tomos. Tomos mentions Pertemps agency for warehouse casual work and agrees to flag Nathan to his line manager. Tomos texts Rhys about Tuesday's pub quiz—Rhys confirms. Nathan washes up; Aisha reveals she's studying pharmacology. Later, Nathan spots Marketplace listings (Kenwood mixer £15, vinyl bundle £10) but gets no cookbook reply. Monday 7am: Nathan rinses his mug and heads out.",
+      "Mon 5 Oct 2026, 07:30 to Mon 5 Oct 2026, 10:44. Monday morning: inspection passed without incident. Nathan, Nia, and Aisha plan a library trip to print documents needed for Pertemps registration (tenancy agreement, bank statement). Nia wants details on why; all three agree to go. Marketplace offers sent for Kenwood mixer and Roberts radio await replies. Pertemps branch on Wind Street will consider provisional licence plus printed bank statement and tenancy agreement before noon.",
+      "Mon 5 Oct 2026, 10:46 to Mon 5 Oct 2026, 15:15. Nathan travelled to Pertemps Wind Street with documents for Right to Work registration. Earlier: tested all three market purchases (mixer, radio, binoculars—all working); Aisha agreed to draft Marketplace listings for commission; Nathan left his gear with her and headed to the city centre. Now arriving at Pertemps to register for casual warehouse work.",
+      "Mon 5 Oct 2026, 15:16 to Mon 5 Oct 2026, 21:04. Monday evening at the house. Nathan registered with Pertemps (warehouse and event stewarding shifts available). Aisha drafted Marketplace listings for mixer, radio, binoculars, and food processor (£6, bought from BHF). Quiet evening: documentary with Nia, kiss on the sofa, panel show comedy, tea. Quiz prep discussion: Nia advised picking a lane for the Tuesday specialist subject.",
+      "Mon 5 Oct 2026, 21:10 to Tue 6 Oct 2026, 11:21. Tuesday morning: Nathan buys two vintage jackets from BHF (£15), has them photographed for Aisha to list after the quiz. Confirms rent (£280/month due Friday) and utilities (~£30–35 electric, £4 broadband each) with Tomos. Marketplace listings live overnight; mixer has two enquiries. Quiz tonight at Westbourne. Outfit sorted: Harrington jacket."
+    ],
+    "story_so_far": "Nathan, first-year business student (lectures begin Mon 10 Oct), shares a rented house in Uplands, Swansea with Nia Davies, Tomos Reed, and Aisha Khan. Saturday: cleared Barry's garden (£50); bought Zenit camera and Harris tweed blazer from BHF for £20. Sunday: sold Zenit to Film Shooter for £38, blazer to Dylan for £45. Nia invited Nathan to a free pub quiz Tuesday at the Westbourne (run by friend Cerys)—prize £50 bar tab split six ways; Nathan claimed 'bit of everything' specialist. Team: Nathan, Nia, Tomos, Aisha, Rhys; one spot open. Monday: inspection passed. Bought Kenwood mixer (£8), Roberts radio and Zenith binoculars (£10) at market. Kissed Nia on the sofa during documentary; stayed for comedy and tea. Nia suggested Nathan pick a clear lane for quiz. Tuesday morning: bought Harrington jacket and charcoal wool overcoat from BHF (£15 pair). Aisha delivered Marketplace listings overnight (mixer £35, processor £28, radio £18, binoculars £25); mixer has two enquiries. Nathan confirmed rent £280/month due Friday 8th; utilities roughly £30–35 electric and £4 broadband each, gas covered. Quiz tonight.",
+    "last_compacted_turn": 313,
+    "compaction_hold_until": 364
+  },
+  "window": [
+    {
+      "turn": 349,
+      "input": "Get a shower and get changed for the quiz",
+      "narration": "You gather the tools and head out, pulling Nia's door to behind you. The bathroom is free — a minor miracle. The shower takes thirty seconds to settle on something tolerable, then spends the rest of the time oscillating between lukewarm and aggressive. You manage. By ten past five you're back in your room, Harrington jacket on over a clean shirt, the overcoat hung on the back of the door in reserve. You look presentable. More to the point, you look like you didn't try too hard.",
+      "clock": "2026-10-06T17:15",
+      "highlights": [
+        "Harrington"
+      ]
+    },
+    {
+      "turn": 350,
+      "input": "...",
+      "narration": "Your phone buzzes. Aisha, from downstairs: *'Buyer confirmed. Says he can do 6pm, outside the Co-op on Uplands Crescent. I'll come with you if you want — got the listing on my phone.'* Downstairs the front door opens and closes; the letting agent gone, by the sound of it. Half five. Plenty of time before the quiz.",
+      "clock": "2026-10-06T17:30"
+    },
+    {
+      "turn": 351,
+      "input": "Go with aisha and meet them",
+      "narration": "You shout down to Aisha that you're coming. She appears at the foot of the stairs already in her coat, the Marketplace listing pulled up on her phone. You unearth the Kenwood mixer from your room — still in its original carry position, awkward but manageable — and the two of you head out into the early evening. Uplands Crescent is five minutes on foot. The Co-op forecourt smells of cardboard and cold air.",
+      "clock": "2026-10-06T17:45",
+      "highlights": [
+        "Marketplace",
+        "Kenwood"
+      ]
+    },
+    {
+      "turn": 352,
+      "input": "Wait by the entrance and watch for him",
+      "narration": "You set the mixer down by the Co-op entrance and lean against the wall. A bloke in a Ford Focus circles twice before pulling over — late twenties, fleece, the careful look of someone who's done a few Marketplace deals before. He gets out, glances at the box, picks it up, sets it down, plugs nothing into nothing but lifts the lid and peers inside. 'Does it all work?' 'Aye,' says Aisha, without looking up from her phone. He counts out thirty without being asked.",
+      "clock": "2026-10-06T17:55",
+      "highlights": [
+        "Ford Focus",
+        "Marketplace"
+      ]
+    },
+    {
+      "turn": 353,
+      "input": "Walk back and chat it aisha",
+      "narration": "You fall into step beside Aisha, heading back up the Crescent. The streetlights are coming on in that half-hearted way they do in early October — not quite needed yet, not quite useless. 'Thirty,' she says. 'Told you it'd go.' She sounds satisfied without sounding smug, which is a skill. She asks if you've decided on a specialist subject for the quiz.",
+      "clock": "2026-10-06T18:05"
+    },
+    {
+      "turn": 354,
+      "input": "Say im winging it and give her a fiver for her cut",
+      "narration": "'Winging it,' you say. 'Bit of everything. Hoping for the best.' Aisha gives you a look that contains a full paragraph of scepticism. You pull a fiver from your wallet and hold it out. 'Your cut. For the listing.' She glances at it, then takes it without ceremony. 'You're buying me a drink at the quiz instead.' She doesn't say thank you, which somehow makes it feel more genuine.",
+      "clock": "2026-10-06T18:08"
+    },
+    {
+      "turn": 355,
+      "input": "Ill buy you a drink no problem aisha, hinting she wants more than just a drink",
+      "narration": "Aisha slows her pace just slightly. 'Just a drink,' she says, which is exactly what someone says when they mean something more ambiguous than that. She doesn't look at you when she says it. The Co-op's fluorescent glow fades behind you and the Crescent opens up into the quieter stretch toward home. 'Quiz starts at seven,' she adds, businesslike again. 'Don't be late or Nia'll have you doing sport.'",
+      "clock": "2026-10-06T18:15"
+    },
+    {
+      "turn": 356,
+      "input": "Walk with her in comfortable silence",
+      "narration": "Neither of you fills the gap. The Crescent is quiet enough that you can hear her keys jangling in her coat pocket. A cat — probably Owen's — sits on the wall outside number fourteen and watches you pass with the mild contempt of something that has never had to split a utility bill. The house comes into view. Lights on in the kitchen.",
+      "clock": "2026-10-06T18:25"
+    },
+    {
+      "turn": 357,
+      "input": "Head up to your room to drop the rucksack before the quiz",
+      "narration": "You take the stairs two at a time. Your room is exactly as you left it — which is to say, not quite tidy but not embarrassing. You shrug off the rucksack and drop it by the desk, peel off the overcoat and drape it over the chair. Feels lighter already. The quiz is in just over half an hour; there's enough time to not rush.",
+      "clock": "2026-10-06T18:30"
+    },
+    {
+      "turn": 358,
+      "input": "Head straight back down and rally the team",
+      "narration": "You clatter back downstairs. The kitchen light's on — Tomos is at the counter with a mug, Aisha's just come in behind you, and Nia appears from the hallway already in her jacket, bag over one shoulder. 'Right,' she says, taking in the assembled group. 'Rhys is meeting us there. That's five. We going?' Tomos drains his mug. Nobody argues. The Westbourne is a ten-minute walk.",
+      "clock": "2026-10-06T18:35"
+    },
+    {
+      "turn": 359,
+      "input": "Ask if anyone's sorted a sixth player, check messages on the phone",
+      "narration": "Nia's already heading for the door. 'Sixth?' you say, pulling your phone out. 'Did anyone grab someone else?' Tomos shrugs. Aisha says she mentioned it to a girl from her seminar but got no reply. Nia pauses, hand on the latch. 'Cerys said five's fine. Six is better but it's not a rule.' Your phone shows nothing useful — no new messages, no Marketplace pings since Aisha's overnight batch. Just a news notification you'll never read.",
+      "clock": "2026-10-06T18:38",
+      "highlights": [
+        "Marketplace"
+      ]
+    },
+    {
+      "turn": 360,
+      "input": "Head to the Westbourne with everyone now",
+      "narration": "Nia pulls the front door open and the evening air comes in — damp, faintly beery, proper October. You fall in behind her. Tomos and Aisha follow. The five of you head up the Crescent in a loose group, nobody walking too fast. The Westbourne's windows are already warm and lit against the dark. Rhys is outside under the hanging basket, hands in his pockets, looking like he wasn't sure you'd actually show.",
+      "clock": "2026-10-06T18:50"
+    }
+  ],
+  "focus_next": [],
+  "scene": {
+    "index": 15,
+    "started_turn": 349,
+    "closed": false
+  },
+  "notes": [],
+  "ending": null,
+  "endings_seen": [],
+  "ledger": [
+    {
+      "turn": 328,
+      "text": "Stick at 30",
+      "kind": "commitment"
+    }
+  ],
+  "modules": {
+    "stats": {
+      "values": {
+        "cash": 67.2,
+        "bank": 30,
+        "health": 100,
+        "energy": 64.11,
+        "stress": 2,
+        "jeopardy": 0
+      },
+      "ledger": [
+        {
+          "clock": "2026-10-05T11:24",
+          "key": "cash",
+          "amount": -1.6,
+          "reason": "Library printing, 4 pages at 40p"
+        },
+        {
+          "clock": "2026-10-05T12:03",
+          "key": "cash",
+          "amount": -8,
+          "reason": "Kenwood KM200 mixer from Marketplace seller"
+        },
+        {
+          "clock": "2026-10-05T12:38",
+          "key": "cash",
+          "amount": -10,
+          "reason": "Roberts Rambler 2 radio and Zenith binoculars from market stall"
+        },
+        {
+          "clock": "2026-10-05T13:22",
+          "key": "cash",
+          "amount": -10,
+          "reason": "Roberts Rambler 2 radio and Zenith binoculars from market stall"
+        },
+        {
+          "clock": "2026-10-05T17:02",
+          "key": "cash",
+          "amount": -6,
+          "reason": "Kenwood food processor from BHF"
+        },
+        {
+          "clock": "2026-10-06T09:25",
+          "key": "cash",
+          "amount": -3.5,
+          "reason": "Bacon roll"
+        },
+        {
+          "clock": "2026-10-06T09:25",
+          "key": "cash",
+          "amount": -2.1,
+          "reason": "Flat white"
+        },
+        {
+          "clock": "2026-10-06T10:08",
+          "key": "cash",
+          "amount": -15,
+          "reason": "Harrington jacket and charcoal wool overcoat from BHF"
+        },
+        {
+          "clock": "2026-10-06T17:45",
+          "key": "cash",
+          "amount": 30,
+          "reason": "Kenwood KM200 mixer sold to Sketty buyer"
+        },
+        {
+          "clock": "2026-10-06T18:05",
+          "key": "cash",
+          "amount": -5,
+          "reason": "Aisha's cut for Marketplace listing"
+        }
+      ]
+    },
+    "inventory": {
+      "owners": {
+        "1": {
+          "roberts-rambler": 1,
+          "zenith-binoculars": 1
+        },
+        "player": {
+          "phone": 1,
+          "wallet": 1,
+          "rucksack": 1,
+          "business-textbook": 1,
+          "driving-licence": 1,
+          "garden-gloves": 1,
+          "shears": 1,
+          "milk": 1,
+          "tin-soup": 1,
+          "tin-beans": 1,
+          "washing-up-liquid": 1,
+          "oat-milk": 1,
+          "thriller-paperback": 1,
+          "consumer-behaviour-book": 1,
+          "roberts-rambler": 1,
+          "zenith-binoculars": 1,
+          "kenwood-food-processor": 1,
+          "harrington-jacket": 1,
+          "wool-overcoat": 1
+        }
+      },
+      "catalog": [
+        {
+          "id": "zenit-camera",
+          "name": "Zenit 35mm film camera",
+          "price": 0,
+          "keeps": true
+        },
+        {
+          "id": "harris-tweed",
+          "name": "Harris tweed blazer (42R)",
+          "price": 0,
+          "keeps": true
+        },
+        {
+          "id": "flat-white",
+          "name": "Flat white",
+          "price": 2.1
+        },
+        {
+          "id": "bread",
+          "name": "Loaf of bread",
+          "price": 1.2
+        },
+        {
+          "id": "eggs-dozen",
+          "name": "Dozen eggs",
+          "price": 2.5
+        },
+        {
+          "id": "butter",
+          "name": "Butter",
+          "price": 1.5
+        },
+        {
+          "id": "pasta",
+          "name": "Bag of pasta",
+          "price": 1.1
+        },
+        {
+          "id": "tin-tomatoes",
+          "name": "Tin of tomatoes",
+          "price": 0.9
+        },
+        {
+          "id": "tin-soup",
+          "name": "Tin of soup",
+          "price": 0.95
+        },
+        {
+          "id": "tin-beans",
+          "name": "Tin of baked beans",
+          "price": 0.65
+        },
+        {
+          "id": "teabags",
+          "name": "Box of teabags (80)",
+          "price": 2.5
+        },
+        {
+          "id": "mince",
+          "name": "Pack of mince",
+          "price": 3.5
+        },
+        {
+          "id": "washing-up-liquid",
+          "name": "Washing-up liquid",
+          "price": 1.2
+        },
+        {
+          "id": "thriller-paperback",
+          "name": "Paperback thriller (read)",
+          "price": 2
+        },
+        {
+          "id": "consumer-behaviour-book",
+          "name": "Consumer behaviour primer (library loan, due 26 Oct)",
+          "keeps": true
+        },
+        {
+          "id": "kenwood-mixer",
+          "name": "Kenwood KM200 mixer",
+          "price": 8,
+          "keeps": true
+        },
+        {
+          "id": "roberts-rambler",
+          "name": "Roberts Rambler 2 radio (analogue)",
+          "keeps": true
+        },
+        {
+          "id": "zenith-binoculars",
+          "name": "Zenith 10x50 binoculars (cased)",
+          "keeps": true
+        },
+        {
+          "id": "kenwood-food-processor",
+          "name": "Kenwood food processor",
+          "price": 6,
+          "keeps": true
+        },
+        {
+          "id": "bacon-roll",
+          "name": "Bacon roll",
+          "price": 3.5
+        },
+        {
+          "id": "harrington-jacket",
+          "name": "Harrington jacket",
+          "price": 0,
+          "keeps": true
+        },
+        {
+          "id": "wool-overcoat",
+          "name": "Charcoal wool overcoat (vintage, late 70s)",
+          "price": 0,
+          "keeps": true
+        }
+      ]
+    },
+    "relationships": {
+      "values": {
+        "1|player": 93,
+        "2|player": 40,
+        "3|player": 60,
+        "4|player": 10,
+        "barry|player": 16,
+        "film_shooter_1|player": 4
+      }
+    },
+    "events": {
+      "fired": {
+        "bins-out": "2026-10-04T20:00",
+        "mobile-plan-renewal": "2026-10-05T09:00",
+        "inspection-window": "2026-10-05T10:02",
+        "overdue:t14": "2026-10-05T12:00",
+        "rent-reminder": "2026-10-06T08:30"
+      },
+      "last_eval": "2026-10-06T18:38"
+    },
+    "dice": {},
+    "offscreen": {}
+  }
+}

@@ -6,9 +6,12 @@ import { MockProvider } from "@book/llm";
 import type { LLMProvider } from "@book/schema";
 import {
   FileSessionLog,
+  bundledResumeDir,
+  consoleEnv,
   handleTurn,
   readLatestSession,
   replaySessionLog,
+  resumeRoot,
   route,
   shownLines,
   MAX_SHOWN_CHARS,
@@ -343,5 +346,95 @@ describe("console http log", () => {
     const body = JSON.parse(open.body) as { session: { game: string } | null };
     expect(body.session?.game).toBe("uk-life");
     expect(await readLatestSession(join(dir, "missing"))).toBeNull();
+  });
+
+  it("resumes the read-only snapshot and leaves it unwritten", async () => {
+    const resume = await mkdtemp(join(tmpdir(), "book-resume-"));
+    const live = await mkdtemp(join(tmpdir(), "book-live-"));
+    dirs.push(resume, live);
+    const started = await handleTurn(
+      { game: "uk-life" },
+      { llm: new MockProvider(), maxCostUsd: 2, newSaveId: () => "phonesnap" },
+    );
+    if (!started.ok || "sync" in started) throw new Error("setup turn failed");
+    const snap = new FileSessionLog(resume);
+    await snap.append({
+      saveId: started.state.save_id,
+      configId: "uk-life",
+      title: started.title,
+      input: "Walk to the Westbourne",
+      turn: started.state.turn,
+      outcome: "ok",
+      lines: [{ kind: "story", text: "The Westbourne is open." }],
+      spentUsd: 6,
+      state: started.state,
+    });
+    const other = await handleTurn(
+      { game: "pirate" },
+      { llm: new MockProvider(), maxCostUsd: 2, newSaveId: () => "phonelive" },
+    );
+    if (!other.ok || "sync" in other) throw new Error("setup turn failed");
+    await new FileSessionLog(live).append({
+      saveId: other.state.save_id,
+      configId: "pirate",
+      title: other.title,
+      input: "Weigh anchor",
+      turn: other.state.turn,
+      outcome: "ok",
+      lines: [{ kind: "story", text: "The sloop holds." }],
+      spentUsd: 0.1,
+      state: other.state,
+    });
+
+    const fromSnap = await route({
+      method: "GET",
+      url: "/api/resume",
+      headers: {},
+      body: "",
+      env: { BOOK_PROVIDER: "mock", BOOK_CONSOLE_RESUME: resume },
+    });
+    expect(fromSnap.status).toBe(200);
+    expect(JSON.parse(fromSnap.body).session.game).toBe("uk-life");
+
+    const fromLog = await route({
+      method: "GET",
+      url: "/api/resume",
+      headers: {},
+      body: "",
+      env: { BOOK_PROVIDER: "mock", BOOK_CONSOLE_LOG: live, BOOK_CONSOLE_RESUME: resume },
+    });
+    expect(JSON.parse(fromLog.body).session.game).toBe("pirate");
+
+    const empty = await route({
+      method: "GET",
+      url: "/api/resume",
+      headers: {},
+      body: "",
+      env: { BOOK_PROVIDER: "mock" },
+    });
+    expect(JSON.parse(empty.body).session).toBeNull();
+
+    const before = await readFile(join(resume, "phonesnap", "state.json"), "utf8");
+    const posted = await route({
+      method: "POST",
+      url: "/api/turn",
+      headers: {},
+      body: JSON.stringify({ game: "uk-life", state: started.state, sync: true, lines: started.lines }),
+      env: { BOOK_PROVIDER: "mock", BOOK_CONSOLE_RESUME: resume },
+    });
+    expect(posted.status).toBe(200);
+    expect(JSON.parse(posted.body).logged).toBe(false);
+    expect(await readFile(join(resume, "phonesnap", "state.json"), "utf8")).toBe(before);
+    expect(resumeRoot({ BOOK_CONSOLE_LOG: live, BOOK_CONSOLE_RESUME: resume })).toBe(live);
+    expect(resumeRoot({})).toBeUndefined();
+  });
+});
+
+describe("vercel resume env", () => {
+  it("points the bundle at the snapshot only when no log is set", () => {
+    expect(bundledResumeDir("file:///var/task/index.js")).toBe("/var/task/saves");
+    expect(consoleEnv({})).toEqual({ BOOK_CONSOLE_RESUME: bundledResumeDir() });
+    expect(consoleEnv({ BOOK_CONSOLE_LOG: "  /tmp/live  " })).toEqual({ BOOK_CONSOLE_LOG: "  /tmp/live  " });
+    expect(consoleEnv({ BOOK_CONSOLE_RESUME: "/tmp/snap" })).toEqual({ BOOK_CONSOLE_RESUME: "/tmp/snap" });
   });
 });
