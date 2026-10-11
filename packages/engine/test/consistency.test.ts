@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ConfigSchema, type Config, type Module, type Op, type State, type TurnDraft, type Violation } from "@book/schema";
-import { applyDraft, coreModule, createInitialState, processOps, validateDraft, weekAheadLine } from "../src/index.ts";
+import { applyDraft, coreModule, createInitialState, dropInventedCharges, processOps, validateDraft, weekAheadLine } from "../src/index.ts";
 
 function config(): Config {
   return ConfigSchema.parse({
@@ -985,6 +985,111 @@ describe("charges the narration never stated", () => {
       "Nip to the shop for milk",
     );
     expect(bought.violations).toEqual([]);
+  });
+
+  it("does not buy gear the narration only prices", () => {
+    const cfg: Config = {
+      ...config(),
+      items: [
+        ...config().items,
+        { id: "kenwood-mixer", name: "Kenwood mixer", price: 8, keeps: true },
+        { id: "roberts-rambler", name: "Roberts Rambler 2 radio", price: 0, keeps: true },
+      ],
+    };
+    const state = fresh();
+    const inv = state.modules.inventory as { owners: Record<string, Record<string, number>> };
+    inv.owners.player = { ...inv.owners.player, "kenwood-mixer": 1, "roberts-rambler": 1 };
+    const narration =
+      "Cross-reference with completed listings: Kenwood mixer in working order, £35–45 is realistic; Roberts Rambler 2, clean tuning, £30–40. Maybe £5–10 off each.";
+    expect(validateDraft(state, cfg, modules, draft({ narration }), "Price them up").violations).toEqual([]);
+    const charged = validateDraft(
+      state,
+      cfg,
+      modules,
+      draft({
+        narration,
+        delta: [
+          { op: "inventory.add", owner: "player", item: "roberts-rambler", qty: 1 },
+          { op: "stat.add", key: "money", amount: -10, reason: "Roberts Rambler 2 radio from the market stall" },
+        ],
+      }),
+      "Price them up",
+    );
+    expect(charged.violations.map((v) => v.code)).toEqual(["already_owned"]);
+  });
+
+  it("still hears a tenner, ten, and thirty-eight as the price", () => {
+    const tenner = validateDraft(
+      fresh(),
+      config(),
+      modules,
+      draft({
+        narration: "You take the milk, both for a tenner.",
+        delta: [
+          { op: "stat.add", key: "money", amount: -10, reason: "Pint of milk" },
+          { op: "inventory.add", owner: "player", item: "milk", qty: 1 },
+        ],
+      }),
+      "both for a tenner",
+    );
+    expect(tenner.violations).toEqual([]);
+    const ten = validateDraft(
+      fresh(),
+      config(),
+      modules,
+      draft({
+        narration: "Give the man ten. You buy the milk.",
+        delta: [
+          { op: "stat.add", key: "money", amount: -10, reason: "Pint of milk" },
+          { op: "inventory.add", owner: "player", item: "milk", qty: 1 },
+        ],
+      }),
+      "give the man ten",
+    );
+    expect(ten.violations).toEqual([]);
+    const shake = validateDraft(
+      fresh(),
+      config(),
+      modules,
+      draft({
+        narration: "You shake on thirty-eight for the textbook.",
+        delta: [
+          { op: "stat.add", key: "money", amount: -38, reason: "Business textbook" },
+          { op: "inventory.add", owner: "player", item: "business-textbook", qty: 1 },
+        ],
+      }),
+      "shake on thirty-eight",
+    );
+    expect(shake.violations).toEqual([]);
+  });
+
+  it("drops a repair charge a price range seemed to state, and the extra copy", () => {
+    const narration = "Maybe £5–10 off each. Roberts Rambler is £30–40.";
+    const dropped = dropInventedCharges(
+      [],
+      [
+        { op: "inventory.add", owner: "player", item: "roberts-rambler", qty: 1 },
+        { op: "stat.add", key: "money", amount: -10, reason: "Roberts Rambler radio" },
+        { op: "clock.advance", minutes: 2 },
+      ],
+      narration,
+      config(),
+    );
+    expect(dropped).toEqual([{ op: "clock.advance", minutes: 2 }]);
+    const tenner = dropInventedCharges(
+      [],
+      [{ op: "stat.add", key: "money", amount: -10, reason: "milk" }],
+      "You give the man ten, both for a tenner.",
+      config(),
+    );
+    expect(tenner).toEqual([{ op: "stat.add", key: "money", amount: -10, reason: "milk" }]);
+    const shake = dropInventedCharges(
+      [],
+      [{ op: "stat.add", key: "money", amount: -38, reason: "blazer" }],
+      "You shake on thirty-eight.",
+      config(),
+    );
+    expect(shake).toHaveLength(1);
   });
 });
 

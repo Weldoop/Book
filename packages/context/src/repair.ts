@@ -2,6 +2,7 @@ import type { Config, DueItem, Module, State, Violation } from "@book/schema";
 import { mapAttention } from "./attention.ts";
 import { resolveBudget } from "./budget.ts";
 import { describeOps } from "./ops.ts";
+import { recallHaystack } from "./recall.ts";
 import { engineNowSection, focusSection, sceneSection, stateSection } from "./sections.ts";
 import { worldSheetSection } from "./world.ts";
 import { extractJsonObject, tokensOf } from "./text.ts";
@@ -132,7 +133,9 @@ function buildDeltaRepair(i: RepairInput): BuiltContext {
   });
   const referenced = view.ids.filter((id) => i.state.entities[id] && id !== i.config.player_id);
   const ids = [...new Set([...referenced, ...attended])].slice(0, DELTA_FOCUS_LIMIT);
-  const focus = focusSection(i.state, ids, budget.entities_in_focus);
+  const player = i.state.entities[i.config.player_id];
+  const recall = recallHaystack(i.input, i.state.threads, player ? [player.name, ...player.aliases] : []);
+  const focus = focusSection(i.state, ids, budget.entities_in_focus, recall);
 
   const sections = [
     { part: "scene", section: sceneSection(i.config, i.state) },

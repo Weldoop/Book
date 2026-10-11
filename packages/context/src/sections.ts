@@ -2,6 +2,7 @@ import { diffMinutes, humanTime } from "@book/engine";
 import type { Beat, Config, DueItem, Entity, Fact, Module, State } from "@book/schema";
 import { orderThreads, selectThreads } from "./attention.ts";
 import { MAX_BEATS, MAX_FACTS_PER_ENTITY_IN_CONTEXT, WINDOW_TURNS } from "./budget.ts";
+import { entityPlaces, selectRecalledFacts } from "./recall.ts";
 import { dayOfWeek, fitLines, renderSection, tokensOf, trimOldestSentences } from "./text.ts";
 
 export interface Section {
@@ -114,10 +115,6 @@ interface FocusEntry {
   facts: Fact[];
 }
 
-function factOrder(a: Fact, b: Fact): number {
-  return b.importance - a.importance || b.turn - a.turn;
-}
-
 /** A person's memory that has already lapsed stays out of the prompt. */
 function liveFacts(entity: Entity, now: string): Fact[] {
   return entity.facts.filter((fact) => fact.expires === undefined || diffMinutes(now, fact.expires) < 0);
@@ -136,16 +133,21 @@ export function focusSection(
   state: State,
   ids: string[],
   cap: number,
+  recall = "",
 ): { section: Section; shown: string[] } {
   const header = "## FOCUS ENTITIES";
   let trimmed = false;
   let entries: FocusEntry[] = [];
+  const places = entityPlaces(state);
   for (const id of ids) {
     const entity = state.entities[id];
     if (!entity) continue;
-    const sorted = liveFacts(entity, state.clock.now).sort(factOrder);
-    if (sorted.length > MAX_FACTS_PER_ENTITY_IN_CONTEXT) trimmed = true;
-    entries.push({ entity, facts: sorted.slice(0, MAX_FACTS_PER_ENTITY_IN_CONTEXT) });
+    const live = liveFacts(entity, state.clock.now);
+    if (live.length > MAX_FACTS_PER_ENTITY_IN_CONTEXT) trimmed = true;
+    entries.push({
+      entity,
+      facts: selectRecalledFacts(live, state.clock.now, recall, places, MAX_FACTS_PER_ENTITY_IN_CONTEXT),
+    });
   }
   const render = (): string => renderSection(header, entries.map((e) => focusLine(state, e)));
 

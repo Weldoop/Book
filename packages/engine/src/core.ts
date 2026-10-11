@@ -1,5 +1,5 @@
 import type { Config, DueItem, Entity, Fact, Module, Op, RenderOutput, State, Violation } from "@book/schema";
-import { memoryExpiry } from "./memory.ts";
+import { factDecision, factsDisagree, memoryExpiry, placeWords } from "./memory.ts";
 import { duplicateOpenThread, weekdayMismatch } from "./threads.ts";
 import { addMinutes, diffMinutes } from "./time.ts";
 
@@ -225,7 +225,12 @@ export const coreModule: Module = {
             const expires = memoryExpiry(s.clock.now, op.importance);
             if (expires) fact.expires = expires;
           }
-          e.facts.push(fact);
+          const places = placeWords(s);
+          const decision = factDecision(e.facts, fact, places);
+          if (decision === "replace") {
+            e.facts = e.facts.filter((kept) => !factsDisagree(kept.text, fact.text, places));
+          }
+          if (decision !== "drop") e.facts.push(fact);
           if (e.facts.length > MAX_FACTS_PER_ENTITY) {
             e.facts.sort((a, b) => b.importance - a.importance || b.turn - a.turn);
             e.facts = e.facts.slice(0, MAX_FACTS_PER_ENTITY);

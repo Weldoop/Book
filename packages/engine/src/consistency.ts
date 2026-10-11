@@ -1,6 +1,7 @@
 import type { Config, Op, State, TurnDraft, Violation } from "@book/schema";
 import { catalogItems } from "./catalog.ts";
 import { playerLocation } from "./core.ts";
+import { sharedContentWords } from "./threads.ts";
 
 /**
  * A place name stops at the next clause. "the house and go into the kitchen" is two places,
@@ -563,7 +564,8 @@ function hasVerb(window: string, pattern: RegExp): boolean {
     const at = match.index ?? 0;
     const before = window.slice(Math.max(0, at - 20), at);
     const word = match[0].toLowerCase();
-    if (word === "order" && /\bin\s+$/i.test(before)) continue;
+    // "in working order" and "in order" are not a purchase.
+    if ((word === "order" || word === "ordered") && /\b(?:in|working|mail)\s+$/i.test(before)) continue;
     if (NEGATED.test(before)) continue;
     return true;
   }
@@ -775,7 +777,13 @@ function checkItems(before: State, after: State, config: Config, draft: TurnDraf
     }
     if (!row.pay || !item) continue;
     const held = heldQty(before, player, id);
-    if (item.keeps === true && held >= 1 && !row.again) continue;
+    if (item.keeps === true && held >= 1 && !row.again) {
+      if (addedQty(applied, player, id) > 0 && !owned.has(id)) {
+        owned.add(id);
+        out.push(alreadyOwned(row.name, id, held));
+      }
+      continue;
+    }
     const fresh = row.again || row.wanted > held;
     if (!fresh && held >= 1) {
       if (addedQty(applied, player, id) > 0 && !owned.has(id)) {
@@ -802,8 +810,16 @@ function checkItems(before: State, after: State, config: Config, draft: TurnDraf
     // "£28 to Aisha for the textbook" settles a debt; the textbook is the reason, not the purchase.
     if (REPAYS.test(spend.reason)) continue;
     for (const item of itemsInText(spend.reason, catalog)) {
-      if (item.price === undefined || item.price <= 0) continue;
       const row = byId.get(item.id);
+      const held = heldQty(before, player, item.id);
+      if (held >= 1 && !ANOTHER.test(spend.reason) && !ANOTHER.test(draft.narration)) {
+        if (!owned.has(item.id)) {
+          owned.add(item.id);
+          out.push(alreadyOwned(item.name, item.id, held));
+        }
+        continue;
+      }
+      if (item.price === undefined || item.price <= 0) continue;
       // Pouring Owen's milk is not buying milk: a charge needs a purchase somewhere in the turn, or the figure.
       if (!row?.pay && !hasVerb(text, PAY) && !SETTLES.test(text) && !hasVerb(input.toLowerCase(), PAY) && !mentionsAmount(draft.narration, spend.amount)) {
         out.push(
@@ -815,16 +831,20 @@ function checkItems(before: State, after: State, config: Config, draft: TurnDraf
         );
         continue;
       }
-      const held = heldQty(before, player, item.id);
-      if (held >= 1 && !ANOTHER.test(spend.reason)) {
-        if (!owned.has(item.id)) {
-          owned.add(item.id);
-          out.push(alreadyOwned(item.name, item.id, held));
-        }
-        continue;
-      }
       noteBuy(buys, item, 1);
     }
+  }
+  // A price quote is not a second copy. Paying, or asking for another, still is.
+  for (const op of applied) {
+    if (op.op !== "inventory.add" || op.owner !== player || owned.has(op.item)) continue;
+    const held = heldQty(before, player, op.item);
+    if (held < 1 || ANOTHER.test(draft.narration)) continue;
+    const row = byId.get(op.item);
+    if (row?.pay || row?.again) continue;
+    const item = catalog.find((candidate) => candidate.id === op.item);
+    if (!item) continue;
+    owned.add(op.item);
+    out.push(alreadyOwned(item.name, op.item, held));
   }
   if (buys.size === 0) return out;
   const spends = currencySpends(applied, config);
@@ -1035,12 +1055,22 @@ function asCharge(op: unknown, keys: Set<string>): { key: string; amount: number
 function mentionsAmount(narration: string, amount: number): boolean {
   const abs = Math.abs(amount);
   if (!Number.isFinite(abs) || abs === 0) return false;
-  const hay = narration.replace(/,/g, "");
+  if (spokenAmount(narration, abs)) return true;
+  // A range is a quote, not a handoff: "£5–10" does not state a charge of 5 or of 10.
+  const hay = narration.replace(/,/g, "").replace(/£?\s*\d+(?:\.\d+)?\s*(?:–|—|-|to)\s*£?\s*\d+(?:\.\d+)?/gi, " ");
   const forms = new Set([String(abs), abs.toFixed(2)]);
   for (const form of forms) {
     const body = form.replace(".", "\\.");
     if (new RegExp(`(?:£\\s*)?${body}\\b`).test(hay)) return true;
   }
+  return false;
+}
+
+/** Haggling that names the price in words still states the charge. */
+function spokenAmount(narration: string, amount: number): boolean {
+  const hay = narration.toLowerCase();
+  if (amount === 10 && /\b(?:tenner|tenners|ten)\b/.test(hay)) return true;
+  if (amount === 38 && /\bthirty[-\s]?eight\b/.test(hay)) return true;
   return false;
 }
 
@@ -1076,16 +1106,44 @@ function checkNarratedCharge(config: Config, draft: TurnDraft, applied: Op[]): V
  * A repair may fix a move or a clock. It may not add a charge the narration never stated
  * and the original delta never contained. A narration that says the cost was nothing drops the charge.
  */
+function asInventoryAdd(op: unknown): { owner: string; item: string } | null {
+  if (!op || typeof op !== "object") return null;
+  const rec = op as { op?: unknown; owner?: unknown; item?: unknown };
+  if (rec.op !== "inventory.add" || typeof rec.owner !== "string" || typeof rec.item !== "string") return null;
+  return { owner: rec.owner, item: rec.item };
+}
+
+function chargeReason(op: unknown): string {
+  if (!op || typeof op !== "object") return "";
+  const reason = (op as { reason?: unknown }).reason;
+  return typeof reason === "string" ? reason : "";
+}
+
+/**
+ * A repair may fix a move or a clock. It may not add a charge the narration never stated
+ * and the original delta never contained. A narration that says the cost was nothing drops the charge.
+ * A price range is not that statement. An inventory.add that arrived with the dropped charge goes too.
+ */
 export function dropInventedCharges(original: unknown[], next: unknown[], narration: string, config: Config): unknown[] {
   const keys = chargeKeys(config);
   if (keys.size === 0) return next;
-  if (saysFree(narration)) return next.filter((op) => !asCharge(op, keys));
   const prior = original.map((op) => asCharge(op, keys)).filter((op): op is { key: string; amount: number } => op !== null);
-  return next.filter((op) => {
+  const priorAdds = original.map(asInventoryAdd).filter((op): op is { owner: string; item: string } => op !== null);
+  const keepCharge = (op: unknown): boolean => {
     const charge = asCharge(op, keys);
     if (!charge) return true;
+    if (saysFree(narration)) return false;
     if (prior.some((item) => item.key === charge.key && Math.abs(item.amount - charge.amount) < 0.001)) return true;
     return mentionsAmount(narration, charge.amount);
+  };
+  const droppedReasons = next.filter((op) => asCharge(op, keys) && !keepCharge(op)).map(chargeReason);
+  return next.filter((op) => {
+    if (asCharge(op, keys)) return keepCharge(op);
+    const add = asInventoryAdd(op);
+    if (!add || droppedReasons.length === 0) return true;
+    if (priorAdds.some((item) => item.owner === add.owner && item.item === add.item)) return true;
+    const label = add.item.replace(/[_-]/g, " ");
+    return !droppedReasons.some((reason) => sharedContentWords(label, reason) >= 1);
   });
 }
 

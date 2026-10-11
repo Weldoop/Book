@@ -1,4 +1,4 @@
-import { diffMinutes } from "@book/engine";
+import { diffMinutes, sharedContentWords } from "@book/engine";
 import type { Config, DueItem, Entity, Module, State, Thread } from "@book/schema";
 import { DEFAULT_FOCUS_LIMIT } from "./budget.ts";
 import { wordMatcher } from "./text.ts";
@@ -165,6 +165,17 @@ export function mapAttention(args: AttentionArgs): string[] {
         .map((e) => e.id),
     ),
   );
+  // A stored fact that shares the player's line comes in even when that person is not in the room.
+  const line = input.trim();
+  if (line.length > 0) {
+    add(
+      byScore(
+        Object.values(state.entities)
+          .filter((e) => e.facts.some((fact) => sharedContentWords(fact.text, line) >= 1))
+          .map((e) => e.id),
+      ),
+    );
+  }
   for (const item of due) add(item.entities);
   add(byScore(here));
 

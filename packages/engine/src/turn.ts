@@ -11,6 +11,7 @@ import {
   type TurnKind,
   type Violation,
 } from "@book/schema";
+import { catalogItems } from "./catalog.ts";
 import { consistencyViolations, materializeAt } from "./consistency.ts";
 import { driftStats } from "./drift.ts";
 import { selectHighlights } from "./highlights.ts";
@@ -157,12 +158,13 @@ export function ageThreads(state: State, config: Config, shown: string[], turn: 
   }
 }
 
-/** An offer nobody took up lapses. It does not become a punishment. */
-export function lapsePotentials(state: State, turn: number): void {
+/** An offer nobody took up lapses. It does not become a punishment. Goods that arrived are not a miss. */
+export function lapsePotentials(state: State, turn: number, config?: Config): void {
   const now = state.clock.now;
   for (const thread of state.threads) {
     if (thread.status !== "open" || thread.scale !== "potential" || thread.expires === undefined) continue;
     if (diffMinutes(now, thread.expires) < 0) continue;
+    if (config && goodsArrived(state, config, thread)) continue;
     thread.status = "failed";
     thread.resolved_turn = turn;
   }
@@ -247,6 +249,66 @@ export function settlePaidThreads(state: State, config: Config, applied: Op[], t
   }
 }
 
+const PLACE_SKIP = new Set(["the", "and", "for", "with", "from", "your"]);
+
+function labelWords(label: string): string[] {
+  return label
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .split(/[^a-z0-9]+/)
+    .filter((word) => word.length >= 3 && !PLACE_SKIP.has(word));
+}
+
+function textHasWords(text: string, words: string[]): boolean {
+  if (words.length === 0) return false;
+  const hay = text.toLowerCase();
+  return words.every((word) => new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(hay));
+}
+
+function placeInThread(place: { id: string; name: string; aliases: string[] }, text: string): boolean {
+  const labels = [place.name, ...place.aliases, place.id.replace(/[_-]/g, " ")];
+  return labels.some((label) => textHasWords(text, labelWords(label)));
+}
+
+/** The player is holding an item this thread is about buying. */
+function goodsArrived(state: State, config: Config, thread: { text: string }): boolean {
+  const player = config.player_id;
+  const inv = state.modules.inventory as { owners?: Record<string, Record<string, number>> } | undefined;
+  const held = inv?.owners?.[player] ?? {};
+  for (const item of catalogItems(config, state)) {
+    if ((held[item.id] ?? 0) < 1) continue;
+    if (sharedContentWords(`${item.name} ${item.id.replace(/[_-]/g, " ")}`, thread.text) >= 1) return true;
+  }
+  return false;
+}
+
+/**
+ * Buying the thread's item at the thread's place keeps the meetup.
+ * The same item bought somewhere else leaves the thread open.
+ */
+export function settlePurchasedThreads(state: State, config: Config, applied: Op[], turn: number): void {
+  const player = config.player_id;
+  const here = state.entities[player]?.location;
+  const place = here ? state.entities[here] : undefined;
+  if (!place || place.type !== "place") return;
+  const catalog = catalogItems(config, state);
+  for (const op of applied) {
+    if (op.op !== "inventory.add" || op.owner !== player) continue;
+    const item = catalog.find((row) => row.id === op.item);
+    if (!item) continue;
+    const itemText = `${item.name} ${item.id.replace(/[_-]/g, " ")}`;
+    for (const thread of state.threads) {
+      if (thread.status !== "open") continue;
+      if (sharedContentWords(itemText, thread.text) < 1) continue;
+      if (!placeInThread(place, thread.text)) continue;
+      thread.status = "resolved";
+      thread.resolved_turn = turn;
+      thread.resolved_at = state.clock.now;
+    }
+  }
+}
+
 function withThreadContact(state: State, config: Config, input: string): State {
   const next = structuredClone(state);
   noteThreadContact(next, config, input, state.turn + 1);
@@ -271,6 +333,7 @@ export function applyDraft(state: State, config: Config, modules: Module[], draf
   next = structuredClone(next);
   driftStats(next, config, processed);
   settlePaidThreads(next, config, processed.applied, turn);
+  settlePurchasedThreads(next, config, processed.applied, turn);
   for (const item of ctx.due) {
     if (item.thread && !duplicateOpenThread(next.threads, item.thread.text, undefined, next.clock.now)) {
       next.threads.push({
@@ -301,7 +364,7 @@ export function applyDraft(state: State, config: Config, modules: Module[], draf
   }
   ageThreads(next, config, ctx.shown_threads ?? [], turn);
   forgetMemories(next);
-  lapsePotentials(next, turn);
+  lapsePotentials(next, turn, config);
 
   const clockBefore = state.clock.now;
   for (const m of modules) {

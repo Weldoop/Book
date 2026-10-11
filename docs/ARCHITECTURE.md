@@ -32,7 +32,7 @@ Evidence from a real 121-turn session on a plain chat setup (figures are estimat
 | Metric | Target |
 |---|---|
 | Input tokens per turn at turn 200 | under 6,000, and flat from turn ~20 onward |
-| Output tokens per turn | under 250 (narration plus structured delta) |
+| Output tokens per turn | under 400 (narration plus structured delta); one reply hard-stops past 1,000 |
 | Model calls per turn | 1 normally; at most 3 including repairs (plus a batched cheap call when a scene closes) |
 | Time until the player sees the story | under 10 seconds on a normal turn, under 20 seconds on a repaired turn |
 | GM interlude rate (game-breaking drafts) | under 3% of turns |
@@ -296,6 +296,7 @@ How focus is computed (all code, no tokens):
 - **Due events:** entities attached to events firing this turn.
 - **Decay:** entities touched recently or with high importance stay warm; others cool off and drop out.
 - **Module hints:** each module's `focus()` adds what it needs (for example the stat being spent, the faction in the room).
+- **Long memory:** before the one reply, a stored fact that shares words with the player's line is pulled in even when that person is not in the room. On someone already in focus, a fact that shares the line, the player's name or aliases, or an open debt or promised time jumps ahead of a colder fact. The per-entity cap stays 6, and the part caps do not move. No embeddings and no second model call. A later line that puts the same matter in a different place does not sit beside the fact already witnessed.
 
 Safeguards against missing something important:
 - A one-line **scene roster** (who is present, where we are) is always included.
@@ -1013,10 +1014,16 @@ engine, and its model-authored status line had already drifted within a single s
     part and the module fragments no longer repeat RULES; the stats module keeps a dated money
     log. See ADR 0023.
 
-### Build status (7 Oct 2026)
+59. The output bar is 400 tokens. One story reply still hard-stops at 1,000, and the fourth call
+    (a rewrite that commits) stays. Before that reply the engine pulls matching long-memory facts
+    into the same prompt. A price range is not a charge, "in working order" is not a purchase, and
+    haggling in words still is. Buying a thread's item at its place resolves it; a miss is only
+    when the goods never arrive. A recall probe fails when the answer denies the fact. See ADR 0025.
+
+### Build status (11 Oct 2026)
 
 Phase 0 (contracts) and Phase 1 (core build) are implemented, plus the fixes from the live sessions
-and the ADR 0005 through 0024 changes; 461 tests pass.
+and the ADR 0005 through 0025 changes; 486 tests pass.
 
 | Area | State |
 |---|---|
@@ -1045,6 +1052,8 @@ and the ADR 0005 through 0024 changes; 461 tests pass.
 | Place from `at`, a clock that can go back, no charge when it cost nothing, cast slots (ADR 0021) | done; played live for 69 turns on Haiku 4.5 |
 | Validators that read less prose, the normalize pass, dated memory, energy drift, name-only highlights (ADR 0022) | done; played live for 44 and 34 turns on Haiku 4.5 (60 ok, 15 repaired, 4 rolled back) |
 | Deadline distances by the clock, inside/home as places, weekday dates in code, measured contract (ADR 0023) | done; mock-tested, live run pending |
+| Phase 2 bars at 6,000 input tokens and a 1% rollback (ADR 0024) | done; the pass line moved, the trim caps did not |
+| Reply memory, quote charges, meetup buys, honest probes (ADR 0025) | done; mock-tested |
 | Real-model benchmark (Phase 2) | three short live sessions played; full golden-session benchmark not yet run |
 | `need` / attention-miss handling, delta-first experiment results | not yet implemented / not yet measured |
 | Nuxt UI, Supabase, hosted trial, wizard | later phases |

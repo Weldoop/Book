@@ -46,6 +46,11 @@ const attend = (over: Record<string, unknown> = {}, state = entityState()) =>
   mapAttention({ config, state, modules: [], input: "look around", due: [], ...over });
 
 describe("mapAttention", () => {
+  it("pulls someone whose stored fact shares the player's line, even from another room", () => {
+    const ids = attend({ input: "who owes the tenner" });
+    expect(ids.slice(0, 3)).toEqual(["flat", "dai", "glenys"]);
+  });
+
   it("puts the location and the entities there first, excluding the player", () => {
     const ids = attend();
     expect(ids.slice(0, 2)).toEqual(["flat", "glenys"]);

@@ -1,5 +1,6 @@
 import type { Config, Module, State } from "@book/schema";
 import { mapAttention } from "./attention.ts";
+import { recallHaystack } from "./recall.ts";
 import { resolveBudget } from "./budget.ts";
 import { allThreadsSection, beatsSection, focusSection, sceneSection, stateSection, storySection, windowSection } from "./sections.ts";
 import { tokensOf } from "./text.ts";
@@ -32,7 +33,9 @@ export function buildOocContext(i: OocInput): BuiltContext {
   const budget = resolveBudget();
   const question = stripOocMarkers(i.input);
   const ids = mapAttention({ ...i, input: question, due: [], limit: 6 });
-  const focus = focusSection(i.state, ids, 300);
+  const player = i.state.entities[i.config.player_id];
+  const recall = recallHaystack(question, i.state.threads, player ? [player.name, ...player.aliases] : []);
+  const focus = focusSection(i.state, ids, 300, recall);
 
   const sections = [
     { part: "scene", section: sceneSection(i.config, i.state) },

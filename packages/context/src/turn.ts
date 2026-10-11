@@ -16,6 +16,7 @@ import {
   windowSection,
   type Section,
 } from "./sections.ts";
+import { recallHaystack } from "./recall.ts";
 import { tokensOf } from "./text.ts";
 import { worldSheetSection } from "./world.ts";
 import type { BuiltContext, ContextPart, OutputOrder } from "./types.ts";
@@ -53,7 +54,9 @@ export function assembleTurn(i: BuildContextInput): TurnAssembly {
     input: i.input,
     due: i.due,
   });
-  const focus = focusSection(i.state, focusIds, budget.entities_in_focus);
+  const player = i.state.entities[i.config.player_id];
+  const recall = recallHaystack(i.input, i.state.threads, player ? [player.name, ...player.aliases] : []);
+  const focus = focusSection(i.state, focusIds, budget.entities_in_focus, recall);
 
   const threads = threadsSection(i.state, i.config, i.input, budget.threads);
   const sections: { part: string; section: Section }[] = [

@@ -99,6 +99,11 @@ describe("probe helpers", () => {
   it("scores case-insensitively with any keyword", () => {
     expect(scoreProbe("It was DAI who came", ["dai"])).toBe(true);
     expect(scoreProbe("nobody", ["dai", "glenys"])).toBe(false);
+    expect(scoreProbe("No one called Dai came", ["dai"])).toBe(false);
+    expect(scoreProbe("You don't know a Nathan", ["nathan"])).toBe(false);
+    expect(scoreProbe("Dai didn't come", ["dai"])).toBe(false);
+    expect(scoreProbe("It was never Dai", ["dai"])).toBe(false);
+    expect(scoreProbe("You don't know the time. It was Dai.", ["dai"])).toBe(true);
   });
   it("dueProbes returns each probe once when reached", () => {
     const p: Probe[] = [

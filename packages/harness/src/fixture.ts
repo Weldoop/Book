@@ -33,9 +33,20 @@ export function parseProbes(json: unknown, source = "probes"): Probe[] {
   return [...r.data].sort((a, b) => a.after_turn - b.after_turn);
 }
 
+const DENIAL =
+  /\b(?:no one|nobody|no-one|never|not|didn't|did not|don't|do not|doesn't|does not|wasn't|was not|isn't|is not|aren't|are not|can't|cannot|won't|will not|haven't|have not|hasn't|has not)\b/i;
+
+/** A probe passes when the answer affirms a keyword. A denial that still contains the word does not. */
 export function scoreProbe(answer: string, expectAny: string[]): boolean {
-  const hay = answer.toLowerCase();
-  return expectAny.some((k) => hay.includes(k.toLowerCase()));
+  const parts = answer
+    .split(/[.!?\n]+/)
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => sentence.length > 0);
+  const sentences = parts.length > 0 ? parts : [answer];
+  return expectAny.some((keyword) => {
+    const needle = keyword.toLowerCase();
+    return sentences.some((sentence) => sentence.toLowerCase().includes(needle) && !DENIAL.test(sentence));
+  });
 }
 
 /** Probes not yet asked whose `after_turn` has been reached. */

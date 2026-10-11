@@ -131,6 +131,7 @@ export async function newGame(rt: Runtime, saveId: string): Promise<State> {
   return state;
 }
 
+/** Hard ceiling for one story reply. The phase target is 400 output tokens; this stops a tail past 1,000. */
 const TURN_MAX_TOKENS = 1000;
 const MAX_REPAIRS = 2;
 
