@@ -27,7 +27,7 @@ private notes. Both panels open and close, including on a phone.
 
 ## Consequences
 
-The phone console and its Vercel project are unchanged. The owner switched this from Google to the
+The phone console and its Vercel project are unchanged. The play app is a separate Vercel project whose root directory is `apps/web`. The owner switched this from Google to the
 email provider on the project named book. Confirmation links need the site origin on the redirect
 list. The Phase 3 tester gate is still open: the app is the place they play, and the pass is still
 that they continue unprompted.

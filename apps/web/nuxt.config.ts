@@ -28,5 +28,10 @@ export default defineNuxtConfig({
     externals: {
       inline: [/^@book\//],
     },
+    vercel: {
+      functions: {
+        maxDuration: 60,
+      },
+    },
   },
 });
