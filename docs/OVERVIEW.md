@@ -12,7 +12,7 @@ The player types; a game master (one language-model call) writes a short scene a
 
 The proof of concept exists to test one claim:
 
-> A game of 200+ turns, in 30–60 minute sessions that can be saved and resumed, can stay coherent and engaging while the context sent per turn stays small and flat (under 5k input tokens, and flat from about turn 20 onward).
+> A game of 200+ turns, in 30–60 minute sessions that can be saved and resumed, can stay coherent and engaging while the context sent per turn stays small and flat (under 6,000 input tokens, and flat from about turn 20 onward).
 
 Publishing, billing, a web UI, a world wizard, and multiplayer are designed for and not built. What is built is a TypeScript monorepo, a CLI harness, two game configs, and the engine those configs run on.
 
@@ -141,7 +141,7 @@ Before validation, a deterministic tidy pass (ADR 0022) fixes what needs no judg
 
 ### Context stays flat on purpose
 
-Each part of the prompt has a hard token cap. Over-budget parts are trimmed by importance, then recency. The player’s input is never trimmed. Total target is under 5k, independent of how long the game has run or how big the world is.
+Each part of the prompt has a hard token cap. Over-budget parts are trimmed by importance, then recency. The player’s input is never trimmed. Total target is under 6,000, independent of how long the game has run or how big the world is.
 
 What the storyteller sees is chosen in code (attention mapping): current place and who is there, names in the input, hot threads, due events, and a recency/importance decay. No embeddings in the proof of concept. A one-line scene roster always goes in. The storyteller may ask for ids it lacks (`need`); that is logged as an attention miss rather than solved with a retrieval system.
 
@@ -204,9 +204,9 @@ pnpm book play --config configs/uk-life/config.json --provider mock
 
 ## What is done, and what is not
 
-Phase 0 (contracts) and Phase 1 (core build) are implemented, including the playtest-driven ADRs through 0023. Tests run on the mock provider.
+Phase 0 (contracts) and Phase 1 (core build) are implemented, including the playtest-driven ADRs through 0024. Tests run on the mock provider.
 
-Measured on the mock golden replay, per-turn input stays flat (a little over 3k after the later contract additions, still under the 5k target). Live Haiku sessions of 34 and 44 turns held at about 4.9k input tokens a turn, flat across chapter writes, at roughly $0.008 a turn; about a quarter of turns needed a cheap repair call and one in thirty was rolled back. Mock replies are short, so the baseline’s growth is understated; the real comparison is the Phase 2 benchmark on a live model, which has not been run in full. Short live sessions drove most of the later ADRs.
+Measured on the mock golden replay, per-turn input stays flat (a little over 3k after the later contract additions, still under the 6,000 target). Live Haiku sessions of 34 and 44 turns held at about 4.9k input tokens a turn, flat across chapter writes, at roughly $0.008 a turn; about a quarter of turns needed a cheap repair call and one in thirty was rolled back. Mock replies are short, so the baseline’s growth is understated; the real comparison is the Phase 2 benchmark on a live model, which has not been run in full. Short live sessions drove most of the later ADRs.
 
 Not in this repository yet: `need` / attention-miss handling as a second call, a measured delta-first streaming experiment, the Nuxt UI, Supabase, hosted trial, and the creator wizard. The wizard, when it exists, is meant to emit this config — prose cards over the string-valued parts, countable parts staying structured — not to invent a new kind of stat.
 

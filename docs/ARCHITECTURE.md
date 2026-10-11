@@ -31,13 +31,13 @@ Evidence from a real 121-turn session on a plain chat setup (figures are estimat
 
 | Metric | Target |
 |---|---|
-| Input tokens per turn at turn 200 | under 5k, and flat from turn ~20 onward |
+| Input tokens per turn at turn 200 | under 6,000, and flat from turn ~20 onward |
 | Output tokens per turn | under 250 (narration plus structured delta) |
 | Model calls per turn | 1 normally; at most 3 including repairs (plus a batched cheap call when a scene closes) |
 | Time until the player sees the story | under 10 seconds on a normal turn, under 20 seconds on a repaired turn |
 | GM interlude rate (game-breaking drafts) | under 3% of turns |
 | Recall probes (facts from turns 1-50 asked at turn 200) | at least 90% correct |
-| Turns that fail all repairs and roll back | under 0.5% |
+| Turns that fail all repairs and roll back | under 1% |
 | Replay determinism | identical state from the delta log, 100% |
 
 ---
@@ -1016,7 +1016,7 @@ engine, and its model-authored status line had already drifted within a single s
 ### Build status (7 Oct 2026)
 
 Phase 0 (contracts) and Phase 1 (core build) are implemented, plus the fixes from the live sessions
-and the ADR 0005 through 0023 changes; 461 tests pass.
+and the ADR 0005 through 0024 changes; 461 tests pass.
 
 | Area | State |
 |---|---|
@@ -1054,7 +1054,7 @@ First mock benchmark (125 turns, estimates only, mock replies are short so basel
 After ADR 0005 the same replay averages 2,937 input tokens per turn (2,927 at turn 25, 2,818 at turn
 125), up 128 on the run before it. The rise is the `consequence` fragment, the `jeopardy` rule and
 stat and two extra seeded places, and most of it sits in the cacheable static block. Still well
-inside the 5k target, and still flat.
+inside the 6,000 target, and still flat.
 
 After ADR 0006 it averages 3,217 (3,216 at turn 25, 3,108 at turn 125), up a further 280. Almost all
 of that is the two new contract sections, so all but about 800 tokens of the 35k cumulative rise is

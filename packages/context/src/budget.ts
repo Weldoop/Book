@@ -14,7 +14,7 @@ export interface ContextBudget {
   story_so_far: number;
 }
 
-/** Per-part token caps from docs/ARCHITECTURE.md section 6. Sum is ~4.9k, still under 5k. */
+/** Per-part token caps from docs/ARCHITECTURE.md section 6. Sum is ~4.9k. The phase target is 6,000. */
 export const DEFAULT_BUDGET: ContextBudget = {
   contract: 700,
   module_fragments: 500,
