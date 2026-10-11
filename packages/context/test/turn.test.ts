@@ -216,6 +216,7 @@ describe("buildTurnContext structure", () => {
       "contract",
       "module_fragments",
       "scene",
+      "ledger",
       "state_snapshot",
       "due_events",
       "threads",

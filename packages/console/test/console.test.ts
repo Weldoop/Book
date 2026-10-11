@@ -194,7 +194,7 @@ describe("console http", () => {
     expect(info.status).toBe(200);
     const body = JSON.parse(info.body) as { provider: string; maxCostUsd: number; needsToken: boolean; games: { title: string }[] };
     expect(body.provider).toBe("mock");
-    expect(body.maxCostUsd).toBe(2);
+    expect(body.maxCostUsd).toBe(5);
     expect(body.needsToken).toBe(false);
     expect(body.games[0]?.title).toBe("Uplands: A Student Life");
 
@@ -295,7 +295,7 @@ describe("console http", () => {
   });
 
   it("reads provider and cap settings", () => {
-    expect(readSettings({})).toEqual({ provider: "mock", maxCostUsd: 2 });
+    expect(readSettings({})).toEqual({ provider: "mock", maxCostUsd: 5 });
     expect(readSettings({ ANTHROPIC_API_KEY: "k" }).provider).toBe("anthropic");
     expect(readSettings({ ANTHROPIC_API_KEY: "k", BOOK_PROVIDER: "mock" }).provider).toBe("mock");
     expect(readSettings({ BOOK_MAX_COST_USD: "0.5", BOOK_CONSOLE_TOKEN: "  t  " })).toEqual({

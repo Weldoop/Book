@@ -20,6 +20,14 @@ function nameOf(state: State, id: string): string {
   return state.entities[id]?.name ?? id;
 }
 
+function youLine(player: Entity): string | null {
+  const aliases = player.aliases.filter((alias) => !/^(me|myself|i)$/i.test(alias.trim()));
+  const aka = aliases.length ? `; aka ${aliases.join(", ")}` : "";
+  const name = player.name.trim();
+  if (!name || name.toLowerCase() === "you") return aliases.length ? `You [${player.id}]${aka}` : null;
+  return `You: ${name} [${player.id}]${aka}`;
+}
+
 export function sceneSection(config: Config, state: State): Section {
   const now = state.clock.now;
   const dow = dayOfWeek(now);
@@ -30,6 +38,8 @@ export function sceneSection(config: Config, state: State): Section {
     `Scene ${state.scene.index}, running ${sceneTurns} turn${sceneTurns === 1 ? "" : "s"}`,
     `Now: ${now}${dow ? ` (${dow})` : ""}`,
   ];
+  const who = player ? youLine(player) : null;
+  if (who) lines.push(who);
   if (locId) {
     lines.push(`Location: ${nameOf(state, locId)} [${locId}]`);
     const present = Object.values(state.entities)
@@ -61,6 +71,14 @@ export function dueSection(config: Config, due: DueItem[], fate: number | undefi
   const fit = fitLines(header, items, cap - Math.ceil(reserve / 4), "end");
   const lines = fateLine ? [...fit.lines, fateLine] : fit.lines;
   return { text: renderSection(header, lines), trimmed: fit.trimmed };
+}
+
+/** What the player stated, kept after it leaves the six-turn window. Capped at the ledger budget. */
+export function ledgerSection(state: State, cap: number): Section {
+  const lines = (state.ledger ?? []).map((entry) => `- t${entry.turn}: ${entry.text}`);
+  if (lines.length === 0) return EMPTY;
+  const fit = fitLines("## WHAT YOU SAID", lines, cap, "start");
+  return { text: renderSection("## WHAT YOU SAID", fit.lines), trimmed: fit.trimmed };
 }
 
 /** Every open thread, for out-of-character recall ("what am I meant to be doing?"). Costs a cheap call only. */

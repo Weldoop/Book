@@ -33,6 +33,7 @@ function state(saveId: string, turn: number): State {
     notes: [],
     ending: null,
     endings_seen: [],
+    ledger: [],
     modules: {},
   };
 }

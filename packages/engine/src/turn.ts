@@ -20,6 +20,7 @@ import { forgetMemories } from "./memory.ts";
 import { normalizeDraft } from "./normalize.ts";
 import { processOps } from "./ops.ts";
 import { resolveStatKey } from "./stat-key.ts";
+import { recordPlayerStatements } from "./statements.ts";
 import { duplicateOpenThread, sharedContentWords } from "./threads.ts";
 import { rngFor } from "./rng.ts";
 import { addMinutes, diffMinutes } from "./time.ts";
@@ -389,6 +390,7 @@ export function applyDraft(state: State, config: Config, modules: Module[], draf
   });
   if (next.window.length > WINDOW_CAP) next.window = next.window.slice(-WINDOW_CAP);
   next.focus_next = (draft.focus_next ?? []).filter((id) => next.entities[id]).slice(0, 8);
+  recordPlayerStatements(next, config, ctx.input);
   return syncPresence(next, config);
 }
 

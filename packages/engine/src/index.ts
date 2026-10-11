@@ -6,6 +6,8 @@ export * from "./ops.ts";
 export * from "./stat-key.ts";
 export * from "./state.ts";
 export * from "./turn.ts";
+export { LEDGER_CAP, readPlayerStatements, recordPlayerStatements } from "./statements.ts";
+export type { StatementHit } from "./statements.ts";
 export { dropInventedCharges } from "./consistency.ts";
 export { selectHighlights } from "./highlights.ts";
 export * from "./catalog.ts";

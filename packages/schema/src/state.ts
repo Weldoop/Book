@@ -102,6 +102,17 @@ export const GmNoteSchema = z.object({
 });
 export type GmNote = z.infer<typeof GmNoteSchema>;
 
+/**
+ * A line the player stated, written by the engine on that turn.
+ * Name and alias stay. Commitments are capped. Old saves load with none.
+ */
+export const LedgerEntrySchema = z.object({
+  turn: z.number().int().min(0),
+  text: z.string().max(160),
+  kind: z.enum(["name", "alias", "commitment"]).default("commitment"),
+});
+export type LedgerEntry = z.infer<typeof LedgerEntrySchema>;
+
 /** An ending that has fired and is waiting for the player to carry on or leave it here. */
 export const PendingEndingSchema = z.object({
   id: IdSchema,
@@ -134,6 +145,8 @@ export const StateSchema = z.object({
   ending: PendingEndingSchema.nullable().default(null),
   /** Endings already fired, so one cannot fire twice after a continuation. */
   endings_seen: z.array(IdSchema).default([]),
+  /** What the player stated. The engine writes it; the model does not. */
+  ledger: z.array(LedgerEntrySchema).default([]),
   modules: z.record(z.string(), z.unknown()),
 });
 export type State = z.infer<typeof StateSchema>;

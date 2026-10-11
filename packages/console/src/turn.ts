@@ -9,6 +9,8 @@ import type { TurnResult } from "@book/runtime";
 import { findGame, listGames } from "./games.ts";
 import { presentTurn } from "./lines.ts";
 import type { ConsoleLine, Presented } from "./lines.ts";
+import { shownLines } from "./log.ts";
+import type { SessionLog } from "./log.ts";
 
 export const MAX_INPUT_CHARS = 2000;
 
@@ -21,12 +23,17 @@ export interface TurnBody {
   input?: unknown;
   state?: unknown;
   spentUsd?: unknown;
+  /** Scrollback already on the phone. Logged once, then left alone. */
+  lines?: unknown;
+  /** Keep the scrollback and do not call the storyteller. */
+  sync?: unknown;
 }
 
 export interface HandleOptions {
   llm: LLMProvider;
   maxCostUsd: number;
   newSaveId?: () => string;
+  log?: SessionLog;
 }
 
 export interface TurnOk extends Presented {
@@ -34,6 +41,18 @@ export interface TurnOk extends Presented {
   title: string;
   state: State;
   spentUsd: number;
+}
+
+export interface SyncOk {
+  ok: true;
+  sync: true;
+  logged: boolean;
+  title: string;
+  state: State;
+  spentUsd: number;
+  lines: ConsoleLine[];
+  suggestions: string[];
+  ended: false;
 }
 
 export interface TurnErr {
@@ -46,7 +65,7 @@ export interface TurnErr {
   spentUsd?: number;
 }
 
-export type TurnResponse = TurnOk | TurnErr;
+export type TurnResponse = TurnOk | TurnErr | SyncOk;
 
 export function newSaveId(now: Date = new Date()): string {
   const stamp = now.toISOString().replace(/\D/g, "").slice(0, 14);
@@ -76,6 +95,21 @@ function costOf(result: TurnResult): number {
   return Math.round(sum * 1e6) / 1e6;
 }
 
+function syncResult(title: string, state: State, spentUsd: number, logged: boolean): SyncOk {
+  return { ok: true, sync: true, logged, title, state, spentUsd, lines: [], suggestions: [], ended: false };
+}
+
+/** A log failure must not hide a turn the engine already committed. */
+async function remember(log: SessionLog | undefined, fn: () => Promise<void>): Promise<void> {
+  if (!log) return;
+  try {
+    await fn();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "failed";
+    process.stderr.write(`console log: ${message}\n`);
+  }
+}
+
 function parseExisting(raw: unknown): State | null {
   if (raw == null) return null;
   const parsed = StateSchema.safeParse(raw);
@@ -95,6 +129,36 @@ export async function handleTurn(body: TurnBody, opts: HandleOptions): Promise<T
   if (body.state != null && !existing) return fail("This save could not be read. /new starts again.");
   if (existing && existing.config_id !== config.id) {
     return fail(`That save belongs to ${existing.config_id}. /new starts again.`, existing, spentUsd);
+  }
+  if (body.sync === true) {
+    if (!existing) return fail("Nothing to keep yet. Pick a game first.");
+    if (!opts.log) return syncResult(config.meta.title, existing, spentUsd, false);
+    try {
+      const logged = await opts.log.archive({
+        saveId: existing.save_id,
+        configId: config.id,
+        title: config.meta.title,
+        lines: shownLines(body.lines),
+        spentUsd,
+        state: existing,
+      });
+      return syncResult(config.meta.title, existing, spentUsd, logged);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "The session could not be kept.";
+      return fail(message, existing, spentUsd);
+    }
+  }
+  if (existing && opts.log && body.lines !== undefined) {
+    await remember(opts.log, () =>
+      opts.log!.archive({
+        saveId: existing.save_id,
+        configId: config.id,
+        title: config.meta.title,
+        lines: shownLines(body.lines),
+        spentUsd,
+        state: existing,
+      }).then(() => undefined),
+    );
   }
   if (spentUsd >= opts.maxCostUsd) {
     return fail(
@@ -124,13 +188,27 @@ export async function handleTurn(body: TurnBody, opts: HandleOptions): Promise<T
     const state = await store.loadSave(saveId);
     if (!opened) {
       const premise = config.meta.premise.trim();
+      const lines: ConsoleLine[] = [
+        ...(premise ? [{ kind: "story" as const, text: premise }] : []),
+        { kind: "note", text: "One line is one turn. /new starts over." },
+      ];
+      await remember(opts.log, () =>
+        opts.log!.append({
+          saveId: state.save_id,
+          configId: config.id,
+          title: config.meta.title,
+          input: null,
+          turn: state.turn,
+          outcome: null,
+          lines,
+          spentUsd,
+          state,
+        }),
+      );
       return {
         ok: true,
         title: config.meta.title,
-        lines: [
-          ...(premise ? [{ kind: "story" as const, text: premise }] : []),
-          { kind: "note", text: "One line is one turn. /new starts over." },
-        ],
+        lines,
         suggestions: [],
         ended: false,
         state,
@@ -139,12 +217,27 @@ export async function handleTurn(body: TurnBody, opts: HandleOptions): Promise<T
     }
     const presented = presentTurn(opened, { profile: config.presentation.profile, wallMs: performance.now() - t0 });
     presented.lines.push({ kind: "note", text: "One line is one turn. /new starts over." });
+    const spent = Math.round((spentUsd + costOf(opened)) * 1e6) / 1e6;
+    await remember(opts.log, () =>
+      opts.log!.append({
+        saveId: state.save_id,
+        configId: config.id,
+        title: config.meta.title,
+        input: null,
+        turn: state.turn,
+        outcome: opened.outcome,
+        lines: presented.lines,
+        spentUsd: spent,
+        state,
+        record: opened.record,
+      }),
+    );
     return {
       ok: true,
       title: config.meta.title,
       ...presented,
       state,
-      spentUsd: Math.round((spentUsd + costOf(opened)) * 1e6) / 1e6,
+      spentUsd: spent,
     };
   }
 
@@ -167,11 +260,26 @@ export async function handleTurn(body: TurnBody, opts: HandleOptions): Promise<T
   }
   const state = await store.loadSave(existing.save_id);
   const presented = presentTurn(result, { profile: config.presentation.profile, wallMs: performance.now() - t0 });
+  const spent = Math.round((spentUsd + costOf(result)) * 1e6) / 1e6;
+  await remember(opts.log, () =>
+    opts.log!.append({
+      saveId: state.save_id,
+      configId: config.id,
+      title: config.meta.title,
+      input: text.length === 0 ? "..." : text,
+      turn: state.turn,
+      outcome: result.outcome,
+      lines: presented.lines,
+      spentUsd: spent,
+      state,
+      record: result.record,
+    }),
+  );
   return {
     ok: true,
     title: config.meta.title,
     ...presented,
     state,
-    spentUsd: Math.round((spentUsd + costOf(result)) * 1e6) / 1e6,
+    spentUsd: spent,
   };
 }

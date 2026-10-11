@@ -4,6 +4,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { createProvider } from "@book/llm";
 import type { LLMProvider } from "@book/schema";
 import { listGames } from "./games.ts";
+import { readLatestSession, sessionLogFromEnv } from "./log.ts";
 import { handleTurn } from "./turn.ts";
 import type { TurnBody } from "./turn.ts";
 
@@ -34,6 +35,16 @@ export interface RouteResult {
 
 const JSON_TYPE = "application/json; charset=utf-8";
 
+/** Sync never calls the model. This stands in when the route was not given one. */
+function idleLlm(): LLMProvider {
+  return {
+    name: "mock",
+    complete: () => {
+      throw new Error("sync does not call the storyteller");
+    },
+  };
+}
+
 export function readSettings(env: Record<string, string | undefined>): ConsoleSettings {
   const rawProvider = env.BOOK_PROVIDER?.trim();
   const key = env.ANTHROPIC_API_KEY?.trim();
@@ -43,7 +54,7 @@ export function readSettings(env: Record<string, string | undefined>): ConsoleSe
   else throw new Error(`Unknown BOOK_PROVIDER "${rawProvider}". Use mock or anthropic.`);
 
   const capRaw = env.BOOK_MAX_COST_USD?.trim();
-  const maxCostUsd = capRaw === undefined || capRaw === "" ? 2 : Number(capRaw);
+  const maxCostUsd = capRaw === undefined || capRaw === "" ? 5 : Number(capRaw);
   if (!Number.isFinite(maxCostUsd) || maxCostUsd < 0) {
     throw new Error("BOOK_MAX_COST_USD must be a number >= 0.");
   }
@@ -86,6 +97,18 @@ export async function route(req: RouteRequest): Promise<RouteResult> {
     const html = pageHtml(req.page);
     return { status: 200, contentType: "text/html; charset=utf-8", body: method === "HEAD" ? "" : html };
   }
+  if (path === "/api/resume" && (method === "GET" || method === "HEAD")) {
+    let settings: ConsoleSettings;
+    try {
+      settings = readSettings(req.env);
+    } catch (err) {
+      return json(500, { ok: false, error: err instanceof Error ? err.message : "The console is not configured." });
+    }
+    if (!tokenOk(req.headers.authorization, settings.token)) return json(401, { ok: false, error: "Wrong token." });
+    const root = req.env.BOOK_CONSOLE_LOG?.trim();
+    const session = root ? await readLatestSession(root) : null;
+    return { status: 200, contentType: JSON_TYPE, body: method === "HEAD" ? "" : JSON.stringify({ ok: true, session }) };
+  }
   if (path !== "/api/turn") return { status: 404, contentType: "text/plain; charset=utf-8", body: "Not found\n" };
 
   let settings: ConsoleSettings;
@@ -124,8 +147,10 @@ export async function route(req: RouteRequest): Promise<RouteResult> {
   }
 
   try {
-    const llm = req.llm ?? createProvider(settings.provider, req.env);
-    const result = await handleTurn(body, { llm, maxCostUsd: settings.maxCostUsd });
+    const log = sessionLogFromEnv(req.env);
+    const llm =
+      body.sync === true ? (req.llm ?? idleLlm()) : (req.llm ?? createProvider(settings.provider, req.env));
+    const result = await handleTurn(body, { llm, maxCostUsd: settings.maxCostUsd, ...(log ? { log } : {}) });
     return json(200, result);
   } catch (err) {
     const message = err instanceof Error ? err.message : "The storyteller is unavailable right now.";

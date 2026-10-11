@@ -63,6 +63,7 @@ export function createInitialState(config: Config, modules: Module[], saveId: st
     notes: [],
     ending: null,
     endings_seen: [],
+    ledger: [],
     modules: moduleState,
   };
 }

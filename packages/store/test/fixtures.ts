@@ -19,6 +19,7 @@ export function makeState(saveId = "s1", turn = 0): State {
     notes: [],
     ending: null,
     endings_seen: [],
+    ledger: [],
     modules: {},
   };
 }

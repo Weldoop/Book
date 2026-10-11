@@ -7,6 +7,8 @@ export interface ContextBudget {
   due_events: number;
   threads: number;
   notes: number;
+  /** What the player stated. ADR 0026. Not a raise of any other part cap. */
+  ledger: number;
   world_sheet: number;
   entities_in_focus: number;
   window: number;
@@ -14,7 +16,7 @@ export interface ContextBudget {
   story_so_far: number;
 }
 
-/** Per-part token caps from docs/ARCHITECTURE.md section 6. Sum is ~4.9k. The phase target is 6,000. */
+/** Per-part token caps from docs/ARCHITECTURE.md section 6. Sum is ~5.0k. The phase target is 6,000. */
 export const DEFAULT_BUDGET: ContextBudget = {
   contract: 700,
   module_fragments: 500,
@@ -23,6 +25,7 @@ export const DEFAULT_BUDGET: ContextBudget = {
   due_events: 100,
   threads: 300,
   notes: 120,
+  ledger: 120,
   world_sheet: 350,
   entities_in_focus: 500,
   window: 800,

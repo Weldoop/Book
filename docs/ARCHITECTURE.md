@@ -267,6 +267,7 @@ The context builder fills a fixed budget in priority order and trims from the bo
 | 6 | Open threads (due soonest first, capped) | ~300 | no |
 | 6a | The GM's private notes from the last few turns (ADR 0006) | ~120 | no |
 | 6b | World sheet: catalog ids and prices, place ids, unmet people (ADR 0007) | ~350 | no |
+| 6c | What the player stated (name and alias stay; six other lines, ADR 0026) | ~120 | no |
 | 7 | Entities in focus (present, named in input, or linked to a hot thread) with top facts | ~500 | no |
 | 8 | Last 6 turns verbatim (more while a scene is still running, trimmed to the budget) | ~800 | no |
 | 9 | Beats since last compaction (max ~20) | ~400 | no |
@@ -296,7 +297,7 @@ How focus is computed (all code, no tokens):
 - **Due events:** entities attached to events firing this turn.
 - **Decay:** entities touched recently or with high importance stay warm; others cool off and drop out.
 - **Module hints:** each module's `focus()` adds what it needs (for example the stat being spent, the faction in the room).
-- **Long memory:** before the one reply, a stored fact that shares words with the player's line is pulled in even when that person is not in the room. On someone already in focus, a fact that shares the line, the player's name or aliases, or an open debt or promised time jumps ahead of a colder fact. The per-entity cap stays 6, and the part caps do not move. No embeddings and no second model call. A later line that puts the same matter in a different place does not sit beside the fact already witnessed.
+- **Long memory:** before the one reply, a stored fact that shares words with the player's line is pulled in even when that person is not in the room. On someone already in focus, a fact that shares the line, the player's name or aliases, or an open debt or promised time jumps ahead of a colder fact. The per-entity cap stays 6, and the part caps do not move. No embeddings and no second model call. A later line that puts the same matter in a different place does not sit beside the fact already witnessed. A name, a nickname, a debt, a reported promise, or a place and a time that the player stated is written by the engine on that turn and stays in a 120-token ledger after it leaves the window. The scene line shows the player's name and aliases. See ADR 0026.
 
 Safeguards against missing something important:
 - A one-line **scene roster** (who is present, where we are) is always included.
@@ -319,6 +320,7 @@ Layers, from hot to cold:
 | Story so far | Rolling summary | Hard cap (~500 tokens) |
 | Entity facts | A person's memory of what they witnessed, or a trait of a place. The game master adds one short fact per person on the turn they witnessed it, and only when it would change a later scene. Importance 1 lapses after a day, 2 after a week, 3 stays | Cap per entity; consolidated at compaction |
 | Threads | Commitments, goals, debts, mysteries, callbacks | Pool unlimited; at most `threads.max_in_context` reach the prompt |
+| What the player said | Name, nickname, and the last six stated debts, promises, and plans | 120 tokens in the prompt. Name and alias also sit on the scene line |
 
 **Callbacks** are first-class: running jokes, favours owed, nicknames, recurring side characters and promises. Compaction must carry them forward as threads or entity facts. This is the main protection against a story that feels flat after summarising.
 
@@ -1020,10 +1022,15 @@ engine, and its model-authored status line had already drifted within a single s
     haggling in words still is. Buying a thread's item at its place resolves it; a miss is only
     when the goods never arrive. A recall probe fails when the answer denies the fact. See ADR 0025.
 
+60. The engine writes down a name, a nickname, a reported promise, a debt, and a place-and-time on
+    the turn the player says them. Weather and a price aside are not stored. The scene line keeps
+    the name. Six other lines stay in a 120-token ledger. A recall keyword has to be a whole word,
+    and "not the Co-op" in a sentence that already stated the fact does not fail it. See ADR 0026.
+
 ### Build status (11 Oct 2026)
 
 Phase 0 (contracts) and Phase 1 (core build) are implemented, plus the fixes from the live sessions
-and the ADR 0005 through 0025 changes; 486 tests pass.
+and the ADR 0005 through 0026 changes; 502 tests pass.
 
 | Area | State |
 |---|---|
@@ -1054,6 +1061,7 @@ and the ADR 0005 through 0025 changes; 486 tests pass.
 | Deadline distances by the clock, inside/home as places, weekday dates in code, measured contract (ADR 0023) | done; mock-tested, live run pending |
 | Phase 2 bars at 6,000 input tokens and a 1% rollback (ADR 0024) | done; the pass line moved, the trim caps did not |
 | Reply memory, quote charges, meetup buys, honest probes (ADR 0025) | done; mock-tested |
+| Player ledger and whole-word probes (ADR 0026) | done; mock-tested |
 | Real-model benchmark (Phase 2) | three short live sessions played; full golden-session benchmark not yet run |
 | `need` / attention-miss handling, delta-first experiment results | not yet implemented / not yet measured |
 | Nuxt UI, Supabase, hosted trial, wizard | later phases |

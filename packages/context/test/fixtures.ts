@@ -97,6 +97,7 @@ export function makeState(over: Partial<State> = {}): State {
     notes: [],
     ending: null,
     endings_seen: [],
+    ledger: [],
     modules: {},
     ...over,
   };

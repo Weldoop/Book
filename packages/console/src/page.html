@@ -212,9 +212,43 @@ function start(gameId) {
   form.hidden = false;
   go("");
 }
+function postTurn(payload) {
+  return fetch("/api/turn", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...(token() ? { authorization: "Bearer " + token() } : {}),
+    },
+    body: JSON.stringify(payload),
+  });
+}
+async function syncLog() {
+  if (!session || !session.state) return;
+  lineEl.disabled = true;
+  sendBtn.disabled = true;
+  try {
+    await postTurn({
+      game: session.game,
+      state: session.state,
+      lines: session.lines,
+      spentUsd: session.spentUsd || 0,
+      sync: true,
+    });
+  } catch {
+    // The next reload tries again. A later turn also sends the scrollback once.
+  } finally {
+    lineEl.disabled = false;
+    sendBtn.disabled = false;
+  }
+}
 async function go(input) {
   if (!session || busy) return;
   busy = true;
+  const history = session.lines.slice();
+  if (session.state || input !== "") {
+    push({ kind: "note", text: "> " + (input.trim() || "...") });
+    persist();
+  }
   lineEl.disabled = true;
   sendBtn.disabled = true;
   const wait = document.createElement("div");
@@ -223,22 +257,17 @@ async function go(input) {
   logEl.appendChild(wait);
   logEl.scrollTop = logEl.scrollHeight;
   try {
-    const res = await fetch("/api/turn", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        ...(token() ? { authorization: "Bearer " + token() } : {}),
-      },
-      body: JSON.stringify({
-        game: session.game,
-        input: input,
-        state: session.state,
-        spentUsd: session.spentUsd || 0,
-      }),
+    const res = await postTurn({
+      game: session.game,
+      input: input,
+      state: session.state,
+      lines: history,
+      spentUsd: session.spentUsd || 0,
     });
     let data = {};
     try { data = await res.json(); } catch { data = {}; }
     wait.remove();
+    if (data.sync) return;
     const message = data.error || "The storyteller is unavailable right now. Try again in a moment.";
     if (!res.ok || data.ok === false) {
       if (!session.state) {
@@ -284,17 +313,45 @@ form.addEventListener("submit", (event) => {
     reset();
     return;
   }
-  const shown = text.trim() || "...";
-  push({ kind: "note", text: "> " + shown });
-  persist();
-  go(shown);
+  go(text.trim() || "...");
 });
+async function resumeLatest() {
+  logEl.textContent = "…";
+  try {
+    const res = await fetch("/api/resume", {
+      headers: token() ? { authorization: "Bearer " + token() } : {},
+    });
+    const data = await res.json();
+    const saved = data && data.session;
+    if (!res.ok || !saved || !saved.state || !Array.isArray(saved.lines)) {
+      showPicker();
+      return;
+    }
+    session = {
+      game: saved.game,
+      lines: saved.lines,
+      suggestions: [],
+      state: saved.state,
+      spentUsd: typeof saved.spentUsd === "number" ? saved.spentUsd : 0,
+      ended: false,
+      status: "",
+      title: saved.title || "",
+    };
+    const status = session.lines.slice().reverse().find((line) => line.kind === "status");
+    if (status) session.status = status.text;
+    persist();
+    paint();
+  } catch {
+    showPicker("The storyteller is unavailable right now. Try again in a moment.");
+  }
+}
 try { session = JSON.parse(localStorage.getItem(SESSION_KEY) || "null"); } catch { session = null; }
 if (!session || !session.state || !Array.isArray(session.lines)) {
   session = null;
-  showPicker();
+  resumeLatest();
 } else {
   paint();
+  syncLog();
 }
 </script>
 </body>

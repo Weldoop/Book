@@ -3,6 +3,7 @@ dist/
 .env
 .env.local
 .book-data/
+.book-console/
 *.log
 coverage/
 .vercel/

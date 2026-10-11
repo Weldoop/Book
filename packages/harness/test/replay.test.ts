@@ -104,6 +104,16 @@ describe("probe helpers", () => {
     expect(scoreProbe("Dai didn't come", ["dai"])).toBe(false);
     expect(scoreProbe("It was never Dai", ["dai"])).toBe(false);
     expect(scoreProbe("You don't know the time. It was Dai.", ["dai"])).toBe(true);
+    expect(
+      scoreProbe(
+        "You bought oat milk and a pint of milk at the shops on Uplands Crescent (not specifically the Co-op).",
+        ["milk"],
+      ),
+    ).toBe(true);
+    expect(scoreProbe("Dai is not coming", ["dai"])).toBe(false);
+    expect(scoreProbe("The garden blitz happened with Cerys, but no deal.", ["rys", "rhys", "rees"])).toBe(false);
+    expect(scoreProbe("His name is Nathan", ["nath"])).toBe(false);
+    expect(scoreProbe("His name is Nathan", ["nathan", "nath"])).toBe(true);
   });
   it("dueProbes returns each probe once when reached", () => {
     const p: Probe[] = [

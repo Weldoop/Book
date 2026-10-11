@@ -8,6 +8,7 @@ import {
   engineNowSection,
   focusSection,
   inputSection,
+  ledgerSection,
   notesSection,
   sceneSection,
   stateSection,
@@ -61,6 +62,7 @@ export function assembleTurn(i: BuildContextInput): TurnAssembly {
   const threads = threadsSection(i.state, i.config, i.input, budget.threads);
   const sections: { part: string; section: Section }[] = [
     { part: "scene", section: sceneSection(i.config, i.state) },
+    { part: "ledger", section: ledgerSection(i.state, budget.ledger) },
     { part: "state_snapshot", section: stateSection(i.config, i.state, i.modules, budget.state_snapshot) },
     { part: "due_events", section: dueSection(i.config, i.due, i.fate, budget.due_events) },
     { part: "threads", section: threads },

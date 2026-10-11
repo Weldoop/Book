@@ -204,7 +204,7 @@ pnpm book play --config configs/uk-life/config.json --provider mock
 
 ## What is done, and what is not
 
-Phase 0 (contracts) and Phase 1 (core build) are implemented, including the playtest-driven ADRs through 0025. Tests run on the mock provider.
+Phase 0 (contracts) and Phase 1 (core build) are implemented, including the playtest-driven ADRs through 0026. Tests run on the mock provider.
 
 Measured on the mock golden replay, per-turn input stays flat (a little over 3k after the later contract additions, still under the 6,000 target). Live Haiku sessions of 34 and 44 turns held at about 4.9k input tokens a turn, flat across chapter writes, at roughly $0.008 a turn; about a quarter of turns needed a cheap repair call and one in thirty was rolled back. Mock replies are short, so the baseline’s growth is understated; the real comparison is the Phase 2 benchmark on a live model, which has not been run in full. Short live sessions drove most of the later ADRs.
 
