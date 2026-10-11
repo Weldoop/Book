@@ -1,0 +1,17 @@
+{
+  "name": "@book/console",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@book/harness": "workspace:*",
+    "@book/llm": "workspace:*",
+    "@book/runtime": "workspace:*",
+    "@book/schema": "workspace:*",
+    "@book/store": "workspace:*"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

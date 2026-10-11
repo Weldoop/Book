@@ -10,7 +10,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check": "pnpm typecheck && pnpm test",
-    "book": "tsx packages/harness/src/cli.ts"
+    "book": "tsx packages/harness/src/cli.ts",
+    "console": "tsx packages/console/src/server.ts",
+    "console:build": "tsx packages/console/src/build.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

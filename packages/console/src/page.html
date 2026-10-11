@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111111">
+<meta name="mobile-web-app-capable" content="yes">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<title>book</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #111; color: #e7e2d6; }
+  body { font: 17px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  #app { display: flex; flex-direction: column; height: 100dvh; }
+  #log {
+    flex: 1; overflow: auto; padding: 16px 14px 12px;
+    white-space: pre-wrap; overflow-wrap: anywhere;
+  }
+  .note { color: #8d887a; }
+  .status { color: #e0c36a; }
+  .error { color: #e07a6a; }
+  .story { color: #f3efe4; }
+  strong { color: #fff; font-weight: 700; }
+  #log button, #offers button, #dock button.send {
+    font: inherit; color: inherit; background: none; border: 0; padding: 0;
+  }
+  #log button.game { display: block; width: 100%; text-align: left; padding: 14px 0; }
+  #log .premise { margin: 0 0 8px; }
+  #log input[type="password"] {
+    display: block; width: 100%; max-width: 280px; margin: 12px 0;
+    font: inherit; color: inherit; background: #1c1c1c;
+    border: 1px solid #3a3a3a; border-radius: 8px; padding: 12px;
+  }
+  #dock {
+    border-top: 1px solid #2c2c2c; background: #111;
+    padding: 8px 12px calc(10px + env(safe-area-inset-bottom));
+  }
+  #title, #bar { font-size: 14px; padding: 0 2px; }
+  #title { color: #8d887a; }
+  #bar { color: #e0c36a; white-space: pre-wrap; }
+  #title:empty, #bar:empty, #offers:empty { display: none; }
+  #offers { padding: 4px 2px 2px; }
+  #offers button { display: block; width: 100%; text-align: left; color: #8d887a; padding: 6px 0; }
+  form { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+  .prompt { color: #8d887a; }
+  #line {
+    flex: 1; min-width: 0; font: inherit; color: inherit; background: transparent;
+    border: 0; padding: 10px 0; outline: none;
+  }
+  button.send { color: #e7e2d6; padding: 12px 10px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="log"></div>
+  <div id="dock">
+    <div id="title"></div>
+    <div id="bar"></div>
+    <div id="offers"></div>
+    <form id="form" hidden>
+      <span class="prompt">&gt;</span>
+      <input id="line" type="text" autocomplete="off" autocapitalize="sentences" enterkeyhint="send" aria-label="What you do">
+      <button class="send" type="submit">send</button>
+    </form>
+  </div>
+</div>
+<script>
+const SESSION_KEY = "book-console";
+const TOKEN_KEY = "book-console-token";
+const logEl = document.querySelector("#log");
+const titleEl = document.querySelector("#title");
+const barEl = document.querySelector("#bar");
+const offersEl = document.querySelector("#offers");
+const form = document.querySelector("#form");
+const lineEl = document.querySelector("#line");
+const sendBtn = form.querySelector("button");
+let info = null;
+let session = null;
+let busy = false;
+
+function token() {
+  return (localStorage.getItem(TOKEN_KEY) || "").trim();
+}
+function esc(text) {
+  return text.replace(/[&<>]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[ch]));
+}
+function rich(text) {
+  return esc(text).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+}
+function append(line) {
+  const div = document.createElement("div");
+  div.className = line.kind;
+  if (line.kind === "story") div.innerHTML = rich(line.text);
+  else div.textContent = line.text;
+  logEl.appendChild(div);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+function push(line) {
+  session.lines.push(line);
+  append(line);
+  if (line.kind === "status") {
+    session.status = line.text;
+    barEl.textContent = line.text;
+  }
+}
+function persist() {
+  if (!session) return;
+  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+}
+function renderOffers(items) {
+  offersEl.replaceChildren();
+  for (const text of items) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = "[ " + text + " ]";
+    button.addEventListener("click", () => {
+      lineEl.value = text;
+      lineEl.focus();
+    });
+    offersEl.appendChild(button);
+  }
+}
+function paint() {
+  logEl.replaceChildren();
+  titleEl.textContent = session.title || "";
+  barEl.textContent = session.status || "";
+  for (const line of session.lines) append(line);
+  renderOffers(session.suggestions || []);
+  form.hidden = false;
+  lineEl.placeholder = session.ended ? "/new" : "";
+  logEl.scrollTop = logEl.scrollHeight;
+}
+function reset(message) {
+  session = null;
+  localStorage.removeItem(SESSION_KEY);
+  titleEl.textContent = "";
+  barEl.textContent = "";
+  offersEl.replaceChildren();
+  form.hidden = true;
+  lineEl.placeholder = "";
+  showPicker(message);
+}
+async function showPicker(message) {
+  logEl.replaceChildren();
+  form.hidden = true;
+  if (!info) {
+    try {
+      const res = await fetch("/api/turn");
+      info = await res.json();
+      if (!res.ok) throw new Error(info.error || "The console is not configured.");
+    } catch (err) {
+      logEl.textContent = err instanceof Error ? err.message : "The storyteller is unavailable right now. Try again in a moment.";
+      return;
+    }
+  }
+  const head = document.createElement("div");
+  head.className = "story";
+  head.textContent = "book";
+  logEl.appendChild(head);
+  if (message) {
+    const err = document.createElement("div");
+    err.className = "error";
+    err.textContent = message;
+    logEl.appendChild(err);
+  }
+  const hint = document.createElement("div");
+  hint.className = "note";
+  hint.textContent = info.provider + " · cap $" + info.maxCostUsd + "\n\nPick a game. One line is one turn. /new starts over.";
+  logEl.appendChild(hint);
+  if (info.needsToken) {
+    const field = document.createElement("input");
+    field.type = "password";
+    field.placeholder = "token";
+    field.autocomplete = "current-password";
+    field.value = token();
+    field.addEventListener("change", () => localStorage.setItem(TOKEN_KEY, field.value.trim()));
+    logEl.appendChild(field);
+  }
+  for (const game of info.games) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "game";
+    button.textContent = "[ " + game.title + " ]";
+    button.addEventListener("click", () => {
+      if (info.needsToken) {
+        const field = logEl.querySelector("input");
+        const value = field ? field.value.trim() : "";
+        if (!value) {
+          showPicker("Type the token first.");
+          return;
+        }
+        localStorage.setItem(TOKEN_KEY, value);
+      }
+      start(game.id);
+    });
+    logEl.appendChild(button);
+    if (game.premise) {
+      const premise = document.createElement("div");
+      premise.className = "note premise";
+      premise.textContent = game.premise;
+      logEl.appendChild(premise);
+    }
+  }
+}
+function start(gameId) {
+  session = { game: gameId, lines: [], suggestions: [], state: null, spentUsd: 0, ended: false, status: "", title: "" };
+  logEl.replaceChildren();
+  titleEl.textContent = "";
+  barEl.textContent = "";
+  offersEl.replaceChildren();
+  form.hidden = false;
+  go("");
+}
+async function go(input) {
+  if (!session || busy) return;
+  busy = true;
+  lineEl.disabled = true;
+  sendBtn.disabled = true;
+  const wait = document.createElement("div");
+  wait.className = "note";
+  wait.textContent = "…";
+  logEl.appendChild(wait);
+  logEl.scrollTop = logEl.scrollHeight;
+  try {
+    const res = await fetch("/api/turn", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...(token() ? { authorization: "Bearer " + token() } : {}),
+      },
+      body: JSON.stringify({
+        game: session.game,
+        input: input,
+        state: session.state,
+        spentUsd: session.spentUsd || 0,
+      }),
+    });
+    let data = {};
+    try { data = await res.json(); } catch { data = {}; }
+    wait.remove();
+    const message = data.error || "The storyteller is unavailable right now. Try again in a moment.";
+    if (!res.ok || data.ok === false) {
+      if (!session.state) {
+        session = null;
+        localStorage.removeItem(SESSION_KEY);
+        showPicker(message);
+        return;
+      }
+      push({ kind: "error", text: message });
+      if (data.state) session.state = data.state;
+      if (typeof data.spentUsd === "number") session.spentUsd = data.spentUsd;
+      persist();
+      return;
+    }
+    session.state = data.state;
+    session.spentUsd = data.spentUsd;
+    session.ended = !!data.ended;
+    session.title = data.title || session.title;
+    session.suggestions = data.suggestions || [];
+    titleEl.textContent = session.title || "";
+    for (const line of data.lines || []) push(line);
+    renderOffers(session.suggestions);
+    lineEl.placeholder = session.ended ? "/new" : "";
+    persist();
+  } catch {
+    wait.remove();
+    if (session && session.state) push({ kind: "error", text: "The storyteller is unavailable right now. Try again in a moment." });
+    else showPicker("The storyteller is unavailable right now. Try again in a moment.");
+    persist();
+  } finally {
+    busy = false;
+    lineEl.disabled = false;
+    sendBtn.disabled = false;
+    if (!form.hidden) lineEl.focus();
+  }
+}
+form.addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (!session || busy) return;
+  const text = lineEl.value;
+  lineEl.value = "";
+  if (text.trim() === "/new") {
+    reset();
+    return;
+  }
+  const shown = text.trim() || "...";
+  push({ kind: "note", text: "> " + shown });
+  persist();
+  go(shown);
+});
+try { session = JSON.parse(localStorage.getItem(SESSION_KEY) || "null"); } catch { session = null; }
+if (!session || !session.state || !Array.isArray(session.lines)) {
+  session = null;
+  showPicker();
+} else {
+  paint();
+}
+</script>
+</body>
+</html>

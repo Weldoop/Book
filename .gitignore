@@ -5,3 +5,4 @@ dist/
 .book-data/
 *.log
 coverage/
+.vercel/

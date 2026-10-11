@@ -58,6 +58,16 @@ and reusing the same `--save` resumes where you left off.
 
 Models default to `claude-sonnet-4-6` (strong) and `claude-haiku-4-5-20251001` (cheap); override with `BOOK_MODEL_STRONG` and `BOOK_MODEL_CHEAP`. Run `pnpm book models` to see what your key can reach.
 
+## Phone console
+
+A single page for a phone. The browser keeps the save and sends it back with each line, so the server has no disk. Import the repo on Vercel and leave the framework empty: `vercel.json` builds one static page and one function. A turn can take about twenty seconds; the function allows sixty.
+
+```bash
+pnpm console    # http://localhost:3000, mock model unless ANTHROPIC_API_KEY is set
+```
+
+Set `ANTHROPIC_API_KEY` on Vercel for the real model. A save stops at $2 unless `BOOK_MAX_COST_USD` says otherwise. That cap lives with the save in the browser, so set `BOOK_CONSOLE_TOKEN` before the URL is public; the page asks for it once. `BOOK_PROVIDER=mock` forces the mock model. One line is one turn. `/new` discards the save on that phone.
+
 Extended thinking is disabled by default: its hidden tokens are billed at the output rate and were
 eating the output cap (ADR 0003). Set `BOOK_THINKING=on` to turn it back on and measure the
 difference.
@@ -74,5 +84,6 @@ difference.
 | `packages/llm` | Mock and Anthropic providers, usage metering, budget caps |
 | `packages/store` | Memory and file stores |
 | `packages/harness` | CLI: play, replay, baseline, report, inspect, models |
+| `packages/console` | Phone console, local and on Vercel |
 | `configs/` | Game configs (UK life, pirate) |
 | `fixtures/` | Golden session and recall probes |
