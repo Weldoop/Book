@@ -1,6 +1,29 @@
 import type { State, TurnRecord } from "@book/schema";
 import type { SaveSummary, ShownLine } from "../../shared/play.ts";
 
+/** A turn as shown in the log. The state from before the line is not loaded with it. */
+export interface ShownTurn {
+  id: string;
+  input: string;
+  outcome: string;
+  record: TurnRecord | null;
+  costUsd: number;
+  lines: ShownLine[];
+  suggestions: string[];
+}
+
+/** A page of turns, oldest first. `before` is set when older turns remain. */
+export interface TurnWindow {
+  turns: ShownTurn[];
+  before: string | null;
+}
+
+/** The latest line the player typed, with the snapshot needed to play it again. */
+export interface EditableTurn {
+  id: string;
+  stateBefore: State | null;
+}
+
 export interface StoredTurn {
   id: string;
   saveId: string;
@@ -25,15 +48,17 @@ export interface StoredSave {
   updatedAt: string;
 }
 
-export interface LoadedSave extends StoredSave {
-  turns: StoredTurn[];
-}
-
 /** Persistence for one person's library. Implementations must not return another user's rows. */
 export interface PlayDb {
   spent(userId: string): Promise<number>;
   list(userId: string): Promise<SaveSummary[]>;
-  load(userId: string, saveId: string): Promise<LoadedSave | null>;
+  loadSave(userId: string, saveId: string): Promise<StoredSave | null>;
+  /**
+   * Whole turns that fill about `messages` transcript lines.
+   * Pass `beforeId` to take the page older than that turn. Null starts at the latest turn.
+   */
+  windowTurns(userId: string, saveId: string, beforeId: string | null, messages: number): Promise<TurnWindow>;
+  lastEditable(userId: string, saveId: string): Promise<EditableTurn | null>;
   insertSave(save: StoredSave): Promise<void>;
   updateSave(save: StoredSave): Promise<void>;
   appendTurn(turn: StoredTurn): Promise<void>;
