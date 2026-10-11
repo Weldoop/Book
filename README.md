@@ -66,7 +66,7 @@ A single page for a phone. The browser keeps the save and sends it back with eac
 pnpm console    # http://localhost:3000, mock model unless ANTHROPIC_API_KEY is set
 ```
 
-Set `ANTHROPIC_API_KEY` on Vercel for the real model. A save stops at $5 unless `BOOK_MAX_COST_USD` says otherwise. The page loads the newest logged save when the phone has none stored. That cap lives with the save in the browser, so set `BOOK_CONSOLE_TOKEN` before the URL is public; the page asks for it once. `BOOK_PROVIDER=mock` forces the mock model. One line is one turn. `/new` discards the save on that phone.
+Set `ANTHROPIC_API_KEY` on Vercel for the real model. A save stops at $7 unless `BOOK_MAX_COST_USD` says otherwise. The page loads the newest logged save when the phone has none stored. That cap lives with the save in the browser, so set `BOOK_CONSOLE_TOKEN` before the URL is public; the page asks for it once. `BOOK_PROVIDER=mock` forces the mock model. One line is one turn. `/new` discards the save on that phone.
 
 Extended thinking is disabled by default: its hidden tokens are billed at the output rate and were
 eating the output cap (ADR 0003). Set `BOOK_THINKING=on` to turn it back on and measure the

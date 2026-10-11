@@ -54,7 +54,7 @@ export function readSettings(env: Record<string, string | undefined>): ConsoleSe
   else throw new Error(`Unknown BOOK_PROVIDER "${rawProvider}". Use mock or anthropic.`);
 
   const capRaw = env.BOOK_MAX_COST_USD?.trim();
-  const maxCostUsd = capRaw === undefined || capRaw === "" ? 5 : Number(capRaw);
+  const maxCostUsd = capRaw === undefined || capRaw === "" ? 7 : Number(capRaw);
   if (!Number.isFinite(maxCostUsd) || maxCostUsd < 0) {
     throw new Error("BOOK_MAX_COST_USD must be a number >= 0.");
   }
