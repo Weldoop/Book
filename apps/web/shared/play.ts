@@ -89,6 +89,22 @@ export function capMessage(spentUsd: number, capUsd = PERSON_CAP_USD): string | 
   return null;
 }
 
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Email and password for the Supabase email provider. Passwords follow its default minimum of 6. */
+export function cleanAccount(
+  email: unknown,
+  password: unknown,
+): { ok: true; email: string; password: string } | { ok: false; error: string } {
+  if (typeof email !== "string" || typeof password !== "string") {
+    return { ok: false, error: "Enter an email and a password." };
+  }
+  const cleaned = email.trim().toLowerCase();
+  if (!EMAIL.test(cleaned)) return { ok: false, error: "Enter the email address for this account." };
+  if (password.length < 6) return { ok: false, error: "Use at least 6 characters for the password." };
+  return { ok: true, email: cleaned, password };
+}
+
 export function cleanInput(raw: unknown): { ok: true; text: string } | { ok: false; error: string } {
   if (typeof raw !== "string") return { ok: false, error: "Type a line first." };
   const text = raw.trim();

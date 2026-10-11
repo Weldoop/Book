@@ -3,7 +3,7 @@ import { MockProvider } from "@book/llm";
 import type { LLMProvider, LLMRequest } from "@book/schema";
 import { MemoryPlayDb } from "../server/lib/memory-db.ts";
 import { library, openGame, readSave, redoTurn, takeTurn } from "../server/lib/session.ts";
-import { capMessage, debugFromRecord, PERSON_CAP_USD, richText } from "../shared/play.ts";
+import { capMessage, cleanAccount, debugFromRecord, PERSON_CAP_USD, richText } from "../shared/play.ts";
 
 function scripted(): MockProvider {
   return new MockProvider({
@@ -137,6 +137,18 @@ describe("a played save", () => {
     const result = await openGame(new MemoryPlayDb(), "ada", "nope", scripted());
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.status).toBe(400);
+  });
+});
+
+describe("account", () => {
+  it("accepts an email and a password of at least 6 characters", () => {
+    expect(cleanAccount("  Ada@Example.com ", "secret")).toEqual({
+      ok: true,
+      email: "ada@example.com",
+      password: "secret",
+    });
+    expect(cleanAccount("ada", "secret").ok).toBe(false);
+    expect(cleanAccount("ada@example.com", "short").ok).toBe(false);
   });
 });
 

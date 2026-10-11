@@ -44,6 +44,29 @@ body {
 }
 .gate h1 { font-weight: 500; font-size: 2.4rem; margin: 0 0 8px; }
 .gate p { color: var(--faint); max-width: 36rem; }
+.account {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(100%, 22rem);
+  margin: 18px auto 0;
+  text-align: left;
+}
+.account label { font-family: var(--sans); font-size: 13px; color: var(--faint); }
+.account input {
+  font: inherit;
+  font-size: 1.05rem;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  padding: 8px 2px;
+  width: 100%;
+  outline: none;
+}
+.account .primary { margin-top: 8px; }
+.switch { margin-top: 14px; }
+.notice { color: var(--accent); font-family: var(--sans); font-size: 14px; }
 button, .text-btn {
   font: inherit;
   color: inherit;

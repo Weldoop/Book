@@ -1,6 +1,6 @@
 # Play app
 
-Nuxt chat for testers. Google sign-in, one Supabase save list per account, a $5 cap, Uplands and the pirate book. The phone console is a separate app.
+Nuxt chat for testers. Email sign-in, one Supabase save list per account, a $5 cap, Uplands and the pirate book. The phone console is a separate app.
 
 ## Server environment
 
@@ -14,9 +14,9 @@ pnpm --filter @book/web dev
 
 ## Supabase project
 
-Create a project, then run `supabase/migrations/20261011160000_play.sql` in the SQL editor. The tables have row level security and no policies, so the browser cannot read them. The server uses the secret key.
+The project is named book: `https://ddosgjvegwvhxfkwzlfb.supabase.co`, with the email provider. The play tables are already there. They have row level security and no policies, so the browser cannot read them. The server uses the secret key.
 
-In Authentication, enable Google and paste the OAuth client id and secret from Google Cloud. Set the site URL to the Nuxt origin, and add `<origin>/auth/callback` to the redirect allow list. Google's authorized redirect URI is `https://<project-ref>.supabase.co/auth/v1/callback`.
+Hosted projects ask a new account to confirm its email. Set the site URL to the Nuxt origin, and add `<origin>/auth/callback` to the redirect allow list, so the confirmation link returns to this app. For local play that origin is `http://localhost:3000`.
 
 ## What a tester sees
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import type { LibraryView, PlayView } from "~/shared/play";
-import { capMessage, richText } from "~/shared/play";
+import { capMessage, cleanAccount, richText } from "~/shared/play";
 
 const { $supabase } = useNuxtApp();
 const supabase = $supabase as SupabaseClient | null;
@@ -11,6 +11,10 @@ const ready = ref(false);
 const library = ref<LibraryView | null>(null);
 const view = ref<PlayView | null>(null);
 const draft = ref("");
+const email = ref("");
+const password = ref("");
+const creating = ref(false);
+const notice = ref("");
 const editing = ref(false);
 const busy = ref(false);
 const fault = ref("");
@@ -110,14 +114,41 @@ function useSuggestion(text: string): void {
   draft.value = text;
 }
 
-async function signIn(): Promise<void> {
-  if (!supabase) return;
+async function submitAccount(): Promise<void> {
+  if (!supabase || busy.value) return;
   fault.value = "";
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: { redirectTo: `${window.location.origin}/auth/callback` },
-  });
-  if (error) fault.value = error.message;
+  notice.value = "";
+  const parsed = cleanAccount(email.value, password.value);
+  if (!parsed.ok) {
+    fault.value = parsed.error;
+    return;
+  }
+  busy.value = true;
+  try {
+    if (creating.value) {
+      const { data, error } = await supabase.auth.signUp({
+        email: parsed.email,
+        password: parsed.password,
+        options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      });
+      if (error) {
+        fault.value = error.message;
+        return;
+      }
+      if (!data.session) {
+        notice.value = "Check your email to confirm this account. Then sign in here.";
+        creating.value = false;
+      }
+    } else {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: parsed.email,
+        password: parsed.password,
+      });
+      if (error) fault.value = error.message;
+    }
+  } finally {
+    busy.value = false;
+  }
 }
 
 async function signOut(): Promise<void> {
@@ -160,14 +191,14 @@ onMounted(async () => {
   supabase.auth.onAuthStateChange((_event, next) => {
     session.value = next;
   });
-  if (data.session) {
-    try {
-      await loadLibrary();
-    } catch (err) {
-      fault.value = problem(err);
-    }
-  }
   ready.value = true;
+});
+
+watch(session, (next, prev) => {
+  if (!next || next.user.id === prev?.user.id) return;
+  void loadLibrary().catch((err: unknown) => {
+    fault.value = problem(err);
+  });
 });
 </script>
 
@@ -182,8 +213,26 @@ onMounted(async () => {
   <main v-else-if="!session" class="gate">
     <div>
       <h1>book</h1>
-      <p>A story that keeps the books. Sign in with Google. Each account has its own saves and five dollars of play.</p>
-      <button class="primary" type="button" @click="signIn">Continue with Google</button>
+      <p>A story that keeps the books. Sign in with your email. Each account has its own saves and five dollars of play.</p>
+      <form class="account" @submit.prevent="submitAccount">
+        <label for="email">Email</label>
+        <input id="email" v-model="email" type="email" autocomplete="email" required />
+        <label for="password">Password</label>
+        <input
+          id="password"
+          v-model="password"
+          type="password"
+          :autocomplete="creating ? 'new-password' : 'current-password'"
+          required
+        />
+        <button class="primary" type="submit" :disabled="busy">{{ creating ? "Create account" : "Sign in" }}</button>
+      </form>
+      <p class="switch">
+        <button type="button" @click="creating = !creating; fault = ''; notice = ''">
+          {{ creating ? "Already have an account? Sign in" : "New here? Create an account" }}
+        </button>
+      </p>
+      <p v-if="notice" class="notice">{{ notice }}</p>
       <p v-if="fault" class="fault">{{ fault }}</p>
     </div>
   </main>

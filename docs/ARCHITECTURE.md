@@ -708,7 +708,7 @@ Proposed tooling: TypeScript, pnpm workspaces, Vitest, Zod, ESLint and Prettier.
 | 0. Contracts | Schemas, delta ops, module interface, budget table, ADRs, `AGENTS.md` | Human approval of contracts |
 | 1. Core build (parallel) | Engine and modules, context and memory, LLM adapter and mock, harness, UK config | All unit tests pass on the mock provider |
 | 2. Benchmark | Baseline vs engine on the golden session with a real model | Meets or explains misses against section 1.2 targets |
-| 3. Playable | Nuxt chat for testers (ADR 0028): Google sign-in, a Supabase save per person, both books, debug panel, edit the last line | Testers continue unprompted; failure list captured. The app is built; the tester gate is still open |
+| 3. Playable | Nuxt chat for testers (ADR 0028): email sign-in, a Supabase save per person, both books, debug panel, edit the last line | Testers continue unprompted; failure list captured. The app is built; the tester gate is still open |
 | 4. Universality | Pirate config with factions and travel modules | Second config runs without engine changes |
 | 5. Next decisions | Supabase, hosted trial, wizard, publishing | Chosen from measured data |
 
@@ -836,7 +836,7 @@ engine, and its model-authored status line had already drifted within a single s
     number of turns, so a mid-scene cut is guaranteed rather than possible, and it needs no
     measuring. See items 33-35.
 31. The Phase 3 UI is for the owner and testers only, with no funnel and no anonymous play.
-    Google sign-in and a save per person are item 61.
+    Email sign-in and a save per person are item 61.
 32. When the UI is built it is mobile-first from the first commit, with serif body text and
     persisted size and theme applied before first paint. A PWA stays out of scope.
 
@@ -1029,7 +1029,7 @@ engine, and its model-authored status line had already drifted within a single s
 
 ### Decided for the play app (11 Oct 2026)
 
-61. Testers play in a Nuxt app with Google sign-in. Each account has its own Supabase saves and a $5
+61. Testers play in a Nuxt app with email sign-in on the Supabase project named book. Each account has its own saves and a $5
     cap across all of them. Uplands and the pirate book are both on the new-game list. The last line
     can be edited and played again, and the money for the replaced line stays spent. A debug panel
     shows context size, repairs, rollbacks, and cost, and it does not show private notes. The phone console
@@ -1038,7 +1038,7 @@ engine, and its model-authored status line had already drifted within a single s
 ### Build status (11 Oct 2026)
 
 Phase 0 (contracts) and Phase 1 (core build) are implemented, plus the fixes from the live sessions
-and the ADR 0005 through 0026 changes; 509 tests pass.
+and the ADR 0005 through 0026 changes; 510 tests pass.
 
 | Area | State |
 |---|---|
