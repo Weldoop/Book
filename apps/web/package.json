@@ -1,0 +1,25 @@
+{
+  "name": "@book/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "typecheck": "nuxt typecheck"
+  },
+  "dependencies": {
+    "@book/harness": "workspace:*",
+    "@book/llm": "workspace:*",
+    "@book/runtime": "workspace:*",
+    "@book/schema": "workspace:*",
+    "@book/store": "workspace:*",
+    "@supabase/supabase-js": "^2.49.8",
+    "nuxt": "^3.19.3",
+    "vue": "^3.5.22"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vue-tsc": "^3.3.13"
+  }
+}

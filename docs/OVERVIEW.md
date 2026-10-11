@@ -189,7 +189,7 @@ Travel words belong to the book: ordinary `means`, this world’s `journeys` (sa
 
 Two tiers behind one interface: `strong` for turns, `cheap` for compaction, OOC, and format/delta repair. The mock provider returns scripted drafts so tests and the harness never spend tokens. Real Anthropic runs are manual, refuse to start without a cost or turn cap, and read `ANTHROPIC_API_KEY` from the environment.
 
-The file store keeps `state.json` (atomic replace) plus append-only `turns.jsonl` and `log.jsonl`. A crash between log and state can leave an extra record, never a lost one. Supabase is the same `Store` interface, later.
+The file store keeps `state.json` (atomic replace) plus append-only `turns.jsonl` and `log.jsonl`. A crash between log and state can leave an extra record, never a lost one. The play app stores saves in Supabase, one account at a time, behind the same turn pipeline.
 
 ### How you run it
 
@@ -208,7 +208,7 @@ Phase 0 (contracts) and Phase 1 (core build) are implemented, including the play
 
 Measured on the mock golden replay, per-turn input stays flat (a little over 3k after the later contract additions, still under the 6,000 target). Live Haiku sessions of 34 and 44 turns held at about 4.9k input tokens a turn, flat across chapter writes, at roughly $0.008 a turn; about a quarter of turns needed a cheap repair call and one in thirty was rolled back. Mock replies are short, so the baseline’s growth is understated; the real comparison is the Phase 2 benchmark on a live model, which has not been run in full. Short live sessions drove most of the later ADRs.
 
-Not in this repository yet: `need` / attention-miss handling as a second call, a measured delta-first streaming experiment, the Nuxt UI, Supabase, hosted trial, and the creator wizard. The wizard, when it exists, is meant to emit this config — prose cards over the string-valued parts, countable parts staying structured — not to invent a new kind of stat.
+The tester app is `apps/web`: Nuxt, Google sign-in, and a Supabase save per person (ADR 0028). The phone console is still there. Not in this repository yet: `need` / attention-miss handling as a second call, a measured delta-first streaming experiment, the hosted trial, and the creator wizard. The wizard, when it exists, is meant to emit this config — prose cards over the string-valued parts, countable parts staying structured — not to invent a new kind of stat.
 
 ---
 
