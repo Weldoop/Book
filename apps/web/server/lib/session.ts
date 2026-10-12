@@ -12,12 +12,13 @@ import {
   debugFromRecord,
   lastPlayerTurn,
   OPENING_INPUT,
+  PAGE_MESSAGES,
   PERSON_CAP_USD,
   roundUsd,
   transcriptOf,
 } from "../../shared/play.ts";
-import type { LibraryView, PlayView, ShownLine } from "../../shared/play.ts";
-import type { LoadedSave, PlayDb, StoredSave, StoredTurn } from "./db.ts";
+import type { HistoryPage, LibraryView, PlayView, ShownLine } from "../../shared/play.ts";
+import type { PlayDb, StoredSave, StoredTurn, TurnWindow } from "./db.ts";
 import { findGame, listGames } from "./games.ts";
 
 export interface PlayFailure {
@@ -70,9 +71,9 @@ function storyEnded(state: State, outcome: string): boolean {
   return Boolean(state.ending && !state.ending.continuable);
 }
 
-function toView(save: LoadedSave, spentUsd: number): PlayView {
-  const last = save.turns.at(-1) ?? null;
-  const editable = lastPlayerTurn(save.turns);
+function toView(save: StoredSave, window: TurnWindow, spentUsd: number): PlayView {
+  const last = window.turns.at(-1) ?? null;
+  const editable = lastPlayerTurn(window.turns);
   return {
     id: save.id,
     configId: save.configId,
@@ -80,7 +81,8 @@ function toView(save: LoadedSave, spentUsd: number): PlayView {
     turn: save.turn,
     ended: save.ended,
     suggestions: last?.suggestions ?? [],
-    lines: transcriptOf(save.turns.map((turn) => ({ input: turn.input, lines: turn.lines }))),
+    lines: transcriptOf(window.turns),
+    before: window.before,
     lastInput: editable?.input ?? null,
     debug: debugFromRecord(spentUsd, last?.record ?? null),
     spentUsd,
@@ -89,10 +91,13 @@ function toView(save: LoadedSave, spentUsd: number): PlayView {
 }
 
 async function viewOf(db: PlayDb, userId: string, saveId: string): Promise<PlaySuccess | PlayFailure> {
-  const save = await db.load(userId, saveId);
+  const save = await db.loadSave(userId, saveId);
   if (!save) return fail(404, "That save is not on this account.");
-  const spentUsd = await db.spent(userId);
-  return { ok: true, view: toView(save, spentUsd) };
+  const [spentUsd, window] = await Promise.all([
+    db.spent(userId),
+    db.windowTurns(userId, saveId, null, PAGE_MESSAGES),
+  ]);
+  return { ok: true, view: toView(save, window, spentUsd) };
 }
 
 export async function library(db: PlayDb, userId: string): Promise<LibraryView> {
@@ -191,10 +196,24 @@ export async function readSave(db: PlayDb, userId: string, saveId: string): Prom
   return viewOf(db, userId, saveId);
 }
 
+export async function readHistory(
+  db: PlayDb,
+  userId: string,
+  saveId: string,
+  beforeId: string,
+): Promise<{ ok: true; page: HistoryPage } | PlayFailure> {
+  const cursor = beforeId.trim();
+  if (!cursor) return fail(400, "Say which page to look back from.");
+  const save = await db.loadSave(userId, saveId);
+  if (!save) return fail(404, "That save is not on this account.");
+  const window = await db.windowTurns(userId, saveId, cursor, PAGE_MESSAGES);
+  return { ok: true, page: { lines: transcriptOf(window.turns), before: window.before } };
+}
+
 async function commitPlayed(
   db: PlayDb,
   userId: string,
-  save: LoadedSave,
+  save: StoredSave,
   input: string,
   played: { result: TurnResult; state: State },
   cost: number,
@@ -220,7 +239,7 @@ async function commitPlayed(
 export async function takeTurn(db: PlayDb, userId: string, saveId: string, rawInput: unknown, llm: LLMProvider): Promise<PlayOutcome> {
   const parsed = cleanInput(rawInput);
   if (!parsed.ok) return fail(400, parsed.error);
-  const save = await db.load(userId, saveId);
+  const save = await db.loadSave(userId, saveId);
   if (!save) return fail(404, "That save is not on this account.");
   const spentUsd = await db.spent(userId);
   const blocked = capMessage(spentUsd);
@@ -245,10 +264,11 @@ export async function takeTurn(db: PlayDb, userId: string, saveId: string, rawIn
 export async function redoTurn(db: PlayDb, userId: string, saveId: string, rawInput: unknown, llm: LLMProvider): Promise<PlayOutcome> {
   const parsed = cleanInput(rawInput);
   if (!parsed.ok) return fail(400, parsed.error);
-  const save = await db.load(userId, saveId);
+  const save = await db.loadSave(userId, saveId);
   if (!save) return fail(404, "That save is not on this account.");
-  const previous = lastPlayerTurn(save.turns);
+  const previous = await db.lastEditable(userId, saveId);
   if (!previous) return fail(400, "There is no line to edit yet.");
+  if (!previous.stateBefore) return fail(400, "That line can't be rewritten. The page from before it wasn't kept.");
   const spentUsd = await db.spent(userId);
   const blocked = capMessage(spentUsd);
   if (blocked) return fail(402, blocked);
@@ -258,7 +278,7 @@ export async function redoTurn(db: PlayDb, userId: string, saveId: string, rawIn
     const played = await playOn(save.configId, previous.stateBefore, parsed.text, budgeted);
     const cost = roundUsd(budgeted.spent().cost_usd);
     await db.deleteTurn(userId, save.id, previous.id);
-    const rewound: LoadedSave = { ...save, state: structuredClone(previous.stateBefore), turn: previous.stateBefore.turn };
+    const rewound: StoredSave = { ...save, state: structuredClone(previous.stateBefore), turn: previous.stateBefore.turn };
     return commitPlayed(db, userId, rewound, parsed.text, played, cost);
   } catch (err) {
     await chargeBurned(db, userId, save.id, budgeted);

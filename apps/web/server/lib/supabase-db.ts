@@ -2,8 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { StateSchema } from "@book/schema";
 import type { State, TurnRecord } from "@book/schema";
 import type { SaveSummary, ShownLine } from "../../shared/play.ts";
-import { roundUsd } from "../../shared/play.ts";
-import type { LoadedSave, PlayDb, StoredSave, StoredTurn } from "./db.ts";
+import { OPENING_INPUT, roundUsd, tailWindow } from "../../shared/play.ts";
+import type { EditableTurn, PlayDb, ShownTurn, StoredSave, StoredTurn, TurnWindow } from "./db.ts";
 
 interface SaveRow {
   id: string;
@@ -16,17 +16,15 @@ interface SaveRow {
   updated_at: string;
 }
 
-interface TurnRow {
+interface TurnHeadRow {
   id: string;
-  save_id: string;
-  user_id: string;
   input: string;
   outcome: string;
   record: unknown;
-  state_before: unknown;
   cost_usd: number | string;
   lines: unknown;
   suggestions: unknown;
+  created_at: string;
 }
 
 interface ChargeRow {
@@ -44,8 +42,13 @@ function asState(raw: unknown, where: string): State {
   return parsed.data;
 }
 
-function asRecord(raw: unknown): TurnRecord {
-  if (!raw || typeof raw !== "object") throw new Error("Corrupt turn record");
+function stateOrNull(raw: unknown): State | null {
+  const parsed = StateSchema.safeParse(raw);
+  return parsed.success ? parsed.data : null;
+}
+
+function asRecord(raw: unknown): TurnRecord | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   return raw as TurnRecord;
 }
 
@@ -77,19 +80,21 @@ function saveFrom(row: SaveRow): StoredSave {
   };
 }
 
-function turnFrom(row: TurnRow): StoredTurn {
+function headFrom(row: TurnHeadRow): ShownTurn {
   return {
     id: row.id,
-    saveId: row.save_id,
-    userId: row.user_id,
     input: row.input,
     outcome: row.outcome,
     record: asRecord(row.record),
-    stateBefore: asState(row.state_before, row.id),
     costUsd: num(row.cost_usd),
     lines: asLines(row.lines),
     suggestions: asSuggestions(row.suggestions),
   };
+}
+
+/** Quote a PostgREST `or` value. Timestamps contain characters that otherwise break the filter. */
+function quoteFilter(value: string): string {
+  return `"${value.replaceAll('"', "")}"`;
 }
 
 async function expectOk(error: { message: string } | null, what: string): Promise<void> {
@@ -122,21 +127,59 @@ export class SupabasePlayDb implements PlayDb {
     }));
   }
 
-  async load(userId: string, saveId: string): Promise<LoadedSave | null> {
+  async loadSave(userId: string, saveId: string): Promise<StoredSave | null> {
     const saveResult = await this.client.from("saves").select("*").eq("user_id", userId).eq("id", saveId).maybeSingle();
     await expectOk(saveResult.error, "load save");
     if (!saveResult.data) return null;
-    const turnResult = await this.client
+    return saveFrom(saveResult.data as SaveRow);
+  }
+
+  async windowTurns(userId: string, saveId: string, beforeId: string | null, messages: number): Promise<TurnWindow> {
+    const limit = Math.max(1, messages);
+    let query = this.client
       .from("turns")
-      .select("*")
+      .select("id, input, outcome, record, cost_usd, lines, suggestions, created_at")
+      .eq("user_id", userId)
+      .eq("save_id", saveId);
+    if (beforeId) {
+      const cursor = await this.client
+        .from("turns")
+        .select("id, created_at")
+        .eq("user_id", userId)
+        .eq("save_id", saveId)
+        .eq("id", beforeId)
+        .maybeSingle();
+      await expectOk(cursor.error, "load turn cursor");
+      const row = cursor.data as { id: string; created_at: string } | null;
+      if (!row) return { turns: [], before: null };
+      const at = quoteFilter(row.created_at);
+      const id = quoteFilter(row.id);
+      query = query.or(`created_at.lt.${at},and(created_at.eq.${at},id.lt.${id})`);
+    }
+    const turnResult = await query.order("created_at", { ascending: false }).order("id", { ascending: false }).limit(limit + 1);
+    await expectOk(turnResult.error, "load turns");
+    const rows = (turnResult.data ?? []) as TurnHeadRow[];
+    const moreBefore = rows.length > limit;
+    const batch = rows.slice(0, limit).reverse().map(headFrom);
+    const window = tailWindow(batch, limit, moreBefore);
+    return { turns: window.turns, before: window.before };
+  }
+
+  async lastEditable(userId: string, saveId: string): Promise<EditableTurn | null> {
+    const result = await this.client
+      .from("turns")
+      .select("id, state_before")
       .eq("user_id", userId)
       .eq("save_id", saveId)
-      .order("created_at", { ascending: true });
-    await expectOk(turnResult.error, "load turns");
-    return {
-      ...saveFrom(saveResult.data as SaveRow),
-      turns: ((turnResult.data ?? []) as TurnRow[]).map(turnFrom),
-    };
+      .neq("input", OPENING_INPUT)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    await expectOk(result.error, "load editable turn");
+    const row = result.data as { id: string; state_before: unknown } | null;
+    if (!row) return null;
+    return { id: row.id, stateBefore: stateOrNull(row.state_before) };
   }
 
   async insertSave(save: StoredSave): Promise<void> {

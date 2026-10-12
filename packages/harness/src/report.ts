@@ -9,6 +9,8 @@ export const TurnRowSchema = z.object({
   game_turn: z.number().int().optional(),
   input_tokens: z.number(),
   output_tokens: z.number(),
+  /** Output of the committed story call. Repair calls stay in `output_tokens`. */
+  story_output_tokens: z.number().optional(),
   cached_input_tokens: z.number(),
   cost_usd: z.number(),
   latency_ms: z.number(),
@@ -42,6 +44,8 @@ export const TotalsSchema = z.object({
   avg_input_tokens: z.number(),
   p50_input_tokens: z.number(),
   p95_input_tokens: z.number(),
+  /** Median output of the committed story call, when the rows recorded one. */
+  p50_story_output_tokens: z.number().optional(),
   repaired_turns: z.number().int(),
   interlude_turns: z.number().int(),
   rolled_back_turns: z.number().int(),
@@ -117,6 +121,12 @@ export function computeTotals(turns: TurnRow[], probes?: ProbeResult[]): Totals 
     interlude_rate: rate(interludes),
     rollback_rate: rate(rolled),
   };
+  if (turns.some((t) => t.story_output_tokens !== undefined)) {
+    totals.p50_story_output_tokens = percentile(
+      turns.map((t) => t.story_output_tokens ?? t.output_tokens),
+      50,
+    );
+  }
   if (turns.some((t) => t.attention_misses !== undefined)) {
     totals.attention_misses = sum(turns, (t) => t.attention_misses ?? 0);
   }
@@ -184,6 +194,7 @@ export function formatReport(report: Report): string {
     `cumulative input tokens ${int(t.input_tokens)} (cached ${int(t.cached_input_tokens)}), output ${int(t.output_tokens)}`,
     `cost ${usd(t.cost_usd)}, total latency ${(t.latency_ms / 1000).toFixed(1)}s`,
     `input tokens per turn: avg ${int(t.avg_input_tokens)}, p50 ${int(t.p50_input_tokens)}, p95 ${int(t.p95_input_tokens)}`,
+    ...(t.p50_story_output_tokens === undefined ? [] : [`story output tokens p50 ${int(t.p50_story_output_tokens)} (repairs stay in the output total)`]),
     `input tokens at turn: ${MILESTONE_TURNS.map((m) => `${m}=${maybe(inputTokensAtTurn(report, m))}`).join("  ")}`,
     `repair rate ${pct(t.repair_rate)}, interlude rate ${pct(t.interlude_rate)}, rollback rate ${pct(t.rollback_rate)}`,
   );

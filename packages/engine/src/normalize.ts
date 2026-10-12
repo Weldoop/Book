@@ -1,5 +1,6 @@
 import type { Config, Entity, State, TurnDraft } from "@book/schema";
 import { catalogItems } from "./catalog.ts";
+import { fillOrderedAt } from "./consistency.ts";
 import { playerLocation } from "./core.ts";
 import { duplicateOpenThread, weekdayDue } from "./threads.ts";
 import { correctRelativeTimes } from "./reltime.ts";
@@ -236,15 +237,35 @@ export function inferAt(state: State, config: Config, draft: TurnDraft): void {
 }
 
 /**
+ * A clock.advance longer than one scene, but inside the skip cap, is the skip the contract asked for.
+ * Sleep and a voyage were failing because the draft used the short op for a long gap.
+ */
+function promoteLongAdvance(config: Config, draft: TurnDraft): void {
+  const scene = config.time.max_per_turn;
+  const skip = config.time.max_skip_minutes;
+  if (skip <= 0) return;
+  for (const op of draft.delta) {
+    const rec = asRec(op);
+    if (!rec || rec.op !== "clock.advance" || typeof rec.minutes !== "number") continue;
+    if (rec.minutes <= scene || rec.minutes > skip) continue;
+    rec.op = "clock.skip";
+    if (typeof rec.reason !== "string" || rec.reason.trim().length === 0) rec.reason = "elapsed";
+  }
+}
+
+/**
  * Deterministic tidying of a draft before validation. Nothing here reads a verb to invent a change:
  * it maps a name the model wrote for someone already in the save, fills a schema default,
  * drops an op about a good the save never tracked, and reads the place the sentence sits in.
  * The one edit to prose is a distance to a dated thread ("five hours away") corrected by the clock.
+ * The player's named sheet place is filled before a place read out of the narration.
  */
-export function normalizeDraft(state: State, config: Config, draft: TurnDraft): void {
+export function normalizeDraft(state: State, config: Config, draft: TurnDraft, input = ""): void {
   remapEntities(state, draft);
   lenientThreads(state, draft);
   softenItems(state, config, draft);
+  fillOrderedAt(state, config, draft, input);
   inferAt(state, config, draft);
+  promoteLongAdvance(config, draft);
   correctRelativeTimes(state, draft);
 }

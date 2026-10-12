@@ -17,6 +17,7 @@ import {
   describeOps,
   applyCompaction,
   buildCompactionRequest,
+  answerFromSave,
   buildOocContext,
   buildRepairContext,
   deltaFormatHint,
@@ -167,6 +168,25 @@ function view(rt: Runtime, state: State) {
 
 async function playOoc(rt: Runtime, state: State, rawInput: string): Promise<TurnResult> {
   const input = stripOocPrefix(rawInput);
+  const known = answerFromSave(state, rt.config, input);
+  if (known) {
+    const record: TurnRecord = {
+      turn: state.turn,
+      kind: "ooc",
+      input: rawInput,
+      narration: known,
+      beat: null,
+      delta: [],
+      due: [],
+      attempts: [],
+      outcome: "ok",
+      context_parts: [],
+      usage: [],
+      at: new Date().toISOString(),
+    };
+    await rt.store.appendLog(state.save_id, { type: "ooc", record });
+    return { turn: state.turn, kind: "ooc", narration: known, ...view(rt, state), outcome: "ok", notices: [], record };
+  }
   const ctx = buildOocContext({ config: rt.config, state, modules: rt.modules, input });
   const res = await rt.llm.complete({
     tier: "cheap",

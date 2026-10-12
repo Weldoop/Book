@@ -15,7 +15,7 @@ const DEST = String.raw`(?:the\s+|a\s+|an\s+)?([a-z][a-z']*(?:\s+(?!${DEST_STOP}
  * the word "still" there is about a person, and it must not hide a missing entity.move.
  */
 const REFUSAL =
-  /\b(?:haven't left|have not left|did not leave|didn't leave|not yet|there is no|there's no|you are still|you're still|can wait|hasn't happened|has not happened|you haven't|you have not)\b|\bno \w+ to leave\b/i;
+  /\b(?:haven't left|have not left|did not leave|didn't leave|not yet|there is no|there's no|you are still|you're still|can wait|hasn't happened|has not happened|you haven't|you have not|makes no sense|you need to sleep|need sleep)\b|\bno \w+ to leave\b/i;
 
 const PAY =
   /\b(buy|bought|pay|paid|order|ordered|purchase|purchased|spend|spent)\b/gi;
@@ -87,8 +87,8 @@ const PURPOSE = new Set([
   "work",
 ]);
 
-/** "Go to sleep" is rest, not a destination. "Go to bed" still is, once a bed exists. */
-const NOT_A_PLACE = new Set(["sleep", "rest", "nap"]);
+/** "Go to sleep" is rest, not a destination. "Go to bed" still is, once a bed exists. "To chase" is an infinitive. */
+const NOT_A_PLACE = new Set(["sleep", "rest", "nap", "chase", "follow", "flee", "fight", "hide", "stay", "stop"]);
 
 const NEGATED = /\b(?:can't|cannot|don't|do not|didn't|did not|won't|will not|never|not)\s*$/i;
 
@@ -192,7 +192,9 @@ function destinationHits(input: string, config: Config): DestHit[] {
     for (const match of text.matchAll(pattern)) {
       const dest = cleanDestination(match[1] ?? "");
       if (match.index === undefined || isProposal(text, match.index)) continue;
-      if (isPlaceDestination(dest)) hits.push({ index: match.index, end: match.index + match[0].length, dest });
+      const end = match.index + match[0].length;
+      if (tripNegated(text, match.index, end)) continue;
+      if (isPlaceDestination(dest)) hits.push({ index: match.index, end, dest });
     }
   };
   const travel = config.travel;
@@ -207,6 +209,12 @@ function destinationHits(input: string, config: Config): DestHit[] {
   return hits;
 }
 
+/** "Do not chase" and "too far to sail" are not trips. The negation has to sit on the verb, not later talk. */
+function tripNegated(text: string, start: number, end: number): boolean {
+  const window = text.slice(Math.max(0, start - 32), end);
+  return /\b(?:not|never|too far|don't|do not|won't|cannot|can't)\b/i.test(window);
+}
+
 /** The last place the player asked to go to, using this book's travel words. */
 export function tripDestination(input: string, config: Config): string | null {
   return destinationHits(input, config).at(-1)?.dest ?? null;
@@ -216,15 +224,35 @@ export function isTravelRefusal(narration: string): boolean {
   return new RegExp(REFUSAL.source, "i").test(narration);
 }
 
+/** A tavern and a pub are the same kind of room when the rest of the name is the same place. */
+const PLACE_KIND: Record<string, string> = { pub: "pub", tavern: "pub", inn: "pub", bar: "pub" };
+
+function sameEstablishment(names: string[], needle: string): boolean {
+  const destWords = needle.split(" ").filter((word) => word.length >= 3);
+  return names.some((name) => {
+    const words = name.split(" ").filter((word) => word.length >= 3);
+    const shared = destWords.filter((word) => !PLACE_KIND[word] && word.length >= 4 && words.includes(word));
+    if (shared.length === 0) return false;
+    const rest = destWords.filter((word) => !shared.includes(word));
+    const other = words.filter((word) => !shared.includes(word));
+    return rest.every((word) => other.some((candidate) => candidate === word || (PLACE_KIND[candidate] !== undefined && PLACE_KIND[candidate] === PLACE_KIND[word])));
+  });
+}
+
 function placeMatches(name: string, aliases: string[], id: string, dest: string): boolean {
   const needle = norm(dest);
   if (needle.length < 3) return false;
   const names = [name, ...aliases, id.replace(/[_-]/g, " ")].map(norm).filter((n) => n.length > 0);
-  return names.some((n) => {
-    if (n === needle || hasWord(n, needle) || hasWord(needle, n)) return true;
-    const words = n.split(" ");
-    return needle.split(" ").every((part) => words.some((word) => wordCovers(word, part)));
-  });
+  if (
+    names.some((n) => {
+      if (n === needle || hasWord(n, needle) || hasWord(needle, n)) return true;
+      const words = n.split(" ");
+      return needle.split(" ").every((part) => words.some((word) => wordCovers(word, part)));
+    })
+  ) {
+    return true;
+  }
+  return sameEstablishment(names, needle);
 }
 
 function violation(severity: Violation["severity"], code: string, message: string): Violation {
@@ -379,6 +407,33 @@ function isMove(op: unknown, id: string, location: string): boolean {
   return rec.op === "entity.move" && rec.id === id && rec.location === location;
 }
 
+function playerAlreadyMoved(op: unknown, player: string): boolean {
+  if (!op || typeof op !== "object") return false;
+  const rec = op as { op?: unknown; id?: unknown };
+  return rec.op === "entity.move" && rec.id === player;
+}
+
+/**
+ * The GM is supposed to set `at`. When that field is empty, the player named one place
+ * already on the sheet, and the reply is not a refusal, that sheet id is `at`.
+ * Narration is not read. An unknown destination is left for the GM to create.
+ * A move or an `at` the GM already wrote is left alone. A return leg is not the outing.
+ */
+export function fillOrderedAt(state: State, config: Config, draft: TurnDraft, input: string): void {
+  if (draft.at || input.trim().length === 0 || isTravelRefusal(draft.narration)) return;
+  const player = config.player_id;
+  if (draft.delta.some((op) => playerAlreadyMoved(op, player))) return;
+  const hits = destinationHits(input, config);
+  const last = hits.at(-1);
+  if (!last || returnLeg(input, last.end)) return;
+  if (notADestination(state, last.dest)) return;
+  const matches = Object.values(state.entities).filter(
+    (entity) => entity.type === "place" && placeMatches(entity.name, entity.aliases, entity.id, last.dest),
+  );
+  if (matches.length !== 1 || !matches[0]) return;
+  draft.at = matches[0].id;
+}
+
 /**
  * The GM sets `at` to the place the player is in. The engine creates that place when it is new
  * and moves the player there on this turn. Narration verbs are not how a move is detected.
@@ -517,6 +572,28 @@ function tailFits(text: string, start: number, end: number, name: string): boole
   return besideOk(wordBeside(text, start, -1), words) && besideOk(wordBeside(text, end, 1), words);
 }
 
+/** "Lager" is the pint's last word and the start of "lager 4-pack". The longer good wins. */
+function longerItemCovers(
+  text: string,
+  start: number,
+  end: number,
+  tail: string,
+  itemId: string,
+  items: { id: string; name: string }[],
+): boolean {
+  const window = text.slice(Math.max(0, start - 32), Math.min(text.length, end + 32));
+  for (const item of items) {
+    if (item.id === itemId) continue;
+    const forms = [norm(item.name), norm(item.id.replace(/[_-]/g, " "))];
+    for (const phrase of forms) {
+      if (phrase.length <= tail.length || !phrase.split(" ").includes(tail)) continue;
+      const flex = phrase.split(" ").map(escapeRegExp).join("[\\s-]+");
+      if (new RegExp(`\\b${flex}\\b`, "i").test(window)) return true;
+    }
+  }
+  return false;
+}
+
 function findMentions(narration: string, items: { id: string; name: string }[]): Mention[] {
   const text = narration.toLowerCase();
   const hits: Mention[] = [];
@@ -541,6 +618,7 @@ function findMentions(narration: string, items: { id: string; name: string }[]):
       const start = match.index;
       const end = start + tail.length;
       if (!tailFits(text, start, end, item.name)) continue;
+      if (longerItemCovers(text, start, end, tail, item.id, items)) continue;
       hits.push({ id: item.id, name: item.name, start, end, phrase: tail });
     }
   }
@@ -703,6 +781,30 @@ interface Buy {
   wanted: number;
 }
 
+/**
+ * The money covers a leading run of the goods, each at a whole catalog price, and stops.
+ * Later goods the bag did not receive are left out of the bill instead of failing the turn.
+ */
+function affordablePrefix(ordered: Buy[], totalSpent: number, narration: string): Buy[] | null {
+  const hay = narration.toLowerCase();
+  const sorted = [...ordered].sort((a, b) => {
+    const ia = hay.indexOf(a.name.toLowerCase());
+    const ib = hay.indexOf(b.name.toLowerCase());
+    return (ia < 0 ? 1_000_000 : ia) - (ib < 0 ? 1_000_000 : ib);
+  });
+  let sum = 0;
+  const kept: Buy[] = [];
+  for (const buy of sorted) {
+    const next = sum + buy.price * Math.max(buy.wanted, 1);
+    if (next > totalSpent + 0.001) break;
+    sum = next;
+    kept.push(buy);
+  }
+  if (kept.length === 0 || kept.length === sorted.length) return null;
+  if (Math.abs(sum - totalSpent) > 0.001) return null;
+  return kept;
+}
+
 function noteBuy(buys: Map<string, Buy>, item: { id: string; name: string; price?: number }, wanted: number): void {
   if (item.price === undefined || item.price <= 0) return;
   const row = buys.get(item.id) ?? { id: item.id, name: item.name, price: item.price, wanted: 1 };
@@ -858,15 +960,27 @@ function checkItems(before: State, after: State, config: Config, draft: TurnDraf
   }
   const short = totalSpent + 0.001 < due;
   if (totalSpent > 0 && short) {
-    const names = [...buys.values()].map((buy) => `${buy.name} (${buy.id}, ${buy.price} each)`).join(", ");
-    out.push(
-      violation(
-        "fixable",
-        "underpaid_item",
-        `Spent ${totalSpent} on ${names}, which is not a whole number of catalog units (due ${due}). Charge a whole multiple of the price with stat.add and inventory.add to '${player}', or remove the spend and narrate that they cannot afford it.`,
-      ),
-    );
-    return out;
+    const ordered = [...buys.values()];
+    const prefix = affordablePrefix(ordered, totalSpent, draft.narration);
+    const dropped = prefix === null ? [] : ordered.filter((buy) => !prefix.includes(buy));
+    const keptWhole = prefix !== null && dropped.every((buy) => addedQty(applied, player, buy.id) < 1);
+    if (keptWhole && prefix) {
+      for (const buy of dropped) buys.delete(buy.id);
+      missing.length = 0;
+      for (const buy of buys.values()) {
+        if (addedQty(applied, player, buy.id) < 1) missing.push(buy);
+      }
+    } else {
+      const names = ordered.map((buy) => `${buy.name} (${buy.id}, ${buy.price} each)`).join(", ");
+      out.push(
+        violation(
+          "fixable",
+          "underpaid_item",
+          `Spent ${totalSpent} on ${names}, which is not a whole number of catalog units (due ${due}). Charge a whole multiple of the price with stat.add and inventory.add to '${player}', or remove the spend and narrate that they cannot afford it.`,
+        ),
+      );
+      return out;
+    }
   }
   for (const buy of missing) {
     out.push(
@@ -881,10 +995,10 @@ function checkItems(before: State, after: State, config: Config, draft: TurnDraf
 }
 
 const PLAN_TIME =
-  /\b(?:for|until|till|before|after|alarm|deadline|due|from|sent|timestamped|stamped|received|arrived|opens?|closes?|starts?|ends?|leaves?|departs?|arrives?|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|tonight|yesterday|earlier|later|next|last)\s+(?:at\s+)?(?:about\s+|around\s+|roughly\s+)?$/i;
+  /\b(?:for|until|till|before|after|alarm|deadline|due|from|sent|timestamped|stamped|received|arrived|opens?|closes?|starts?|ends?|leaves?|departs?|arrives?|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|tonight|yesterday|earlier|later|next|last)\s+(?:(?:the|a|an)\s+)?(?:at\s+)?(?:about\s+|around\s+|roughly\s+)?$/i;
 
 /** A sentence about a plan, a day, or a message: the time in it is not the clock unless it says so. */
-const NOT_NOW = /\b(?:tomorrow|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday|next week|interview|appointment|meeting|booked|deadline|text|texts|message|notification|timestamp|timestamped|sent|reply|replied)\b/i;
+const NOT_NOW = /\b(?:tomorrow|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday|next week|interview|appointment|meeting|booked|deadline|inspection|lecture|lectures|alarm|quiz|text|texts|message|notification|timestamp|timestamped|sent|reply|replied)\b/i;
 const IS_MESSAGE = /\b(?:text|texts|message|notification|timestamp|timestamped|sent|reply|replied)\b/i;
 const CLOCK_NOW_HINT = /\b(?:now|it's|it is|reads?|shows|(?<!o')clock|watch)\b/i;
 

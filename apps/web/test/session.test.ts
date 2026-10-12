@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { MockProvider } from "@book/llm";
 import type { LLMProvider, LLMRequest } from "@book/schema";
 import { MemoryPlayDb } from "../server/lib/memory-db.ts";
-import { library, openGame, readSave, redoTurn, takeTurn } from "../server/lib/session.ts";
-import { capMessage, cleanAccount, debugFromRecord, PERSON_CAP_USD, richText } from "../shared/play.ts";
+import { library, openGame, readHistory, readSave, redoTurn, takeTurn } from "../server/lib/session.ts";
+import { capMessage, cleanAccount, debugFromRecord, faultMessage, PAGE_MESSAGES, PERSON_CAP_USD, richText, tailWindow } from "../shared/play.ts";
 
 function scripted(): MockProvider {
   return new MockProvider({
@@ -149,6 +149,82 @@ describe("account", () => {
     });
     expect(cleanAccount("ada", "secret").ok).toBe(false);
     expect(cleanAccount("ada@example.com", "short").ok).toBe(false);
+  });
+});
+
+describe("a long save", () => {
+  it("shows the last page and walks back to the first line", async () => {
+    const db = new MemoryPlayDb();
+    const opened = await openGame(db, "ada", "uk-life", scripted());
+    if (!opened.ok) throw new Error(opened.error);
+    const inputs: string[] = [];
+    for (let i = 0; i < 8; i += 1) {
+      const text = `hello ${i}`;
+      inputs.push(text);
+      const played = await takeTurn(db, "ada", opened.view.id, text, scripted());
+      if (!played.ok) throw new Error(played.error);
+    }
+    const page = await readSave(db, "ada", opened.view.id);
+    expect(page.ok).toBe(true);
+    if (!page.ok) return;
+    expect(page.view.before).toBeTruthy();
+    expect(page.view.lines.some((line) => line.text === "hello 0")).toBe(false);
+    expect(page.view.lines.some((line) => line.text === "hello 7")).toBe(true);
+    expect(page.view.lines.length).toBeGreaterThanOrEqual(PAGE_MESSAGES);
+
+    const seen = [...page.view.lines];
+    let cursor = page.view.before;
+    let guard = 0;
+    while (cursor && guard < 20) {
+      guard += 1;
+      const older = await readHistory(db, "ada", opened.view.id, cursor);
+      expect(older.ok).toBe(true);
+      if (!older.ok) return;
+      expect(older.page.before).not.toBe(cursor);
+      seen.unshift(...older.page.lines);
+      cursor = older.page.before;
+    }
+    expect(cursor).toBeNull();
+    expect(seen.filter((line) => line.kind === "player").map((line) => line.text)).toEqual(inputs);
+  });
+
+  it("refuses to rewrite a line whose earlier page was not kept", async () => {
+    const db = new MemoryPlayDb();
+    const opened = await openGame(db, "ada", "uk-life", scripted());
+    if (!opened.ok) throw new Error(opened.error);
+    const first = await takeTurn(db, "ada", opened.view.id, "hello there", scripted());
+    if (!first.ok) throw new Error(first.error);
+    db.forgetStateBefore("ada", opened.view.id);
+    const again = await redoTurn(db, "ada", opened.view.id, "goodbye then", scripted());
+    expect(again.ok).toBe(false);
+    if (!again.ok) expect(again.error).toMatch(/wasn't kept/);
+    const still = await readSave(db, "ada", opened.view.id);
+    expect(still.ok).toBe(true);
+    if (!still.ok) return;
+    expect(still.view.lines.some((line) => line.text === "hello there")).toBe(true);
+  });
+});
+
+describe("earlier pages", () => {
+  it("keeps a turn whole once the page has enough lines", () => {
+    const turns = [
+      { id: "a", input: "one", lines: [{ kind: "story" as const, text: "A" }] },
+      { id: "b", input: "two", lines: [{ kind: "story" as const, text: "B" }] },
+      { id: "c", input: "three", lines: [{ kind: "story" as const, text: "C" }] },
+    ];
+    const page = tailWindow(turns, 3, false);
+    expect(page.turns.map((turn) => turn.id)).toEqual(["b", "c"]);
+    expect(page.before).toBe("b");
+    expect(tailWindow(turns, 10, false)).toEqual({ turns, before: null });
+    expect(tailWindow([], 10, true)).toEqual({ turns: [], before: null });
+  });
+
+  it("reads the sentence inside a failed response, not the boolean flag", () => {
+    expect(faultMessage({ data: { error: true, data: { error: "Corrupt save state (turn)" } } })).toBe(
+      "Corrupt save state (turn)",
+    );
+    expect(faultMessage({ data: { error: "Sign in first." } })).toBe("Sign in first.");
+    expect(faultMessage(null)).toMatch(/did not go through/);
   });
 });
 

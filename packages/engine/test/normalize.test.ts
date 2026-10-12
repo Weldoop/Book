@@ -303,6 +303,21 @@ describe("highlights", () => {
   });
 });
 
+describe("a long advance", () => {
+  it("becomes a skip when it fits the night, and stays a jump when it does not", () => {
+    const night = draft({
+      narration: "You sleep.",
+      delta: [{ op: "clock.advance", minutes: 540 }],
+    });
+    expect(validateDraft(fresh(), config(), [coreModule], night, "Sleep until morning").violations).toEqual([]);
+    expect(night.delta[0]).toMatchObject({ op: "clock.skip", minutes: 540, reason: "elapsed" });
+
+    const week = draft({ narration: "A week passes.", delta: [{ op: "clock.advance", minutes: 2000 }] });
+    expect(validateDraft(fresh(), config(), [coreModule], week, "Wait").violations.map((v) => v.code)).toContain("time_jump");
+    expect(week.delta[0]).toMatchObject({ op: "clock.advance", minutes: 2000 });
+  });
+});
+
 describe("the whole pass", () => {
   it("runs every tidy-up before validation", () => {
     const state = fresh();

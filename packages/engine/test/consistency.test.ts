@@ -185,9 +185,10 @@ describe("travel and place", () => {
 
     const named = fresh();
     named.entities.town = { ...sample, id: "town", type: "place", name: "Town", aliases: [], location: null };
-    expect(
-      validateDraft(named, cfg, modules, draft({ narration: "You stay in the room." }), "Walk into town").violations.map((v) => v.code),
-    ).toContain("arrived_elsewhere");
+    const intoTown = draft({ narration: "You stay in the room." });
+    const namedTrip = validateDraft(named, cfg, modules, intoTown, "Walk into town");
+    expect(intoTown.at).toBe("town");
+    expect(namedTrip.violations.filter((v) => v.code === "arrived_elsewhere")).toEqual([]);
   });
 
   it("treats going to bed as the bedroom, and only when the player is already there", () => {
@@ -334,16 +335,14 @@ describe("travel and place", () => {
         local: ["rail", "deck", "helm", "hold", "cabin"],
       },
     };
-    const sail = validateDraft(fresh(), cfg, modules, draft({ narration: "The bay stays grey." }), "Sail to the kitchen");
-    expect(sail.violations.map((v) => v.code)).toContain("arrived_elsewhere");
-    const course = validateDraft(
-      fresh(),
-      cfg,
-      modules,
-      draft({ narration: "The bay stays grey." }),
-      "Set a course for the seafront",
-    );
-    expect(course.violations.map((v) => v.code)).toContain("arrived_elsewhere");
+    const sailDraft = draft({ narration: "The bay stays grey." });
+    const sail = validateDraft(fresh(), cfg, modules, sailDraft, "Sail to the kitchen");
+    expect(sailDraft.at).toBe("kitchen");
+    expect(sail.violations.filter((v) => v.code === "arrived_elsewhere")).toEqual([]);
+    const courseDraft = draft({ narration: "The bay stays grey." });
+    const course = validateDraft(fresh(), cfg, modules, courseDraft, "Set a course for the seafront");
+    expect(courseDraft.at).toBe("seafront");
+    expect(course.violations.filter((v) => v.code === "arrived_elsewhere")).toEqual([]);
     const supplies = validateDraft(
       fresh(),
       cfg,
@@ -390,10 +389,10 @@ describe("travel and place", () => {
     const cfg = config();
     const input = "I walk back to the house and go into the kitchen.";
     const narration = "The kitchen is empty, the fridge humming to itself.";
-    const missed = validateDraft(fresh(), cfg, modules, draft({ narration }), input);
-    const travel = missed.violations.find((v) => v.code === "arrived_elsewhere");
-    expect(travel?.message).toContain('go to "kitchen"');
-    expect(travel?.message).not.toContain('go to "house"');
+    const landed = draft({ narration });
+    const missed = validateDraft(fresh(), cfg, modules, landed, input);
+    expect(landed.at).toBe("kitchen");
+    expect(missed.violations.filter((v) => v.code === "arrived_elsewhere")).toEqual([]);
 
     const arrived = validateDraft(
       fresh(),
@@ -540,8 +539,10 @@ describe("travel and place", () => {
     const room = bedState.entities.room;
     if (!room) throw new Error("room missing");
     bedState.entities.bed = { ...room, id: "bed", name: "Your bed", aliases: [] };
-    const missedBed = validateDraft(bedState, cfg, modules, draft({ narration: "You stay in the room." }), "I go to bed");
-    expect(missedBed.violations.find((v) => v.code === "arrived_elsewhere")?.message).toContain('go to "bed"');
+    const bedDraft = draft({ narration: "You stay in the room." });
+    const missedBed = validateDraft(bedState, cfg, modules, bedDraft, "I go to bed");
+    expect(bedDraft.at).toBe("bed");
+    expect(missedBed.violations.filter((v) => v.code === "arrived_elsewhere")).toEqual([]);
     const inBed = validateDraft(
       bedState,
       cfg,
@@ -566,6 +567,7 @@ describe("travel and place", () => {
     expect(clockOf("Priya's message reads: 'Tuesday 14:30 work? The Waterfront Cafe. Let me know.' Tuesday, 2:30 PM. That's solid.")).toEqual([]);
     expect(clockOf("The interview is tomorrow at 14:00, so you lay out a shirt.")).toEqual([]);
     expect(clockOf("The inspection window opens at 10:00; you have time.")).toEqual([]);
+    expect(clockOf("You set your alarm for 08:30, early enough before the 10:00 inspection.")).toEqual([]);
     expect(clockOf("At 10:04, a sharp knock.")[0]?.message).toContain("10:04");
     expect(clockOf("By 12:15 you're filing out into the corridor with everyone else.")[0]?.message).toContain("12:15");
   });
@@ -614,14 +616,44 @@ describe("travel and place", () => {
       "Suggest we go to the pub tonight to celebrate the garden, my shout for the first round",
     );
     expect(pub.violations).toEqual([]);
-    const asked = validateDraft(
+    const askedDraft = draft({ narration: "Tomos shrugs. You stay in the kitchen." });
+    const asked = validateDraft(fresh(), cfg, modules, askedDraft, "Go to the pub tonight");
+    expect(askedDraft.at).toBe("pub");
+    expect(asked.violations.filter((v) => v.code === "arrived_elsewhere")).toEqual([]);
+  });
+
+  it("does not invent a place, and does not override a move or a refusal", () => {
+    const cfg = config();
+    const refused = draft({ narration: "You're still here. The pub can wait." });
+    expect(validateDraft(fresh(), cfg, modules, refused, "Walk to the pub").violations).toEqual([]);
+    expect(refused.at).toBeUndefined();
+
+    const unknown = validateDraft(fresh(), cfg, modules, draft({ narration: "You stay put." }), "Walk to the campus");
+    expect(unknown.violations.find((v) => v.code === "arrived_elsewhere")?.message ?? "").toContain('go to "campus"');
+
+    const tavern = fresh();
+    const sample = tavern.entities.pub;
+    if (!sample) throw new Error("pub missing");
+    tavern.entities["uplands-pub"] = { ...sample, id: "uplands-pub", name: "Uplands Pub", aliases: [] };
+    const already = draft({
+      narration: "You push through the doors.",
+      delta: [{ op: "entity.move", id: "player", location: "uplands-pub" }],
+      at: "uplands-pub",
+    });
+    expect(validateDraft(tavern, cfg, modules, already, "Walk to the Uplands Tavern").violations).toEqual([]);
+
+    const pirate: Config = {
+      ...cfg,
+      travel: { ...cfg.travel, journeys: ["sail", "set a course"] },
+    };
+    const chase = validateDraft(
       fresh(),
-      cfg,
+      pirate,
       modules,
-      draft({ narration: "Tomos shrugs. You stay in the kitchen." }),
-      "Go to the pub tonight",
+      draft({ narration: "You hold your heading." }),
+      "A distant sail is too far to chase. Say we do not chase",
     );
-    expect(asked.violations.map((v) => v.code)).toContain("arrived_elsewhere");
+    expect(chase.violations.filter((v) => v.code === "arrived_elsewhere")).toEqual([]);
   });
 
   it("keeps the trip inside one action and reads an errand after to as the errand", () => {
@@ -659,8 +691,10 @@ describe("travel and place", () => {
     const cfg = config();
     const narration = "You step back inside. Cerys is still at the table, tea cooling in front of her.";
     const input = "I go back into the kitchen and ask Cerys what the inspection checks";
-    const missed = validateDraft(fresh(), cfg, modules, draft({ narration }), input);
-    expect(missed.violations.map((v) => v.code)).toContain("arrived_elsewhere");
+    const stayed = draft({ narration });
+    const missed = validateDraft(fresh(), cfg, modules, stayed, input);
+    expect(stayed.at).toBe("kitchen");
+    expect(missed.violations.filter((v) => v.code === "arrived_elsewhere")).toEqual([]);
 
     const arrived = validateDraft(
       fresh(),
@@ -922,6 +956,41 @@ describe("catalog items", () => {
     expect(short.violations.map((v) => v.code)).toEqual(["underpaid_item"]);
     expect(short.violations[0]?.message).toContain("rum-cask");
     expect(short.violations[0]?.message).toContain("due 480");
+
+    const both: Config = {
+      ...cfg,
+      items: [...cfg.items, { id: "lager-4-pack", name: "Lager 4-pack", price: 5 }],
+    };
+    const paidBoth = validateDraft(
+      fresh(),
+      both,
+      modules,
+      draft({
+        narration: "You take the carton of oat milk and the lager 4-pack.",
+        delta: [
+          { op: "stat.add", key: "money", amount: -6.75, reason: "Oat milk and lager 4-pack" },
+          { op: "inventory.add", owner: "player", item: "oat-milk", qty: 1 },
+          { op: "inventory.add", owner: "player", item: "lager-4-pack", qty: 1 },
+        ],
+      }),
+      "Get the oat milk and a four pack",
+    );
+    expect(paidBoth.violations.filter((v) => v.code === "underpaid_item")).toEqual([]);
+
+    const firstOnly = validateDraft(
+      fresh(),
+      both,
+      modules,
+      draft({
+        narration: "You buy a pint of milk and you buy a pint of lager.",
+        delta: [
+          { op: "stat.add", key: "money", amount: -1.3, reason: "Pint of milk" },
+          { op: "inventory.add", owner: "player", item: "milk", qty: 1 },
+        ],
+      }),
+      "Get the milk and a pint",
+    );
+    expect(firstOnly.violations.filter((v) => v.code === "underpaid_item" || v.code === "unpaid_item")).toEqual([]);
 
     const paid = validateDraft(
       fresh(),

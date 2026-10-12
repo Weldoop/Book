@@ -560,6 +560,7 @@
         "id": "bathroom",
         "type": "place",
         "name": "The bathroom",
+        "aliases": ["shower", "the shower"],
         "location": "shared-house",
         "facts": [
           "Shared bathroom with a shower of unpredictable temperature."

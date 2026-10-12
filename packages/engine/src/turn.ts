@@ -114,7 +114,7 @@ export function validateDraft(
   draft: TurnDraft,
   input = "",
 ): ValidationResult {
-  normalizeDraft(state, config, draft);
+  normalizeDraft(state, config, draft, input);
   materializeAt(state, config, draft);
   const processed = processOps(withThreadContact(state, config, input), config, modules, draft.delta);
   const warnings: string[] = [];
@@ -318,7 +318,7 @@ function withThreadContact(state: State, config: Config, input: string): State {
 
 /** Applies a draft that has already passed validation. Pure: returns the next state. */
 export function applyDraft(state: State, config: Config, modules: Module[], draft: TurnDraft, ctx: ApplyContext): State {
-  normalizeDraft(state, config, draft);
+  normalizeDraft(state, config, draft, ctx.input);
   materializeAt(state, config, draft);
   const processed = processOps(withThreadContact(state, config, ctx.input), config, modules, draft.delta);
   if (processed.violations.length > 0) {

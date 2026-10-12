@@ -64,6 +64,8 @@ export interface PlayView {
   ended: boolean;
   suggestions: string[];
   lines: TranscriptItem[];
+  /** Oldest turn in `lines`, when turns older than this page still exist. */
+  before: string | null;
   lastInput: string | null;
   debug: DebugView;
   spentUsd: number;
@@ -76,6 +78,15 @@ export interface LibraryView {
   spentUsd: number;
   capUsd: number;
 }
+
+/** Lines brought back when the reader scrolls above the page already shown. */
+export interface HistoryPage {
+  lines: TranscriptItem[];
+  before: string | null;
+}
+
+/** How many transcript lines a freshly opened save, or one scroll back, shows. */
+export const PAGE_MESSAGES = 10;
 
 export function roundUsd(n: number): number {
   return Math.round(n * 1_000_000) / 1_000_000;
@@ -180,6 +191,71 @@ export function transcriptOf(turns: { input: string; lines: ShownLine[] }[]): Tr
     for (const line of turn.lines) out.push(line);
   }
   return out;
+}
+
+export function messageCount(turn: { input: string; lines: ShownLine[] }): number {
+  const player = turn.input !== OPENING_INPUT && turn.input.trim().length > 0 ? 1 : 0;
+  return player + turn.lines.length;
+}
+
+/**
+ * The newest whole turns that fill about `messages` lines.
+ * `moreBefore` means turns exist older than `turns[0]`, even though they were not passed in.
+ * A turn is kept whole, so the page can run a few lines past `messages`.
+ */
+export function tailWindow<T extends { id: string; input: string; lines: ShownLine[] }>(
+  turns: readonly T[],
+  messages: number,
+  moreBefore: boolean,
+): { turns: T[]; before: string | null } {
+  if (turns.length === 0) return { turns: [], before: null };
+  const limit = Math.max(1, messages);
+  let count = 0;
+  let start = turns.length;
+  for (let i = turns.length - 1; i >= 0; i -= 1) {
+    const turn = turns[i];
+    if (!turn) break;
+    count += messageCount(turn);
+    start = i;
+    if (count >= limit) break;
+  }
+  const page = turns.slice(start);
+  const oldest = page[0]?.id;
+  const olderExists = start > 0 || moreBefore;
+  return { turns: page, before: olderExists && oldest ? oldest : null };
+}
+
+/** The sentence to show when a request fails. Unwraps the `{ error: true, data: { error } }` envelope. */
+export function faultMessage(err: unknown): string {
+  return readFault(err) ?? "That did not go through. Try again in a moment.";
+}
+
+function readFault(value: unknown, depth = 0): string | null {
+  if (depth > 4 || value == null) return null;
+  if (typeof value === "string") {
+    const text = value.trim();
+    if (!text || text === "true" || text === "Request failed") return null;
+    return text;
+  }
+  if (typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.error === "string") {
+    const text = record.error.trim();
+    if (text && text !== "true") return text;
+  }
+  for (const key of ["data", "cause"]) {
+    const nested = readFault(record[key], depth + 1);
+    if (nested) return nested;
+  }
+  if (typeof record.statusMessage === "string") {
+    const text = record.statusMessage.trim();
+    if (text && text !== "Request failed" && text !== "true") return text;
+  }
+  if (typeof record.message === "string") {
+    const text = record.message.trim();
+    if (text && text !== "Request failed" && text !== "true") return text;
+  }
+  return null;
 }
 
 /** The latest line the player typed, skipping the dealt opening. */

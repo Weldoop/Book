@@ -15,6 +15,8 @@ describe("runReplay with a fake runtime", () => {
     expect(r.kind).toBe("engine");
     expect(r.turns.map((t) => t.turn)).toEqual([1, 2, 3]);
     expect(r.turns[1]?.calls).toBe(2);
+    expect(r.turns[1]?.story_output_tokens).toBeLessThan(r.turns[1]?.output_tokens ?? 0);
+    expect(r.totals.p50_story_output_tokens).toBeGreaterThan(0);
     expect(r.turns[1]?.outcome).toBe("repaired");
     expect(r.turns[0]?.calls).toBe(1);
     expect(r.turns[0]?.input_tokens).toBeGreaterThan(0);
@@ -114,6 +116,8 @@ describe("probe helpers", () => {
     expect(scoreProbe("The garden blitz happened with Cerys, but no deal.", ["rys", "rhys", "rees"])).toBe(false);
     expect(scoreProbe("His name is Nathan", ["nath"])).toBe(false);
     expect(scoreProbe("His name is Nathan", ["nathan", "nath"])).toBe(true);
+    expect(scoreProbe("back by 4 p.m. on Saturday", ["4 pm"])).toBe(true);
+    expect(scoreProbe("back by 4pm", ["4 pm"])).toBe(true);
   });
   it("dueProbes returns each probe once when reached", () => {
     const p: Probe[] = [

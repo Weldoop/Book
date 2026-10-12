@@ -1,12 +1,35 @@
+import { lastPlayerTurn, roundUsd, tailWindow } from "../../shared/play.ts";
 import type { SaveSummary } from "../../shared/play.ts";
-import { roundUsd } from "../../shared/play.ts";
-import type { LoadedSave, PlayDb, StoredSave, StoredTurn } from "./db.ts";
+import type { EditableTurn, PlayDb, ShownTurn, StoredSave, StoredTurn, TurnWindow } from "./db.ts";
 
 /** In-memory library used by tests. Charges survive a deleted turn, so a redo does not refund. */
 export class MemoryPlayDb implements PlayDb {
   private readonly saves = new Map<string, StoredSave>();
   private readonly turns: StoredTurn[] = [];
   private readonly charges: { userId: string; costUsd: number }[] = [];
+  private readonly missingState = new Set<string>();
+
+  /** Test hook: the latest player line keeps no snapshot, as with an imported history. */
+  forgetStateBefore(userId: string, saveId: string): void {
+    const previous = lastPlayerTurn(this.ownedTurns(userId, saveId));
+    if (previous) this.missingState.add(previous.id);
+  }
+
+  private ownedTurns(userId: string, saveId: string): StoredTurn[] {
+    return this.turns.filter((turn) => turn.saveId === saveId && turn.userId === userId);
+  }
+
+  private shown(turn: StoredTurn): ShownTurn {
+    return {
+      id: turn.id,
+      input: turn.input,
+      outcome: turn.outcome,
+      record: turn.record,
+      costUsd: turn.costUsd,
+      lines: turn.lines,
+      suggestions: turn.suggestions,
+    };
+  }
 
   async spent(userId: string): Promise<number> {
     return roundUsd(this.charges.filter((row) => row.userId === userId).reduce((n, row) => n + row.costUsd, 0));
@@ -26,12 +49,36 @@ export class MemoryPlayDb implements PlayDb {
       .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : a.id.localeCompare(b.id)));
   }
 
-  async load(userId: string, saveId: string): Promise<LoadedSave | null> {
+  async loadSave(userId: string, saveId: string): Promise<StoredSave | null> {
     const save = this.saves.get(saveId);
     if (!save || save.userId !== userId) return null;
+    return structuredClone(save);
+  }
+
+  async windowTurns(userId: string, saveId: string, beforeId: string | null, messages: number): Promise<TurnWindow> {
+    const owned = this.ownedTurns(userId, saveId);
+    let end = owned.length;
+    if (beforeId) {
+      const index = owned.findIndex((turn) => turn.id === beforeId);
+      if (index < 0) return { turns: [], before: null };
+      end = index;
+    }
+    const older = owned.slice(0, end);
+    const batch = older.slice(Math.max(0, older.length - Math.max(1, messages)));
+    const window = tailWindow(
+      batch.map((turn) => this.shown(turn)),
+      messages,
+      older.length > batch.length,
+    );
+    return { turns: window.turns, before: window.before };
+  }
+
+  async lastEditable(userId: string, saveId: string): Promise<EditableTurn | null> {
+    const previous = lastPlayerTurn(this.ownedTurns(userId, saveId));
+    if (!previous) return null;
     return {
-      ...structuredClone(save),
-      turns: this.turns.filter((turn) => turn.saveId === saveId && turn.userId === userId).map((turn) => structuredClone(turn)),
+      id: previous.id,
+      stateBefore: this.missingState.has(previous.id) ? null : structuredClone(previous.stateBefore),
     };
   }
 

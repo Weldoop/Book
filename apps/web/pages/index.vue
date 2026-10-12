@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
-import type { LibraryView, PlayView } from "~/shared/play";
-import { capMessage, cleanAccount, richText } from "~/shared/play";
+import type { HistoryPage, LibraryView, PlayView, TranscriptItem } from "~/shared/play";
+import { capMessage, cleanAccount, faultMessage, richText } from "~/shared/play";
+
+interface LogLine {
+  key: string;
+  kind: TranscriptItem["kind"];
+  text: string;
+}
 
 const { $supabase } = useNuxtApp();
 const supabase = $supabase as SupabaseClient | null;
@@ -25,11 +31,18 @@ const logEl = ref<HTMLElement | null>(null);
 const composerEl = ref<HTMLTextAreaElement | null>(null);
 const textSize = ref("19px");
 const themeName = ref<"light" | "dark">("light");
+const transcript = ref<LogLine[]>([]);
+const earlier = ref<string | null>(null);
+const loadingEarlier = ref(false);
+const pinning = ref(false);
+let lastScrollTop = 0;
+let lineKey = 0;
+let viewGen = 0;
 
 const sizes = ["17px", "19px", "21px", "24px"];
 const capped = computed(() => (library.value ? capMessage(library.value.spentUsd, library.value.capUsd) : null));
 const lastPlayerIndex = computed(() => {
-  const lines = view.value?.lines ?? [];
+  const lines = transcript.value;
   for (let i = lines.length - 1; i >= 0; i -= 1) {
     if (lines[i]?.kind === "player") return i;
   }
@@ -40,12 +53,68 @@ function token(): string | null {
   return session.value?.access_token ?? null;
 }
 
-function problem(err: unknown): string {
-  if (err && typeof err === "object") {
-    const data = (err as { data?: { error?: unknown } }).data;
-    if (typeof data?.error === "string" && data.error.trim()) return data.error;
+function stamp(lines: TranscriptItem[]): LogLine[] {
+  return lines.map((line) => {
+    lineKey += 1;
+    return { key: `line-${lineKey}`, kind: line.kind, text: line.text };
+  });
+}
+
+function applyView(next: PlayView): void {
+  viewGen += 1;
+  view.value = next;
+  transcript.value = stamp(next.lines);
+  earlier.value = next.before;
+  void pinToEnd();
+}
+
+async function pinToEnd(): Promise<void> {
+  pinning.value = true;
+  await nextTick();
+  const el = logEl.value;
+  if (el) {
+    el.scrollTop = el.scrollHeight;
+    lastScrollTop = el.scrollTop;
   }
-  return "That did not go through. Try again in a moment.";
+  pinning.value = false;
+}
+
+async function loadEarlier(): Promise<void> {
+  const cursor = earlier.value;
+  const el = logEl.value;
+  if (!view.value || !cursor || loadingEarlier.value || !el) return;
+  const beforeHeight = el.scrollHeight;
+  const beforeTop = el.scrollTop;
+  const gen = viewGen;
+  loadingEarlier.value = true;
+  fault.value = "";
+  try {
+    const page = await api<HistoryPage>(`/api/saves/${view.value.id}/history?before=${encodeURIComponent(cursor)}`);
+    if (gen !== viewGen) return;
+    transcript.value = [...stamp(page.lines), ...transcript.value];
+    earlier.value = page.before;
+    pinning.value = true;
+    await nextTick();
+    if (gen !== viewGen) return;
+    el.scrollTop = el.scrollHeight - beforeHeight + beforeTop;
+    lastScrollTop = el.scrollTop;
+  } catch (err) {
+    fault.value = faultMessage(err);
+  } finally {
+    pinning.value = false;
+    loadingEarlier.value = false;
+  }
+}
+
+function onLogScroll(): void {
+  const el = logEl.value;
+  if (!el) return;
+  const top = el.scrollTop;
+  const movedUp = top + 1 < lastScrollTop;
+  lastScrollTop = top;
+  if (pinning.value || loadingEarlier.value || busy.value) return;
+  if (!movedUp || top > 64 || !earlier.value) return;
+  void loadEarlier();
 }
 
 async function api<T>(path: string, body?: unknown): Promise<T> {
@@ -65,11 +134,11 @@ async function openSave(id: string): Promise<void> {
   editing.value = false;
   busy.value = true;
   try {
-    view.value = await api<PlayView>(`/api/saves/${id}`);
+    applyView(await api<PlayView>(`/api/saves/${id}`));
     draft.value = "";
-    if (window.matchMedia("(max-width: 959px)").matches) leftOpen.value = false;
+    if (narrowScreen()) leftOpen.value = false;
   } catch (err) {
-    fault.value = problem(err);
+    fault.value = faultMessage(err);
   } finally {
     busy.value = false;
   }
@@ -80,12 +149,12 @@ async function newGame(configId: string): Promise<void> {
   editing.value = false;
   busy.value = true;
   try {
-    view.value = await api<PlayView>("/api/saves", { configId });
+    applyView(await api<PlayView>("/api/saves", { configId }));
     draft.value = "";
     await loadLibrary();
-    if (window.matchMedia("(max-width: 959px)").matches) leftOpen.value = false;
+    if (narrowScreen()) leftOpen.value = false;
   } catch (err) {
-    fault.value = problem(err);
+    fault.value = faultMessage(err);
   } finally {
     busy.value = false;
   }
@@ -98,12 +167,12 @@ async function send(): Promise<void> {
   fault.value = "";
   busy.value = true;
   try {
-    view.value = await api<PlayView>(path, { input: draft.value });
+    applyView(await api<PlayView>(path, { input: draft.value }));
     draft.value = "";
     editing.value = false;
     await loadLibrary();
   } catch (err) {
-    fault.value = problem(err);
+    fault.value = faultMessage(err);
   } finally {
     busy.value = false;
   }
@@ -184,6 +253,8 @@ async function signOut(): Promise<void> {
   session.value = null;
   view.value = null;
   library.value = null;
+  transcript.value = [];
+  earlier.value = null;
   editing.value = false;
   draft.value = "";
   fault.value = "";
@@ -235,23 +306,9 @@ function toggleTheme(): void {
   localStorage.setItem("book-theme", next);
 }
 
-watch(
-  () => view.value?.lines.length,
-  async () => {
-    await nextTick();
-    if (logEl.value) logEl.value.scrollTop = logEl.value.scrollHeight;
-  },
-);
-
 watch(draft, async () => {
   await nextTick();
   fitComposer();
-});
-
-watch(busy, async (isBusy) => {
-  if (!isBusy) return;
-  await nextTick();
-  if (logEl.value) logEl.value.scrollTop = logEl.value.scrollHeight;
 });
 
 onMounted(async () => {
@@ -274,7 +331,7 @@ onMounted(async () => {
 watch(session, (next, prev) => {
   if (!next || next.user.id === prev?.user.id) return;
   void loadLibrary().catch((err: unknown) => {
-    fault.value = problem(err);
+    fault.value = faultMessage(err);
   });
 });
 </script>
@@ -357,11 +414,14 @@ watch(session, (next, prev) => {
         </div>
       </aside>
       <section class="story">
-        <div ref="logEl" class="log">
+        <div ref="logEl" class="log" @scroll="onLogScroll">
           <p v-if="!view" class="empty">Choose a book, or open one of your saves.</p>
+          <button v-else-if="earlier" class="earlier" type="button" :disabled="loadingEarlier" @click="loadEarlier">
+            {{ loadingEarlier ? "Turning back…" : "Earlier" }}
+          </button>
           <p
-            v-for="(line, index) in view?.lines ?? []"
-            :key="index"
+            v-for="(line, index) in transcript"
+            :key="line.key"
             :class="[line.kind, { 'being-edited': editing && index === lastPlayerIndex }]"
           >
             <template v-for="(part, partIndex) in richText(line.text)" :key="partIndex">

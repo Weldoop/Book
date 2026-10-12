@@ -27,11 +27,13 @@ export function rowFromResult(result: TurnResultLike, inputTurn: number, wallMs:
   const usage = result.record.usage;
   const sum = (pick: (u: (typeof usage)[number]) => number): number => usage.reduce((n, u) => n + pick(u), 0);
   const misses = usage.filter((u) => ATTENTION_PURPOSE.test(u.purpose)).length;
+  const story = usage.find((u) => u.purpose === "turn") ?? usage[0];
   const row: TurnRow = {
     turn: inputTurn,
     game_turn: result.turn,
     input_tokens: sum((u) => u.input_tokens),
     output_tokens: sum((u) => u.output_tokens),
+    ...(story ? { story_output_tokens: story.output_tokens } : {}),
     cached_input_tokens: sum((u) => u.cached_input_tokens),
     cost_usd: sum((u) => u.cost_usd),
     latency_ms: wallMs,
