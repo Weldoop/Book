@@ -61,6 +61,22 @@ describe("player statements", () => {
     expect(hits.find((hit) => hit.text.includes("coffee"))?.thread?.kind).toBe("debt");
   });
 
+  it("keeps an agreed time and a disclaimer", () => {
+    const cfg = config();
+    const state = createInitialState(cfg, [coreModule], "s");
+    const hits = readPlayerStatements(
+      "Four o'clock then Glenys no problem\nWe'll do the tip but we are not responsible for the fence and the bench, ill talk our way out of that one",
+      state,
+      cfg,
+    );
+    expect(hits.map((hit) => hit.text)).toEqual([
+      "Back by four o'clock.",
+      "Not responsible for the fence and the bench.",
+    ]);
+    expect(hits[0]?.thread?.text).toBe("Back by four o'clock.");
+    expect(hits[1]?.thread).toBeUndefined();
+  });
+
   it("does not keep weather, a price aside, a denial, or an out-of-character line", () => {
     const cfg = config();
     const state = createInitialState(cfg, [coreModule], "s");

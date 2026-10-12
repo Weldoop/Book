@@ -157,20 +157,17 @@ describe("op validation", () => {
     expect(res.violations[0]).toMatchObject({ severity: "fixable", code: "unknown_item" });
   });
 
-  it("treats malformed ops and unknown ids as fixable", () => {
+  it("treats malformed ops as fixable and drops a fact for an id the save does not have", () => {
     const { config, modules, state } = testSetup();
-    const res = validateDraft(
-      state,
-      config,
-      modules,
-      draft([
-        { op: "clock.advance", minutes: "ten" },
-        { op: "entity.fact.add", id: "nobody", fact: "x" },
-        { op: "stat.add", key: "mana", amount: 1 },
-        { op: "does.not.exist" },
-      ]) as never,
-    );
-    expect(res.violations.map((v) => v.code)).toEqual(["bad_op", "unknown_entity", "unknown_stat", "bad_op"]);
+    const d = draft([
+      { op: "clock.advance", minutes: "ten" },
+      { op: "entity.fact.add", id: "nobody", fact: "x" },
+      { op: "stat.add", key: "mana", amount: 1 },
+      { op: "does.not.exist" },
+    ]) as never as { delta: unknown[] };
+    const res = validateDraft(state, config, modules, d as never);
+    expect(d.delta.some((op) => (op as { id?: string }).id === "nobody")).toBe(false);
+    expect(res.violations.map((v) => v.code)).toEqual(["bad_op", "unknown_stat", "bad_op"]);
     expect(res.violations.every((v) => v.severity === "fixable")).toBe(true);
   });
 

@@ -142,4 +142,27 @@ describe("an out-of-character answer from the save", () => {
     expect(answer).not.toContain("£");
     expect(answerFromSave(state, config, "Is Glenys he or she?")).toBe("No pronoun is recorded for Glenys.");
   });
+
+  it("answers a time from the line that states one, and what was said from that sentence", () => {
+    const glenys = state.entities.glenys;
+    const next = makeState({
+      entities: {
+        ...state.entities,
+        ...(glenys ? { glenys: { ...glenys, facts: [] } } : {}),
+      },
+      ledger: [
+        { turn: 2, text: "You go by Weldo.", kind: "alias" },
+        { turn: 3, text: "Dai is doing the bins tomorrow", kind: "commitment" },
+        { turn: 4, text: "Back by four o'clock.", kind: "commitment" },
+        { turn: 5, text: "Not responsible for the fence and the bench.", kind: "commitment" },
+      ],
+    });
+    const time = answerFromSave(next, config, "What time did I promise to return the borrowed mower?");
+    expect(time).toContain("four o'clock");
+    expect(time).not.toContain("Weldo");
+    const said = answerFromSave(next, config, "Which two garden items did I say we are not responsible for?");
+    expect(said).toContain("fence and the bench");
+    expect(said).not.toContain("mower");
+    expect(answerFromSave(next, config, "What time is the train?")).toBeNull();
+  });
 });

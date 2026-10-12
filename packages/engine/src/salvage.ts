@@ -46,6 +46,39 @@ function reasonNamesItem(reason: string, item: { id: string; name: string }): bo
 }
 
 /**
+ * A fact or a move for an id the save does not have is a prop the model invented.
+ * It is dropped. A move of the player toward a place that does not exist yet is kept,
+ * so the place can still be created from the player's words.
+ */
+export function dropUnknownProps(state: State, config: Config, draft: TurnDraft): void {
+  const created = new Set<string>();
+  for (const op of draft.delta) {
+    const rec = asRec(op);
+    if (rec?.op === "entity.create" && typeof rec.id === "string") created.add(rec.id);
+  }
+  const known = (id: string): boolean => state.entities[id] !== undefined || created.has(id);
+  const player = config.player_id;
+  draft.delta = draft.delta.flatMap((op) => {
+    const rec = asRec(op);
+    if (!rec) return [op];
+    if (rec.op === "entity.create" && typeof rec.location === "string" && !known(rec.location)) {
+      delete rec.location;
+      return [op];
+    }
+    if (rec.op === "entity.fact.add" && typeof rec.id === "string" && !known(rec.id)) return [];
+    if (rec.op === "entity.move" && typeof rec.id === "string" && typeof rec.location === "string") {
+      if (!known(rec.id)) return [];
+      if (rec.id !== player && !known(rec.location)) return [];
+      return [op];
+    }
+    if (Array.isArray(rec.entities)) {
+      rec.entities = rec.entities.filter((id): id is string => typeof id === "string" && known(id));
+    }
+    return [op];
+  });
+}
+
+/**
  * A charge the narration never buys, and a second copy of gear already in the bag,
  * come out of the delta. The turn can commit. A price the narration does state stays.
  */

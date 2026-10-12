@@ -319,6 +319,15 @@ function checkAt(after: State, config: Config, draft: TurnDraft): Violation[] {
   return [];
 }
 
+/** The last place the player asked for is this one. */
+export function matchesAskedPlace(state: State, config: Config, input: string, placeId: string): boolean {
+  const place = state.entities[placeId];
+  if (!place || place.type !== "place") return false;
+  const last = bindingHits(input, config).at(-1);
+  if (!last) return false;
+  return placeMatches(place.name, place.aliases, place.id, last.dest);
+}
+
 function knownPlace(state: State, dest: string): boolean {
   return Object.values(state.entities).some((entity) => entity.type === "place" && placeMatches(entity.name, entity.aliases, entity.id, dest));
 }
@@ -1320,6 +1329,48 @@ function checkClock(before: State, after: State, config: Config, draft: TurnDraf
       `The narration says ${label} but the clock is ${now}.${exact} Put that exact number in the delta.`,
     ),
   ];
+}
+
+/**
+ * A face the narration states as now, inside the turn limit, is the clock.
+ * An advance that overshoots or falls short is rewritten. A time already past, a plan,
+ * and a clock.set that goes backward are left alone.
+ */
+export function snapStatedClock(state: State, config: Config, draft: TurnDraft): void {
+  const stated = statedClock(draft.narration, state.clock.now);
+  const began = clockFace(state.clock.now);
+  if (!stated || !began) return;
+  if (stated.hours === began.hours && stated.minutes === began.minutes) return;
+  const mins = minutesUntil(state.clock.now, stated.hours, stated.minutes);
+  if (mins <= 0) return;
+  const scene = config.time.max_per_turn;
+  const skip = config.time.max_skip_minutes;
+  if (mins > scene && (skip <= 0 || mins > skip)) return;
+  const backward = draft.delta.some((op) => {
+    if (!op || typeof op !== "object") return false;
+    const rec = op as { op?: unknown; now?: unknown };
+    return rec.op === "clock.set" && typeof rec.now === "string" && rec.now < state.clock.now;
+  });
+  if (backward) return;
+  const clockOp =
+    mins <= scene
+      ? { op: "clock.advance", minutes: mins }
+      : { op: "clock.skip", minutes: mins, reason: "the narration's clock" };
+  let placed = false;
+  const next: unknown[] = [];
+  for (const op of draft.delta) {
+    const rec = op && typeof op === "object" ? (op as { op?: unknown }) : null;
+    if (rec && (rec.op === "clock.advance" || rec.op === "clock.skip" || rec.op === "clock.set")) {
+      if (!placed) {
+        next.push(clockOp);
+        placed = true;
+      }
+      continue;
+    }
+    next.push(op);
+  }
+  if (!placed) next.push(clockOp);
+  draft.delta = next;
 }
 
 /** A negative currency change. */

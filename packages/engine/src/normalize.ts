@@ -1,8 +1,8 @@
 import type { Config, Entity, State, TurnDraft } from "@book/schema";
 import { catalogItems } from "./catalog.ts";
-import { fillOrderedAt, retargetUnknownPlace } from "./consistency.ts";
+import { fillOrderedAt, matchesAskedPlace, retargetUnknownPlace, snapStatedClock } from "./consistency.ts";
 import { playerLocation } from "./core.ts";
-import { holdGuests, protectQuotes, salvageBookkeeping } from "./salvage.ts";
+import { dropUnknownProps, holdGuests, protectQuotes, salvageBookkeeping } from "./salvage.ts";
 import { correctRelativeTimes } from "./reltime.ts";
 import { duplicateOpenThread, isPlayerScrap, sameErrandThread, weekdayDue } from "./threads.ts";
 
@@ -287,6 +287,44 @@ function alignMoveWithProse(state: State, config: Config, draft: TurnDraft): voi
 }
 
 /**
+ * `at` and the player move name one place. The paragraph picks it. Otherwise the place
+ * the player asked for picks it. A move that matches neither is dropped, so a repair is
+ * not told to go to the room and the shower in the same turn.
+ */
+function agreeStop(state: State, config: Config, draft: TurnDraft, input: string): void {
+  const player = config.player_id;
+  const move = draft.delta.find((op) => asRec(op)?.op === "entity.move" && asRec(op)?.id === player);
+  const moved = typeof asRec(move)?.location === "string" ? (asRec(move)?.location as string) : undefined;
+  if (!draft.at || !moved || draft.at === moved) return;
+  const atPlace = state.entities[draft.at];
+  const movePlace = state.entities[moved];
+  const sits = (place: Entity | undefined): boolean =>
+    place?.type === "place" && placeNamed(draft.narration, place);
+  const proseAt = sits(atPlace);
+  const proseMove = sits(movePlace);
+  const dropMove = (): void => {
+    draft.delta = draft.delta.filter((op) => !(asRec(op)?.op === "entity.move" && asRec(op)?.id === player));
+  };
+  if (proseAt && !proseMove) {
+    dropMove();
+    return;
+  }
+  if (proseMove && !proseAt) {
+    draft.at = moved;
+    return;
+  }
+  if (matchesAskedPlace(state, config, input, moved)) {
+    draft.at = moved;
+    return;
+  }
+  if (draft.at && matchesAskedPlace(state, config, input, draft.at)) {
+    dropMove();
+    return;
+  }
+  dropMove();
+}
+
+/**
  * Deterministic tidying of a draft before validation. It maps a name the model wrote for someone
  * already in the save, drops a charge or a bag op the narration never performed, keeps a quoted
  * sentence, and reads the place the sentence sits in. It does not invent a purchase or a trip.
@@ -300,10 +338,13 @@ export function normalizeDraft(state: State, config: Config, draft: TurnDraft, i
   salvageBookkeeping(state, config, draft, input);
   protectQuotes(draft, input);
   holdGuests(state, config, draft, input);
+  dropUnknownProps(state, config, draft);
   retargetUnknownPlace(state, config, draft, input);
   fillOrderedAt(state, config, draft, input);
   alignMoveWithProse(state, config, draft);
+  agreeStop(state, config, draft, input);
   inferAt(state, config, draft);
   promoteLongAdvance(config, draft);
+  snapStatedClock(state, config, draft);
   correctRelativeTimes(state, draft);
 }

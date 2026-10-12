@@ -478,17 +478,13 @@ describe("travel and place", () => {
     );
     expect(onTime.violations).toEqual([]);
 
-    const wrongTime = validateDraft(
-      fresh(),
-      cfg,
-      modules,
-      draft({
-        narration: "The clock reads 09:47.",
-        delta: [{ op: "clock.advance", minutes: 10 }],
-      }),
-      "I look around.",
-    );
-    expect(wrongTime.violations.find((v) => v.code === "clock_mismatch")?.message).toContain("47");
+    const wrongDraft = draft({
+      narration: "The clock reads 09:47.",
+      delta: [{ op: "clock.advance", minutes: 10 }],
+    });
+    const wrongTime = validateDraft(fresh(), cfg, modules, wrongDraft, "I look around.");
+    expect(wrongTime.violations.filter((v) => v.code === "clock_mismatch")).toEqual([]);
+    expect(wrongDraft.delta).toEqual([{ op: "clock.advance", minutes: 47 }]);
 
     const alarm = validateDraft(
       fresh(),
@@ -576,8 +572,15 @@ describe("travel and place", () => {
     expect(clockOf("The interview is tomorrow at 14:00, so you lay out a shirt.")).toEqual([]);
     expect(clockOf("The inspection window opens at 10:00; you have time.")).toEqual([]);
     expect(clockOf("You set your alarm for 08:30, early enough before the 10:00 inspection.")).toEqual([]);
-    expect(clockOf("At 10:04, a sharp knock.")[0]?.message).toContain("10:04");
-    expect(clockOf("By 12:15 you're filing out into the corridor with everyone else.")[0]?.message).toContain("12:15");
+    const knock = draft({ narration: "At 10:04, a sharp knock.", delta: [{ op: "clock.advance", minutes: 10 }] });
+    expect(validateDraft(fresh(), cfg, modules, knock, "I look.").violations.filter((v) => v.code === "clock_mismatch")).toEqual([]);
+    expect(knock.delta).toEqual([{ op: "clock.advance", minutes: 64 }]);
+    const filing = draft({
+      narration: "By 12:15 you're filing out into the corridor with everyone else.",
+      delta: [{ op: "clock.advance", minutes: 10 }],
+    });
+    expect(validateDraft(fresh(), cfg, modules, filing, "I look.").violations.filter((v) => v.code === "clock_mismatch")).toEqual([]);
+    expect(filing.delta).toEqual([{ op: "clock.advance", minutes: 195 }]);
   });
 
   it("reads six o'clock, half seven, and quarter to nine as clock times", () => {
@@ -589,7 +592,14 @@ describe("travel and place", () => {
         (v) => v.code === "clock_mismatch",
       );
     };
-    expect(mismatch("The pages turn steadily. By six o'clock your eyes are tired.", "2026-10-03T16:24")?.message).toContain("18:00");
+    const tired = draft({
+      narration: "The pages turn steadily. By six o'clock your eyes are tired.",
+      delta: [{ op: "clock.advance", minutes: 10 }],
+    });
+    const tiredState = fresh();
+    tiredState.clock.now = "2026-10-03T16:24";
+    expect(validateDraft(tiredState, cfg, modules, tired, "I read.").violations.filter((v) => v.code === "clock_mismatch")).toEqual([]);
+    expect(tired.delta).toEqual([{ op: "clock.advance", minutes: 96 }]);
     expect(mismatch("You surface at half seven, groggy.")).toBeUndefined();
     expect(mismatch("It is quarter to nine when the kettle clicks.")).toBeUndefined();
     expect(mismatch("Owen has two essays due by Thursday and three quid for chips.")).toBeUndefined();
@@ -1491,5 +1501,44 @@ describe("playable salvage", () => {
       { input: "Ask again.", due: [] },
     );
     expect(flipped.entities.harri?.tags.filter((tag) => tag.startsWith("pronoun:"))).toEqual(["pronoun:he"]);
+  });
+
+  it("drops a fact about a prop the save has no id for", () => {
+    const cfg = config();
+    const d = draft({
+      narration: "You wheel the mower back and knock.",
+      delta: [
+        { op: "entity.fact.add", id: "flymo", fact: "Borrowed from next door", importance: 2 },
+        { op: "clock.advance", minutes: 5 },
+      ],
+    });
+    const res = validateDraft(fresh(), cfg, modules, d, "Drop the mower back");
+    expect(res.violations.map((v) => v.code)).not.toContain("unknown_entity");
+    expect(d.delta).toEqual([{ op: "clock.advance", minutes: 5 }]);
+  });
+
+  it("does not tell a repair to be in the room and the shower", () => {
+    const cfg = config();
+    const state = fresh();
+    const room = state.entities.room;
+    if (!room) throw new Error("room missing");
+    state.entities.bathroom = { ...room, id: "bathroom", name: "Bathroom", aliases: ["shower"], location: "shared-house" };
+    const stayed = draft({
+      narration: "You stay in the box room and look at the clock.",
+      at: "room",
+      delta: [{ op: "entity.move", id: "player", location: "bathroom" }],
+    });
+    const missed = validateDraft(state, cfg, modules, stayed, "Go to the shower and get changed");
+    expect(missed.violations.map((v) => v.code)).toEqual(["arrived_elsewhere"]);
+    expect(stayed.delta.some((op) => (op as { location?: string }).location === "bathroom")).toBe(false);
+
+    const went = draft({
+      narration: "You step into the bathroom and turn the water on.",
+      at: "room",
+      delta: [{ op: "entity.move", id: "player", location: "bathroom" }],
+    });
+    const arrived = validateDraft(state, cfg, modules, went, "Go to the shower and get changed");
+    expect(arrived.violations.filter((v) => v.code === "location_mismatch" || v.code === "arrived_elsewhere")).toEqual([]);
+    expect(went.at).toBe("bathroom");
   });
 });
