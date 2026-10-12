@@ -70,6 +70,7 @@ export async function runBaseline(opts: BaselineOptions): Promise<Report> {
         turn: input.turn,
         input_tokens: res.usage.input_tokens,
         output_tokens: res.usage.output_tokens,
+        story_output_tokens: res.usage.output_tokens,
         cached_input_tokens: res.usage.cached_input_tokens,
         cost_usd: res.usage.cost_usd,
         latency_ms: Math.round(performance.now() - t0),

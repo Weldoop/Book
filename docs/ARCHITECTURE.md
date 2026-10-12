@@ -1027,6 +1027,12 @@ engine, and its model-authored status line had already drifted within a single s
     the name. Six other lines stay in a 120-token ledger. A recall keyword has to be a whole word,
     and "not the Co-op" in a sentence that already stated the fact does not fail it. See ADR 0026.
 
+62. A missing `at` is the one sheet place the player named, when the reply is not a refusal and
+    the delta has not already moved them. A long advance inside the skip cap is a skip. The longer
+    catalog name wins over its last word, and a spend that pays for a leading run of goods is not
+    an underpayment of the rest. An out-of-character question that hits a stored name, purchase,
+    or fact is answered from the save. The part caps stay where ADR 0024 left them. See ADR 0029.
+
 ### Decided for the play app (11 Oct 2026)
 
 61. Testers play in a Nuxt app with email sign-in on the Supabase project named book. Each account has its own saves and a $5
@@ -1038,7 +1044,7 @@ engine, and its model-authored status line had already drifted within a single s
 ### Build status (11 Oct 2026)
 
 Phase 0 (contracts) and Phase 1 (core build) are implemented, plus the fixes from the live sessions
-and the ADR 0005 through 0026 changes; 510 tests pass.
+and the ADR 0005 through 0029 changes; 520 tests pass.
 
 | Area | State |
 |---|---|

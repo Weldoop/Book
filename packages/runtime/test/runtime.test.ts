@@ -259,6 +259,16 @@ describe("playTurn", () => {
     expect(records[0]?.usage.length).toBe(3);
   });
 
+  it("answers a stored nickname without a model call", async () => {
+    const llm = scripted({});
+    const { rt } = await setup(llm);
+    const res = await playTurn(rt, "s1", "OOC: What nickname do my housemates use for me?");
+    expect(res.kind).toBe("ooc");
+    expect(res.narration).toContain("weldo");
+    expect(llm.calls).toEqual([]);
+    expect(res.record.usage).toEqual([]);
+  });
+
   it("answers out-of-character questions without advancing the game", async () => {
     const llm = scripted({});
     const { rt, store } = await setup(llm);
