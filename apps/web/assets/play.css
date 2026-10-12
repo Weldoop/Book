@@ -165,16 +165,17 @@ button:disabled { opacity: 0.5; cursor: default; }
   margin-bottom: 8px;
 }
 .turning {
-  margin: 2px 0 10px;
+  margin: 4px 0 12px;
   color: var(--faint);
   font-family: var(--sans);
   font-size: 14px;
+  text-align: center;
 }
 @media (prefers-reduced-motion: no-preference) {
   .turning { animation: turning 1.4s ease-in-out infinite; }
 }
 @keyframes turning {
-  0%, 100% { opacity: 0.4; }
+  0%, 100% { opacity: 0.82; }
   50% { opacity: 1; }
 }
 .composer { display: flex; gap: 8px; align-items: flex-end; }
@@ -221,20 +222,20 @@ button:disabled { opacity: 0.5; cursor: default; }
 .repair ul { margin: 4px 0 0; padding-left: 18px; }
 
 @media (max-width: 959px) {
+  .stage { overflow: hidden; }
   .panel {
-    position: fixed;
+    position: absolute;
     top: 0;
     bottom: 0;
     width: min(88vw, 320px);
     z-index: 3;
     transform: translateX(-105%);
     transition: transform 0.18s ease;
-    box-shadow: 0 0 0 100vw transparent;
   }
   .panel.right { right: 0; left: auto; transform: translateX(105%); }
   .panel.left { left: 0; }
   .panel.open { transform: none; }
-  .scrim { position: fixed; inset: 0; z-index: 2; background: rgb(0 0 0 / 35%); border: 0; border-radius: 0; }
+  .scrim { position: absolute; inset: 0; z-index: 2; background: rgb(0 0 0 / 35%); border: 0; border-radius: 0; padding: 0; }
 }
 @media (min-width: 960px) {
   .scrim { display: none; }
