@@ -1,6 +1,49 @@
 import { TurnDraftSchema, type TurnDraft } from "@book/schema";
 import { z } from "zod";
 
+/**
+ * A quote inside the narration often arrives unescaped, which is still the reply.
+ * A `"` that is not followed by a comma, colon, or closer is escaped. A raw newline
+ * inside a string becomes `\n`. A trailing comma is dropped.
+ */
+export function loosenJson(text: string): string {
+  let out = "";
+  let inString = false;
+  let escaped = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i] ?? "";
+    if (!inString) {
+      if (ch === '"') inString = true;
+      out += ch;
+      continue;
+    }
+    if (escaped) {
+      out += ch;
+      escaped = false;
+      continue;
+    }
+    if (ch === "\\") {
+      out += ch;
+      escaped = true;
+      continue;
+    }
+    if (ch === "\n" || ch === "\r") {
+      out += "\\n";
+      continue;
+    }
+    if (ch === '"') {
+      const rest = text.slice(i + 1);
+      if (/^\s*[:,}\]]/.test(rest)) {
+        inString = false;
+        out += ch;
+      } else out += '\\"';
+      continue;
+    }
+    out += ch;
+  }
+  return out.replace(/,(\s*[}\]])/g, "$1");
+}
+
 /** Pulls the first JSON object out of model text, tolerating code fences and surrounding prose. */
 export function extractJson(text: string): unknown {
   const trimmed = text.trim();
@@ -9,7 +52,12 @@ export function extractJson(text: string): unknown {
   const start = candidate.indexOf("{");
   const end = candidate.lastIndexOf("}");
   if (start === -1 || end <= start) throw new Error("no JSON object found");
-  return JSON.parse(candidate.slice(start, end + 1));
+  const slice = candidate.slice(start, end + 1);
+  try {
+    return JSON.parse(slice);
+  } catch {
+    return JSON.parse(loosenJson(slice));
+  }
 }
 
 export type ParsedDraft = { ok: true; draft: TurnDraft } | { ok: false; error: string };
@@ -49,6 +97,10 @@ function prepareDraft(value: unknown): unknown {
   if (!value || typeof value !== "object" || Array.isArray(value)) return value;
   const draft = { ...(value as Record<string, unknown>) };
   if (typeof draft.focus_next === "string") delete draft.focus_next;
+  if (typeof draft.delta === "string") draft.delta = [];
+  if (draft.check !== null && draft.check !== undefined && (typeof draft.check !== "object" || Array.isArray(draft.check))) {
+    delete draft.check;
+  }
   const beat = typeof draft.beat === "string" ? draft.beat.trim() : "";
   const narration = typeof draft.narration === "string" ? draft.narration.trim() : "";
   const deltaOk = draft.delta === undefined || Array.isArray(draft.delta);
@@ -71,6 +123,11 @@ export function parseDraftText(text: string): ParsedDraft {
     value = extractJson(text);
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "invalid JSON" };
+  }
+  if (typeof value === "string") {
+    const narration = value.trim();
+    if (!narration) return { ok: false, error: "narration: the reply was empty" };
+    value = { narration, delta: [], beat: beatFromNarration(narration) };
   }
   const parsed = TurnDraftSchema.safeParse(prepareDraft(value));
   if (!parsed.success) {

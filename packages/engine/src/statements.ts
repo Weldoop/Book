@@ -217,6 +217,28 @@ function readDebt(line: string, state: State, config: Config): StatementHit | un
   };
 }
 
+const CLOCK_WORD = "(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\\d{1,2})";
+
+/** "Four o'clock then" agrees a time. It is not a place. */
+function readDeadline(line: string): StatementHit | undefined {
+  const match = new RegExp(
+    `^(?:(?:yeah|yes|aye|ok|okay|right|cheers|sound)[, ]+)?(?:back\\s+)?(?:by\\s+|before\\s+|at\\s+)?(${CLOCK_WORD}(?:\\s*:\\s*\\d{2})?(?:\\s*o'?clock|\\s*(?:am|pm))?)\\s+then\\b`,
+    "i",
+  ).exec(line.trim());
+  const time = match?.[1]?.toLowerCase().replace(/\s+/g, " ");
+  if (!time) return undefined;
+  const text = tidy(`Back by ${time}.`);
+  return { kind: "commitment", text, thread: { kind: "commitment", text, entities: [] } };
+}
+
+/** "not responsible for the fence and the bench" is what the player said, not an errand. */
+function readDisclaimer(line: string): StatementHit | undefined {
+  const match = /\b(?:not|aren'?t|are not|isn'?t|is not)\s+responsible\s+for\s+((?:the\s+|a\s+|an\s+)?[a-z][a-z' -]{2,80})/i.exec(line);
+  const raw = match?.[1]?.split(/[,.]/)[0]?.trim();
+  if (!raw || raw.length < 3) return undefined;
+  return { kind: "commitment", text: tidy(`Not responsible for ${raw}.`) };
+}
+
 function readPlan(line: string): StatementHit | undefined {
   const re = new RegExp(`\\b([a-z][a-z'-]*(?:\\s+[a-z][a-z'-]*){0,4})\\s+at\\s+(${TIME})\\b`, "gi");
   for (let match = re.exec(line); match !== null; match = re.exec(line)) {
@@ -250,6 +272,8 @@ export function readPlayerStatements(input: string, state: State, config: Config
     push(readAlias(line, state, config));
     push(readSaid(line, state, config));
     push(readDebt(line, state, config));
+    push(readDeadline(line));
+    push(readDisclaimer(line));
     push(readPlan(line));
   }
   return hits;

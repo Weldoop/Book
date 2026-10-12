@@ -187,18 +187,64 @@ function factLines(state: State, config: Config): string[] {
   return lines;
 }
 
+const PRONOUN_QUESTION = /\b(?:pronouns?|he or she|she or he|his or her|him or her)\b/i;
+
+function storedPronoun(entity: { name: string; tags: string[] }): string | null {
+  const tag = entity.tags.find((item) => item.startsWith("pronoun:"));
+  if (!tag) return null;
+  const pronoun = tag.slice("pronoun:".length);
+  return pronoun === "he" || pronoun === "she" || pronoun === "they" ? pronoun : null;
+}
+
+/**
+ * A pronoun question is answered from the stored pronoun, in a sentence.
+ * It does not dump the ledger. Null means the question was not about a pronoun.
+ */
+function pronounAnswer(state: State, question: string): string | null {
+  if (!PRONOUN_QUESTION.test(question)) return null;
+  const people = Object.values(state.entities).filter((entity) => entity.type === "person");
+  const named = people.filter((entity) => {
+    const names = [entity.name, ...entity.aliases];
+    return names.some((name) => name.trim().length >= 3 && new RegExp(`\\b${name}\\b`, "i").test(question));
+  });
+  if (named.length !== 1 || !named[0]) return "No pronoun is recorded.";
+  const person = named[0];
+  const pronoun = storedPronoun(person);
+  if (!pronoun) return `No pronoun is recorded for ${person.name}.`;
+  return `${person.name} uses ${pronoun}.`;
+}
+
+const HAS_TIME = /\b(?:\d{1,2}:\d{2}|\d{1,2}\s*(?:am|pm)|o'clock)\b/i;
+const ASKS_TIME = /\b(?:what time|when)\b/i;
+const ASKS_SAID = /\bdid i say\b|\bi said\b|\bwe said\b/i;
+
 /**
  * A short answer from the save when the question hits a name, a purchase, or a stored fact.
- * Null means the cheap model still has to read the prompt. Nothing here is invented.
+ * A time question only returns a line that states a time. "What did I say" only returns
+ * what was said. A weak overlap does not answer, and the cheap read still runs.
+ * Null means nothing here is the answer. Nothing here is invented.
  */
 export function answerFromSave(state: State, config: Config, question: string): string | null {
+  const pronouns = pronounAnswer(state, question);
+  if (pronouns) return pronouns;
   const words = contentWords(question);
-  const askedBuy = /\b(buy|bought|order|ordered|promise|promised|spend|spent|pay|paid|purchase|purchased|owe|owed|debt)\b/i.test(
-    question,
-  );
+  const asksTime = ASKS_TIME.test(question);
+  const asksSaid = ASKS_SAID.test(question);
+  const askedBuy =
+    !asksTime &&
+    !asksSaid &&
+    /\b(buy|bought|order|ordered|spend|spent|pay|paid|purchase|purchased|owe|owed|debt)\b/i.test(question);
   const askedName = /\b(name|nickname|called|call me|call you)\b/i.test(question);
   const saved = recallLines(state, config);
-  const pool = [...saved, ...factLines(state, config)];
+  let pool = [...saved.filter((line) => askedBuy || !line.startsWith("Ledger:")), ...factLines(state, config)];
+  if (asksSaid) pool = pool.filter((line) => line.startsWith("Said:"));
+  if (asksTime) {
+    const timed = pool.filter((line) => HAS_TIME.test(line));
+    const aboutIt = timed.filter((line) => scoreLine(line, words) > 0);
+    const agreed = /\b(?:promise|promised|return|back|borrow|borrowed|mower)\b/i.test(question);
+    pool = aboutIt.length > 0 ? aboutIt : agreed ? timed.filter((line) => line.startsWith("Said:")) : [];
+    if (pool.length === 0) return null;
+  }
   const scored = pool
     .map((line) => ({ line, score: scoreLine(line, words) }))
     .filter((row) => row.score > 0)
@@ -214,7 +260,7 @@ export function answerFromSave(state: State, config: Config, question: string): 
   }
   if (askedBuy) {
     for (const line of saved) {
-      if (line.startsWith("Ledger:") || line.startsWith("Said:") || line.startsWith("Carrying:") || line.startsWith("Thread ")) add(line);
+      if (line.startsWith("Ledger:")) add(line);
     }
   }
   const best = scored[0]?.score ?? 0;
@@ -222,6 +268,11 @@ export function answerFromSave(state: State, config: Config, question: string): 
     for (const row of scored) {
       if (row.score < best && picked.length > 0) break;
       add(row.line);
+      if (picked.length >= 4) break;
+    }
+  } else if (asksTime) {
+    for (const line of pool) {
+      add(line);
       if (picked.length >= 4) break;
     }
   }

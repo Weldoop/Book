@@ -279,6 +279,8 @@ was the early target. The other rows are still targets. The static prefix is cac
 
 Rules:
 - Hard cap per part; over-budget parts are trimmed by importance, then recency.
+- The world sheet keeps every catalog price. Visited places, the place the player is in, and a place named in the input are kept ahead of places that have never been visited.
+- People who are in the room, or named in the input, stay in focus. Extra facts on someone who is absent go first. A home fact and a stored pronoun stay on the line (`Harri (he)`).
 - "In focus" is decided by code: scene location, name or alias match in the input, and threads that reference the entity. No embeddings in the PoC.
 - Static parts (1-2) are placed first so provider prompt caching helps where available.
 - The debug view shows every part, its token count, and what was trimmed.

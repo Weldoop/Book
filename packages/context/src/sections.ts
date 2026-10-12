@@ -3,7 +3,7 @@ import type { Beat, Config, DueItem, Entity, Fact, Module, State } from "@book/s
 import { orderThreads, selectThreads } from "./attention.ts";
 import { MAX_BEATS, MAX_FACTS_PER_ENTITY_IN_CONTEXT, WINDOW_TURNS } from "./budget.ts";
 import { entityPlaces, selectRecalledFacts } from "./recall.ts";
-import { dayOfWeek, fitLines, renderSection, tokensOf, trimOldestSentences } from "./text.ts";
+import { dayOfWeek, fitLines, renderSection, tokensOf, trimOldestSentences, wordMatcher } from "./text.ts";
 
 export interface Section {
   text: string;
@@ -138,13 +138,32 @@ function liveFacts(entity: Entity, now: string): Fact[] {
   return entity.facts.filter((fact) => fact.expires === undefined || diffMinutes(now, fact.expires) < 0);
 }
 
+function pronounOf(entity: Entity): string {
+  const tag = entity.tags.find((item) => item.startsWith("pronoun:"));
+  if (!tag) return "";
+  const pronoun = tag.slice("pronoun:".length);
+  return pronoun === "he" || pronoun === "she" || pronoun === "they" ? `, ${pronoun}` : "";
+}
+
+function pinnedFact(text: string): boolean {
+  return /\b(?:lives?|lived|home|flat|pronouns?)\b/i.test(text);
+}
+
 function focusLine(state: State, entry: FocusEntry): string {
   const e = entry.entity;
   const where = e.location ? ` @ ${nameOf(state, e.location)}` : "";
   const aka = e.aliases.length ? `; aka ${e.aliases.join(", ")}` : "";
   const remembered = entry.facts.map((f) => f.text).join("; ");
   const facts = remembered ? (e.type === "person" ? ` remembers: ${remembered}` : `: ${remembered}`) : "";
-  return `- ${e.name} [${e.id}] (${e.type}${where}${aka})${facts}`;
+  return `- ${e.name} [${e.id}] (${e.type}${pronounOf(e)}${where}${aka})${facts}`;
+}
+
+function namedHere(entity: Entity, input: string): boolean {
+  for (const term of [entity.name, ...entity.aliases]) {
+    const matcher = wordMatcher(term);
+    if (matcher?.test(input)) return true;
+  }
+  return false;
 }
 
 export function focusSection(
@@ -152,6 +171,8 @@ export function focusSection(
   ids: string[],
   cap: number,
   recall = "",
+  input = "",
+  here: string | null = null,
 ): { section: Section; shown: string[] } {
   const header = "## FOCUS ENTITIES";
   let trimmed = false;
@@ -162,32 +183,47 @@ export function focusSection(
     if (!entity) continue;
     const live = liveFacts(entity, state.clock.now);
     if (live.length > MAX_FACTS_PER_ENTITY_IN_CONTEXT) trimmed = true;
-    entries.push({
-      entity,
-      facts: selectRecalledFacts(live, state.clock.now, recall, places, MAX_FACTS_PER_ENTITY_IN_CONTEXT),
-    });
+    const facts = selectRecalledFacts(live, state.clock.now, recall, places, MAX_FACTS_PER_ENTITY_IN_CONTEXT);
+    const pinned = live.filter((fact) => pinnedFact(fact.text) && !facts.includes(fact));
+    entries.push({ entity, facts: [...pinned, ...facts].slice(0, MAX_FACTS_PER_ENTITY_IN_CONTEXT) });
   }
+  const kept = (entity: Entity): boolean =>
+    (here !== null && (entity.id === here || entity.location === here)) || (input.trim().length > 0 && namedHere(entity, input));
   const render = (): string => renderSection(header, entries.map((e) => focusLine(state, e)));
+
+  const popFact = (entry: FocusEntry): boolean => {
+    for (let i = entry.facts.length - 1; i >= 1; i--) {
+      if (pinnedFact(entry.facts[i]?.text ?? "")) continue;
+      entry.facts.splice(i, 1);
+      return true;
+    }
+    if (entry.facts.length > 1) {
+      entry.facts.pop();
+      return true;
+    }
+    return false;
+  };
 
   while (entries.length > 0 && tokensOf(render()) > cap) {
     trimmed = true;
-    let victim = -1;
-    for (let i = 0; i < entries.length; i++) {
-      const facts = entries[i]?.facts ?? [];
-      if (facts.length <= 1) continue;
-      const tail = facts[facts.length - 1];
-      const cur = victim >= 0 ? entries[victim]?.facts.at(-1) : undefined;
-      if (!tail) continue;
-      if (
-        !cur ||
-        tail.importance < cur.importance ||
-        (tail.importance === cur.importance && tail.turn <= cur.turn)
-      ) {
-        victim = i;
-      }
+    const absent = entries.filter((entry) => !kept(entry.entity));
+    const withSpare = (pool: FocusEntry[]) => pool.find((entry) => entry.facts.length > 1 && entry.facts.some((fact, index) => index > 0 && !pinnedFact(fact.text)));
+    const spare = withSpare(absent) ?? absent.find((entry) => entry.facts.length > 1) ?? withSpare(entries);
+    if (spare && popFact(spare)) continue;
+    const loose = entries.findIndex((entry) => !kept(entry.entity));
+    if (loose >= 0) {
+      entries.splice(loose, 1);
+      continue;
     }
-    if (victim >= 0) entries[victim]?.facts.pop();
-    else entries = entries.slice(0, -1);
+    const any = entries.find((entry) => entry.facts.length > 1);
+    if (any && popFact(any)) continue;
+    const bulky = [...entries].reverse().find((entry) => entry.facts.length > 0 && !kept(entry.entity))
+      ?? [...entries].reverse().find((entry) => entry.facts.length > 0);
+    if (bulky) {
+      bulky.facts.pop();
+      continue;
+    }
+    break;
   }
   return {
     section: { text: render(), trimmed },

@@ -226,6 +226,64 @@ export function sharedContentWords(a: string, b: string): number {
   return sharedCount(contentWords(a), contentWords(b));
 }
 
+/**
+ * A scrap of a sentence, not a commitment. "is still opening the door at ten" and
+ * "write Friday at nine" are the player's words cut short. A short goal ("sort the garden") is not.
+ */
+const SCRAP_THREAD =
+  /^(?:see you|write\s+\S+\s+at\b|i'll be|i will be|we're|we are|are fine|is still|has to)\b/i;
+
+const SCRAP_GOAL =
+  /^(?:find|get|sort|pay|meet|buy|call|text|attend|finish|help|check|clean|fix|bring|keep|remember|work|walk|go)\b/i;
+
+export function isScrapThread(text: string): boolean {
+  const trimmed = text.trim();
+  if (SCRAP_THREAD.test(trimmed)) return true;
+  const words = trimmed.split(/\s+/).filter(Boolean);
+  if (words.length === 0 || words.length >= 8) return false;
+  if (!/^[a-z]/.test(trimmed)) return false;
+  return !SCRAP_GOAL.test(trimmed);
+}
+
+/** The thread text is a short slice of a longer player line, so it is not its own matter. */
+export function isPlayerScrap(text: string, input: string): boolean {
+  if (isScrapThread(text)) return true;
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0 || words.length >= 8) return false;
+  const needle = text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+  const hay = input
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+  if (needle.length < 12 || !hay.includes(needle)) return false;
+  return hay.split(" ").filter(Boolean).length >= words.length + 4;
+}
+
+/**
+ * An open thread about the same errand, worded differently. Two substantial words
+ * ("shift" and "tesco") are enough. A near-copy (four shared words) stays with
+ * `duplicateOpenThread`, which adopts rather than opening a second line.
+ */
+export function sameErrandThread(
+  threads: readonly ThreadOverlap[],
+  text: string,
+): ThreadOverlap | undefined {
+  const words = contentWords(text);
+  const substantial = [...words].filter((word) => word.length >= 5);
+  for (const thread of threads) {
+    if (thread.status !== "open") continue;
+    const other = contentWords(thread.text);
+    const sharedSubstantial = substantial.filter((word) => other.has(word));
+    if (sharedSubstantial.length < 2) continue;
+    if (sharedCount(words, other) >= 4) continue;
+    return thread;
+  }
+  return undefined;
+}
+
 function recentlyResolved(thread: ThreadOverlap, now: string | undefined): boolean {
   if (thread.status !== "resolved" || !now || !thread.resolved_at) return false;
   const age = diffMinutes(now, thread.resolved_at);

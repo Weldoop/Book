@@ -35,7 +35,8 @@ export function buildOocContext(i: OocInput): BuiltContext {
   const ids = mapAttention({ ...i, input: question, due: [], limit: 6 });
   const player = i.state.entities[i.config.player_id];
   const recall = recallHaystack(question, i.state.threads, player ? [player.name, ...player.aliases] : []);
-  const focus = focusSection(i.state, ids, 300, recall);
+  const here = player?.location ?? null;
+  const focus = focusSection(i.state, ids, 300, recall, question, here);
 
   const sections = [
     { part: "scene", section: sceneSection(i.config, i.state) },
