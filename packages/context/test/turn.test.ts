@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { ConfigSchema, estimateTokens, type Module, type Op, type State } from "@book/schema";
 import { contractText } from "../src/contract.ts";
 import { buildTurnContext, DEFAULT_BUDGET } from "../src/index.ts";
-import { inventoryModule, makeBigState, makeConfig, makeState, makeThread, statsModule } from "./fixtures.ts";
+import { inventoryModule, makeBigState, makeConfig, makeEntity, makeState, makeThread, statsModule } from "./fixtures.ts";
 
 const config = makeConfig();
 const modules = [statsModule, inventoryModule];
@@ -365,6 +365,36 @@ describe("budget", () => {
     expect(part(ctx, "window").tokens).toBeLessThanOrEqual(100);
     expect(part(ctx, "window").trimmed).toBe(true);
     expect(ctx.messages[0]?.content).toContain("THE-END");
+  });
+
+  it("keeps the room and a named person when focus is trimmed", () => {
+    const ctx = buildTurnContext({
+      config,
+      state: makeBigState(30),
+      modules,
+      input: "I ask Person 3 about the plan",
+      kind: "act",
+      due: [],
+      budget: { entities_in_focus: 120 },
+    });
+    const focus = (ctx.messages[0]?.content ?? "").split("## FOCUS ENTITIES")[1]?.split("##")[0] ?? "";
+    expect(focus).toContain("Person 3");
+    expect(focus).toContain("[loc0]");
+    expect(part(ctx, "entities_in_focus").tokens).toBeLessThanOrEqual(120);
+  });
+
+  it("prints a stored pronoun on the entity line", () => {
+    const state = makeState();
+    state.entities.harri = makeEntity({
+      id: "harri",
+      name: "Harri",
+      location: "flat",
+      tags: ["pronoun:he"],
+      facts: [{ text: "Lives in the house", importance: 2, turn: 1 }],
+    });
+    const text = build({ input: "Ask Harri" }, state).messages[0]?.content ?? "";
+    expect(text).toContain("Harri [harri] (person, he @");
+    expect(text).toContain("Lives in the house");
   });
 
   it("drops fragments from the end when module fragments exceed their cap", () => {

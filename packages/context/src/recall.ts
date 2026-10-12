@@ -187,18 +187,50 @@ function factLines(state: State, config: Config): string[] {
   return lines;
 }
 
+const PRONOUN_QUESTION = /\b(?:pronouns?|he or she|she or he|his or her|him or her)\b/i;
+
+function storedPronoun(entity: { name: string; tags: string[] }): string | null {
+  const tag = entity.tags.find((item) => item.startsWith("pronoun:"));
+  if (!tag) return null;
+  const pronoun = tag.slice("pronoun:".length);
+  return pronoun === "he" || pronoun === "she" || pronoun === "they" ? pronoun : null;
+}
+
+/**
+ * A pronoun question is answered from the stored pronoun, in a sentence.
+ * It does not dump the ledger. Null means the question was not about a pronoun.
+ */
+function pronounAnswer(state: State, question: string): string | null {
+  if (!PRONOUN_QUESTION.test(question)) return null;
+  const people = Object.values(state.entities).filter((entity) => entity.type === "person");
+  const named = people.filter((entity) => {
+    const names = [entity.name, ...entity.aliases];
+    return names.some((name) => name.trim().length >= 3 && new RegExp(`\\b${name}\\b`, "i").test(question));
+  });
+  if (named.length !== 1 || !named[0]) return "No pronoun is recorded.";
+  const person = named[0];
+  const pronoun = storedPronoun(person);
+  if (!pronoun) return `No pronoun is recorded for ${person.name}.`;
+  return `${person.name} uses ${pronoun}.`;
+}
+
 /**
  * A short answer from the save when the question hits a name, a purchase, or a stored fact.
  * Null means the cheap model still has to read the prompt. Nothing here is invented.
  */
 export function answerFromSave(state: State, config: Config, question: string): string | null {
+  const pronouns = pronounAnswer(state, question);
+  if (pronouns) return pronouns;
   const words = contentWords(question);
   const askedBuy = /\b(buy|bought|order|ordered|promise|promised|spend|spent|pay|paid|purchase|purchased|owe|owed|debt)\b/i.test(
     question,
   );
   const askedName = /\b(name|nickname|called|call me|call you)\b/i.test(question);
   const saved = recallLines(state, config);
-  const pool = [...saved, ...factLines(state, config)];
+  const pool = [
+    ...saved.filter((line) => askedBuy || !line.startsWith("Ledger:")),
+    ...factLines(state, config),
+  ];
   const scored = pool
     .map((line) => ({ line, score: scoreLine(line, words) }))
     .filter((row) => row.score > 0)

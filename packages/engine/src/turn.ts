@@ -21,7 +21,8 @@ import { normalizeDraft } from "./normalize.ts";
 import { processOps } from "./ops.ts";
 import { resolveStatKey } from "./stat-key.ts";
 import { recordPlayerStatements } from "./statements.ts";
-import { duplicateOpenThread, sharedContentWords } from "./threads.ts";
+import { notePronouns } from "./salvage.ts";
+import { duplicateOpenThread, isScrapThread, sharedContentWords } from "./threads.ts";
 import { rngFor } from "./rng.ts";
 import { addMinutes, diffMinutes } from "./time.ts";
 
@@ -391,7 +392,19 @@ export function applyDraft(state: State, config: Config, modules: Module[], draf
   if (next.window.length > WINDOW_CAP) next.window = next.window.slice(-WINDOW_CAP);
   next.focus_next = (draft.focus_next ?? []).filter((id) => next.entities[id]).slice(0, 8);
   recordPlayerStatements(next, config, ctx.input);
+  notePronouns(next, draft.narration);
+  closeScrapThreads(next, turn);
   return syncPresence(next, config);
+}
+
+/** A sentence scrap that is still open is not a commitment. It closes when the turn commits. */
+function closeScrapThreads(state: State, turn: number): void {
+  for (const thread of state.threads) {
+    if (thread.status !== "open" || !isScrapThread(thread.text)) continue;
+    thread.status = "resolved";
+    thread.resolved_turn = turn;
+    thread.resolved_at = state.clock.now;
+  }
 }
 
 /**

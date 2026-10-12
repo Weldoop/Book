@@ -121,4 +121,25 @@ describe("an out-of-character answer from the save", () => {
   it("reads a fact that is not on the player", () => {
     expect(answerFromSave(state, config, "When does Glenys want the mower back?")).toContain("4pm");
   });
+
+  it("answers a pronoun from the stored tag and does not dump the ledger", () => {
+    const harri = makeEntity({
+      id: "harri",
+      name: "Harri",
+      location: "flat",
+      tags: ["pronoun:he"],
+      facts: [{ text: "Opens the door", importance: 2, turn: 1 }],
+    });
+    const next = makeState({
+      entities: { ...state.entities, harri },
+      modules: {
+        stats: { values: { money: 10 }, ledger: [{ clock: "2026-10-03T10:56", key: "money", amount: 2, reason: "Gave Harri £2.00" }] },
+      },
+    });
+    const answer = answerFromSave(next, config, "What pronouns does Harri use, he or she?");
+    expect(answer).toBe("Harri uses he.");
+    expect(answer).not.toContain("Ledger");
+    expect(answer).not.toContain("£");
+    expect(answerFromSave(state, config, "Is Glenys he or she?")).toBe("No pronoun is recorded for Glenys.");
+  });
 });

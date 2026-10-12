@@ -135,11 +135,12 @@ function buildDeltaRepair(i: RepairInput): BuiltContext {
   const ids = [...new Set([...referenced, ...attended])].slice(0, DELTA_FOCUS_LIMIT);
   const player = i.state.entities[i.config.player_id];
   const recall = recallHaystack(i.input, i.state.threads, player ? [player.name, ...player.aliases] : []);
-  const focus = focusSection(i.state, ids, budget.entities_in_focus, recall);
+  const here = player?.location ?? null;
+  const focus = focusSection(i.state, ids, budget.entities_in_focus, recall, i.input, here);
 
   const sections = [
     { part: "scene", section: sceneSection(i.config, i.state) },
-    { part: "world_sheet", section: worldSheetSection(i.config, i.state, budget.state_snapshot) },
+    { part: "world_sheet", section: worldSheetSection(i.config, i.state, budget.state_snapshot, i.input) },
     { part: "state_snapshot", section: stateSection(i.config, i.state, i.modules, budget.state_snapshot) },
     { part: "engine_now", section: engineNowSection(i.config, i.state, i.modules) },
     { part: "entities_in_focus", section: focus.section },

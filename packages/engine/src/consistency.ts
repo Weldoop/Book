@@ -198,15 +198,50 @@ function destinationHits(input: string, config: Config): DestHit[] {
     }
   };
   const travel = config.travel;
+  // toward/towards is a direction. Stopping on the way is arrival. Only to/into must land.
   scan(verbPattern(
     travel.means.filter((verb) => !departing(verb)),
-    "to|towards|toward|into",
+    "to|into",
     40,
   ));
-  scan(immediateTripPattern(travel.means, "to|towards|toward|into"));
-  scan(verbPattern(travel.journeys, "to|towards|toward|into|for", 48));
+  scan(immediateTripPattern(travel.means, "to|into"));
+  scan(verbPattern(travel.journeys, "to|into|for", 48));
   hits.sort((a, b) => a.index - b.index);
   return hits;
+}
+
+/** A prior clause that is itself the trip, so the last place of that journey still counts. */
+function priorIsJourney(prior: string, config: Config): boolean {
+  if (/\b(?:leave|left|head out|heading out|set off|go out|set a course|sail|walk out)\b/.test(prior)) return true;
+  return destinationHits(prior, config).some((hit) => !deferredDestination(prior, config, hit));
+}
+
+/**
+ * A later or conditional clause is not this turn's destination. "I'll go to Lidl" after
+ * asking for cash, and "if I pass a shop", can wait. "I'll walk to Lidl" on its own cannot.
+ */
+function deferredDestination(input: string, config: Config, hit: DestHit): boolean {
+  const text = input.toLowerCase();
+  const before = text.slice(0, hit.index);
+  const after = text.slice(hit.index, Math.min(text.length, hit.end + 48));
+  if (/\bif\b/.test(after)) return true;
+  const clauseStart = Math.max(
+    before.lastIndexOf("."),
+    before.lastIndexOf("!"),
+    before.lastIndexOf("?"),
+    before.lastIndexOf("\n"),
+    before.lastIndexOf(";"),
+  );
+  if (/\bif\b/.test(before.slice(clauseStart + 1))) return true;
+  const breakAt = Math.max(before.lastIndexOf(" then "), before.lastIndexOf(" and "), before.lastIndexOf(" but "));
+  if (breakAt < 0) return false;
+  const prior = before.slice(0, breakAt).trim();
+  if (!prior || priorIsJourney(prior, config)) return false;
+  return true;
+}
+
+function bindingHits(input: string, config: Config): DestHit[] {
+  return destinationHits(input, config).filter((hit) => !deferredDestination(input, config, hit));
 }
 
 /** "Do not chase" and "too far to sail" are not trips. The negation has to sit on the verb, not later talk. */
@@ -215,9 +250,9 @@ function tripNegated(text: string, start: number, end: number): boolean {
   return /\b(?:not|never|too far|don't|do not|won't|cannot|can't)\b/i.test(window);
 }
 
-/** The last place the player asked to go to, using this book's travel words. */
+/** The last place the player asked to go to this turn, using this book's travel words. */
 export function tripDestination(input: string, config: Config): string | null {
-  return destinationHits(input, config).at(-1)?.dest ?? null;
+  return bindingHits(input, config).at(-1)?.dest ?? null;
 }
 
 export function isTravelRefusal(narration: string): boolean {
@@ -327,7 +362,7 @@ function withinPlace(state: State, id: string | null, target: string): boolean {
 }
 
 function checkTravel(before: State, after: State, config: Config, draft: TurnDraft, input: string, applied: Op[]): Violation[] {
-  const hits = destinationHits(input, config);
+  const hits = bindingHits(input, config);
   const last = hits.at(-1);
   if (!last) return [];
   const back = returnLeg(input, last.end);
@@ -387,7 +422,7 @@ function missedStop(
   return violation(
     "fixable",
     "arrived_elsewhere",
-    `${lead} Set "at" to the place id for "${dest}". The engine creates that place when the save does not have it and moves the player there this turn.`,
+    `${lead} Narrate the arrival and set "at" to the place id. The engine creates that place only once the narration has arrived there. Do not invent a second id for the same place.`,
   );
 }
 
@@ -419,19 +454,122 @@ function playerAlreadyMoved(op: unknown, player: string): boolean {
  * Narration is not read. An unknown destination is left for the GM to create.
  * A move or an `at` the GM already wrote is left alone. A return leg is not the outing.
  */
+function narrationMentionsPlace(narration: string, name: string, aliases: string[], id: string): boolean {
+  const hay = norm(narration);
+  const names = [name, ...aliases, id.replace(/[_-]+/g, " ")];
+  return names.some((label) => {
+    const needle = norm(label).replace(/^(?:the|a|an)\s+/, "");
+    return needle.length >= 3 && hay.includes(needle);
+  });
+}
+
+function narrationMentionsDest(narration: string, dest: string): boolean {
+  const needle = norm(dest);
+  if (needle.length < 3) return false;
+  const hay = norm(narration);
+  if (hay.includes(needle)) return true;
+  const words = needle.split(" ").filter((word) => word.length >= 4);
+  return words.length > 0 && words.every((word) => hay.includes(word));
+}
+
+/** One stable id from the player's destination words. The model is not asked to invent another. */
+export function placeSlug(dest: string): string {
+  const slug = norm(dest)
+    .split(" ")
+    .filter((word) => word.length > 0 && word !== "the" && word !== "a" && word !== "an")
+    .join("-")
+    .replace(/[^a-z0-9_.-]/g, "")
+    .slice(0, 64);
+  return /^[a-z0-9]/.test(slug) ? slug : "";
+}
+
+function playerMoveIndex(delta: unknown[], player: string): number {
+  return delta.findIndex((op) => playerAlreadyMoved(op, player));
+}
+
+/**
+ * A move to an id the save does not have is retargeted onto one slug of the player's
+ * destination, and that place is created, when the narration has arrived. A move the
+ * narration never reaches is dropped, so the turn is not rejected for a missing id.
+ */
+export function retargetUnknownPlace(state: State, config: Config, draft: TurnDraft, input: string): void {
+  const player = config.player_id;
+  const index = playerMoveIndex(draft.delta, player);
+  const hits = bindingHits(input, config);
+  const last = hits.at(-1);
+  const dropUnknown = (): void => {
+    if (index < 0) return;
+    const rec = asOp(draft.delta[index]);
+    if (!rec || state.entities[String(rec.location)]) return;
+    draft.delta.splice(index, 1);
+  };
+  if (!last || returnLeg(input, last.end) || notADestination(state, last.dest) || isTravelRefusal(draft.narration)) {
+    dropUnknown();
+    return;
+  }
+  const matches = Object.values(state.entities).filter(
+    (entity) => entity.type === "place" && placeMatches(entity.name, entity.aliases, entity.id, last.dest),
+  );
+  const known = matches.length === 1 ? matches[0] : undefined;
+  const slug = known?.id ?? placeSlug(last.dest);
+  const mentioned = known
+    ? narrationMentionsPlace(draft.narration, known.name, known.aliases, known.id)
+    : narrationMentionsDest(draft.narration, last.dest);
+  if (index < 0) return;
+  const rec = asOp(draft.delta[index]);
+  if (!rec || typeof rec.location !== "string" || state.entities[rec.location]) return;
+  if (!mentioned || !slug) {
+    draft.delta.splice(index, 1);
+    return;
+  }
+  rec.location = slug;
+  if (!state.entities[slug] && !draft.delta.some((op) => isCreate(op, slug))) {
+    draft.delta.unshift({ op: "entity.create", id: slug, type: "place", name: placeTitle(slug) });
+  }
+  if (!draft.at) draft.at = slug;
+}
+
+function asOp(op: unknown): { location?: unknown } | null {
+  return op && typeof op === "object" ? (op as { location?: unknown }) : null;
+}
+
+const ARRIVED =
+  /\b(?:head|heads|go|goes|step|steps|slip|slips|walk|walks|come|comes|climb|climbs|wander|wanders|hurry|hurries|run|runs|drift|drifts|trudge|trudges|pad|pads|sail|sails|enter|enters|reach|reaches|arrive|arrives)\b/i;
+
+/** The sentence has them moving, and it does not sit them in some other known place. */
+function proseArrived(state: State, narration: string, dest: string): boolean {
+  if (!ARRIVED.test(narration)) return false;
+  return !Object.values(state.entities).some(
+    (entity) =>
+      entity.type === "place" &&
+      !placeMatches(entity.name, entity.aliases, entity.id, dest) &&
+      narrationMentionsPlace(narration, entity.name, entity.aliases, entity.id) &&
+      /\byou\b/i.test(narration),
+  );
+}
+
 export function fillOrderedAt(state: State, config: Config, draft: TurnDraft, input: string): void {
   if (draft.at || input.trim().length === 0 || isTravelRefusal(draft.narration)) return;
   const player = config.player_id;
   if (draft.delta.some((op) => playerAlreadyMoved(op, player))) return;
-  const hits = destinationHits(input, config);
+  const hits = bindingHits(input, config);
   const last = hits.at(-1);
   if (!last || returnLeg(input, last.end)) return;
   if (notADestination(state, last.dest)) return;
   const matches = Object.values(state.entities).filter(
     (entity) => entity.type === "place" && placeMatches(entity.name, entity.aliases, entity.id, last.dest),
   );
-  if (matches.length !== 1 || !matches[0]) return;
-  draft.at = matches[0].id;
+  if (matches.length === 1 && matches[0]) {
+    const place = matches[0];
+    const mentioned = narrationMentionsPlace(draft.narration, place.name, place.aliases, place.id);
+    if (mentioned || proseArrived(state, draft.narration, last.dest)) draft.at = place.id;
+    return;
+  }
+  if (matches.length > 0) return;
+  if (!narrationMentionsDest(draft.narration, last.dest)) return;
+  const slug = placeSlug(last.dest);
+  if (!slug || (state.entities[slug] && state.entities[slug]?.type !== "place")) return;
+  draft.at = slug;
 }
 
 /**
@@ -829,6 +967,28 @@ function alreadyOwned(name: string, id: string, held: number): Violation {
   );
 }
 
+/**
+ * Gear is still held unless the verb sits on that item in the same short clause.
+ * "Mop the floor" must not fail because a phone is also in the paragraph.
+ */
+function keptItemLetGo(narration: string, itemId: string, itemName: string): boolean {
+  const text = narration.toLowerCase();
+  const phrases = [norm(itemName), norm(itemId.replace(/[_-]/g, " "))].filter((phrase) => phrase.length >= 3);
+  for (const phrase of phrases) {
+    const re = new RegExp(`\\b${escapeRegExp(phrase)}\\b`, "g");
+    for (const match of text.matchAll(re)) {
+      if (match.index === undefined) continue;
+      const prior = text.slice(Math.max(0, match.index - 48), match.index);
+      const clause = prior.split(/[.!?\n;,]|\band\b|\bthen\b/).pop() ?? "";
+      const window = clause.slice(-32);
+      const following = text.slice(match.index + phrase.length, match.index + phrase.length + 24);
+      if (PARKED.test(following)) continue;
+      if (hasVerb(window, RELEASE) || hasVerb(window, PUT_OR_LEAVE) || (hasVerb(window, SET_DOWN) && !PARKED.test(window))) return true;
+    }
+  }
+  return false;
+}
+
 function checkItems(before: State, after: State, config: Config, draft: TurnDraft, applied: Op[], input = ""): Violation[] {
   const catalog = catalogItems(config, after);
   if (catalog.length === 0) return [];
@@ -867,8 +1027,10 @@ function checkItems(before: State, after: State, config: Config, draft: TurnDraf
   const player = config.player_id;
   for (const [id, row] of byId) {
     const item = catalog.find((candidate) => candidate.id === id);
-    const gearSetDown = item?.keeps === true && row.setDown && !row.consume && !row.put;
-    if (row.release && !gearSetDown && carrying(after, player, id) && !removedItem(applied, player, id)) {
+    const gear = item?.keeps === true;
+    const gearSetDown = gear && row.setDown && !row.consume && !row.put;
+    const gearLetGo = !gear || keptItemLetGo(draft.narration, id, row.name);
+    if (row.release && !gearSetDown && gearLetGo && carrying(after, player, id) && !removedItem(applied, player, id)) {
       out.push(
         violation(
           "fixable",
@@ -1140,13 +1302,16 @@ function checkClock(before: State, after: State, config: Config, draft: TurnDraf
   const mins = minutesUntil(before.clock.now, stated.hours, stated.minutes);
   const cap = Math.max(config.time.max_skip_minutes, config.time.max_per_turn);
   const date = before.clock.now.slice(0, 10);
+  // A face earlier than the clock is a stamp (a missed call, a quote). Do not tell the
+  // model to clock.set backwards. A draft that itself contains clock.set may still go back.
+  if (mins < 0) return [];
   let exact: string;
   if (mins === 0) {
     exact = ` The clock was already ${label}. Leave it there, or name the other time and put it in the delta.`;
   } else if (mins > 0 && mins <= cap) {
     exact = ` From ${before.clock.now.slice(11)}, clock.advance ${mins} minutes lands on ${label}.`;
   } else {
-    exact = ` clock.set {"now":"${date}T${label}"} lands on ${label}, including a time already past.`;
+    exact = ` clock.set {"now":"${date}T${label}"} lands on ${label}.`;
   }
   return [
     violation(
@@ -1259,6 +1424,32 @@ export function dropInventedCharges(original: unknown[], next: unknown[], narrat
     const label = add.item.replace(/[_-]/g, " ");
     return !droppedReasons.some((reason) => sharedContentWords(label, reason) >= 1);
   });
+}
+
+/**
+ * Catalog goods a charge names when the narration and the input never buy, pay, or state the figure.
+ * The same test as `unstated_charge`, so a turn can drop those ops and commit.
+ */
+export function unstatedItemIds(state: State, config: Config, narration: string, input: string, delta: unknown[]): Set<string> {
+  const catalog = catalogItems(config, state);
+  const out = new Set<string>();
+  if (catalog.length === 0) return out;
+  const text = narration.toLowerCase();
+  const stated = hasVerb(text, PAY) || SETTLES.test(text) || hasVerb(input.toLowerCase(), PAY);
+  for (const op of delta) {
+    if (!op || typeof op !== "object") continue;
+    const rec = op as { op?: unknown; key?: unknown; amount?: unknown; reason?: unknown };
+    if (rec.op !== "stat.add" || typeof rec.key !== "string" || typeof rec.amount !== "number" || !(rec.amount < 0)) continue;
+    if (!chargeKeys(config).has(rec.key)) continue;
+    const reason = typeof rec.reason === "string" ? rec.reason : "";
+    if (REPAYS.test(reason)) continue;
+    if (stated || mentionsAmount(narration, rec.amount)) continue;
+    for (const item of itemsInText(reason, catalog)) {
+      if (item.price === undefined || item.price <= 0) continue;
+      out.add(item.id);
+    }
+  }
+  return out;
 }
 
 /** Checks that run after a legal delta: place, travel, clock, and catalog items. They do not invent ops. */

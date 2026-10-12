@@ -57,7 +57,8 @@ export function assembleTurn(i: BuildContextInput): TurnAssembly {
   });
   const player = i.state.entities[i.config.player_id];
   const recall = recallHaystack(i.input, i.state.threads, player ? [player.name, ...player.aliases] : []);
-  const focus = focusSection(i.state, focusIds, budget.entities_in_focus, recall);
+  const here = player?.location ?? null;
+  const focus = focusSection(i.state, focusIds, budget.entities_in_focus, recall, i.input, here);
 
   const threads = threadsSection(i.state, i.config, i.input, budget.threads);
   const sections: { part: string; section: Section }[] = [
@@ -67,7 +68,7 @@ export function assembleTurn(i: BuildContextInput): TurnAssembly {
     { part: "due_events", section: dueSection(i.config, i.due, i.fate, budget.due_events) },
     { part: "threads", section: threads },
     { part: "notes", section: notesSection(i.state, i.config, budget.notes) },
-    { part: "world_sheet", section: worldSheetSection(i.config, i.state, budget.world_sheet) },
+    { part: "world_sheet", section: worldSheetSection(i.config, i.state, budget.world_sheet, i.input) },
     { part: "entities_in_focus", section: focus.section },
     { part: "story_so_far", section: storySection(i.state, budget.story_so_far) },
     { part: "beats", section: beatsSection(i.state, budget.beats) },

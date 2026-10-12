@@ -88,8 +88,14 @@ describe("op validation", () => {
     );
     expect(inventoryOf(next).owners.player?.strimmer).toBe(1);
     expect(inventoryOf(next).catalog).toEqual([{ id: "strimmer", name: "Petrol strimmer", price: 40, keeps: true }]);
-    const again = validateDraft(next, config, modules, draft([{ op: "inventory.add", owner: "player", item: "strimmer", qty: 1 }]) as never);
-    expect(again.violations[0]?.code).toBe("gear_owned");
+    const quiet = draft([{ op: "inventory.add", owner: "player", item: "strimmer", qty: 1 }]) as never as { delta: unknown[] };
+    const again = validateDraft(next, config, modules, quiet as never);
+    expect(again.ok).toBe(true);
+    expect(quiet.delta).toEqual([]);
+    const second = draft([{ op: "inventory.add", owner: "player", item: "strimmer", qty: 1 }], {
+      narration: "You buy another strimmer.",
+    }) as never;
+    expect(validateDraft(next, config, modules, second).violations[0]?.code).toBe("gear_owned");
   });
 
   it("refuses to create an id the sheet already has", () => {
@@ -122,10 +128,13 @@ describe("op validation", () => {
       next,
       config,
       modules,
-      draft([
-        { op: "inventory.add", owner: "player", item: "pint", qty: 1 },
-        { op: "stat.add", key: "money", amount: -4.5, reason: "Pint of lager" },
-      ]) as never,
+      draft(
+        [
+          { op: "inventory.add", owner: "player", item: "pint", qty: 1 },
+          { op: "stat.add", key: "money", amount: -4.5, reason: "Pint of lager" },
+        ],
+        { narration: "You buy another pint of lager." },
+      ) as never,
       { input: "another pint", due: [] },
     );
     expect(inventoryOf(another).owners.player?.pint).toBe(1);

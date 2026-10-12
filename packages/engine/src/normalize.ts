@@ -1,9 +1,10 @@
 import type { Config, Entity, State, TurnDraft } from "@book/schema";
 import { catalogItems } from "./catalog.ts";
-import { fillOrderedAt } from "./consistency.ts";
+import { fillOrderedAt, retargetUnknownPlace } from "./consistency.ts";
 import { playerLocation } from "./core.ts";
-import { duplicateOpenThread, weekdayDue } from "./threads.ts";
+import { holdGuests, protectQuotes, salvageBookkeeping } from "./salvage.ts";
 import { correctRelativeTimes } from "./reltime.ts";
+import { duplicateOpenThread, isPlayerScrap, sameErrandThread, weekdayDue } from "./threads.ts";
 
 type Rec = Record<string, unknown>;
 
@@ -110,8 +111,9 @@ function remapEntities(state: State, draft: TurnDraft): void {
 }
 
 /** A kind the schema does not know becomes a goal. "potential" was the scale, so it goes there. */
-function lenientThreads(state: State, draft: TurnDraft): void {
+function lenientThreads(state: State, draft: TurnDraft, input: string): void {
   const out: unknown[] = [];
+  const resolving = new Set<string>();
   for (const op of draft.delta) {
     const rec = asRec(op);
     if (!rec) {
@@ -135,12 +137,19 @@ function lenientThreads(state: State, draft: TurnDraft): void {
           }
           continue;
         }
+        if (isPlayerScrap(rec.text, input)) continue;
+        const echo = sameErrandThread(state.threads, rec.text);
+        if (echo && !resolving.has(echo.id)) {
+          out.push({ op: "thread.resolve", id: echo.id });
+          resolving.add(echo.id);
+        }
       }
       out.push(op);
       continue;
     }
     if ((rec.op === "thread.adopt" || rec.op === "thread.resolve") && typeof rec.id === "string") {
       if (!state.threads.some((thread) => thread.id === rec.id)) continue;
+      if (rec.op === "thread.resolve") resolving.add(rec.id);
     }
     out.push(op);
   }
@@ -254,17 +263,46 @@ function promoteLongAdvance(config: Config, draft: TurnDraft): void {
 }
 
 /**
- * Deterministic tidying of a draft before validation. Nothing here reads a verb to invent a change:
- * it maps a name the model wrote for someone already in the save, fills a schema default,
- * drops an op about a good the save never tracked, and reads the place the sentence sits in.
- * The one edit to prose is a distance to a dated thread ("five hours away") corrected by the clock.
- * The player's named sheet place is filled before a place read out of the narration.
+ * The narration has the player in some other known place than the move. Status follows that
+ * sentence: the move and `at` are dropped, and the turn is not a silent change of room.
+ */
+function alignMoveWithProse(state: State, config: Config, draft: TurnDraft): void {
+  const player = config.player_id;
+  const move = draft.delta.find((op) => asRec(op)?.op === "entity.move" && asRec(op)?.id === player);
+  const target = draft.at ?? (typeof asRec(move)?.location === "string" ? (asRec(move)?.location as string) : undefined);
+  if (!target) return;
+  const sitting = Object.values(state.entities).filter((entity) => entity.type === "place" && placeNamed(draft.narration, entity));
+  if (sitting.length === 0 || sitting.every((place) => place.id === target)) return;
+  const targetEntity = state.entities[target];
+  const mentioned = targetEntity
+    ? placeNamed(draft.narration, targetEntity) ||
+      [targetEntity.name, ...targetEntity.aliases, targetEntity.id.replace(/[_-]+/g, " ")].some((name) => {
+        const needle = name.replace(/^(?:the|your|my)\s+/i, "").trim();
+        return needle.length >= 3 && new RegExp(`\\b${escapeRegExp(needle)}\\b`, "i").test(draft.narration);
+      })
+    : new RegExp(`\\b${escapeRegExp(target.replace(/[_-]+/g, " "))}\\b`, "i").test(draft.narration);
+  if (mentioned) return;
+  if (draft.at === target) delete draft.at;
+  draft.delta = draft.delta.filter((op) => !(asRec(op)?.op === "entity.move" && asRec(op)?.id === player));
+}
+
+/**
+ * Deterministic tidying of a draft before validation. It maps a name the model wrote for someone
+ * already in the save, drops a charge or a bag op the narration never performed, keeps a quoted
+ * sentence, and reads the place the sentence sits in. It does not invent a purchase or a trip.
+ * The one edit to prose, besides restoring a player quote, is a distance to a dated thread
+ * ("five hours away") corrected by the clock.
  */
 export function normalizeDraft(state: State, config: Config, draft: TurnDraft, input = ""): void {
   remapEntities(state, draft);
-  lenientThreads(state, draft);
+  lenientThreads(state, draft, input);
   softenItems(state, config, draft);
+  salvageBookkeeping(state, config, draft, input);
+  protectQuotes(draft, input);
+  holdGuests(state, config, draft, input);
+  retargetUnknownPlace(state, config, draft, input);
   fillOrderedAt(state, config, draft, input);
+  alignMoveWithProse(state, config, draft);
   inferAt(state, config, draft);
   promoteLongAdvance(config, draft);
   correctRelativeTimes(state, draft);

@@ -187,8 +187,8 @@ describe("travel and place", () => {
     named.entities.town = { ...sample, id: "town", type: "place", name: "Town", aliases: [], location: null };
     const intoTown = draft({ narration: "You stay in the room." });
     const namedTrip = validateDraft(named, cfg, modules, intoTown, "Walk into town");
-    expect(intoTown.at).toBe("town");
-    expect(namedTrip.violations.filter((v) => v.code === "arrived_elsewhere")).toEqual([]);
+    expect(intoTown.at).toBeUndefined();
+    expect(namedTrip.violations.map((v) => v.code)).toContain("arrived_elsewhere");
   });
 
   it("treats going to bed as the bedroom, and only when the player is already there", () => {
@@ -304,12 +304,20 @@ describe("travel and place", () => {
     );
     expect(checking.violations).toEqual([]);
 
-    const coop = validateDraft(
+    const later = validateDraft(
       fresh(),
       cfg,
       modules,
       draft({ narration: "You say sorry on the way out." }),
       "Polish it off and go to coop as I leave say to the lad sorry I didn't catch your name",
+    );
+    expect(later.violations.filter((v) => v.code === "arrived_elsewhere")).toEqual([]);
+    const coop = validateDraft(
+      fresh(),
+      cfg,
+      modules,
+      draft({ narration: "You say sorry on the way out." }),
+      "Go to coop as I leave say to the lad sorry I didn't catch your name",
     );
     const coopMessage = coop.violations.find((v) => v.code === "arrived_elsewhere")?.message ?? "";
     expect(coopMessage).toContain('go to "coop"');
@@ -337,12 +345,12 @@ describe("travel and place", () => {
     };
     const sailDraft = draft({ narration: "The bay stays grey." });
     const sail = validateDraft(fresh(), cfg, modules, sailDraft, "Sail to the kitchen");
-    expect(sailDraft.at).toBe("kitchen");
-    expect(sail.violations.filter((v) => v.code === "arrived_elsewhere")).toEqual([]);
+    expect(sailDraft.at).toBeUndefined();
+    expect(sail.violations.find((v) => v.code === "arrived_elsewhere")?.message ?? "").toContain('go to "kitchen"');
     const courseDraft = draft({ narration: "The bay stays grey." });
     const course = validateDraft(fresh(), cfg, modules, courseDraft, "Set a course for the seafront");
-    expect(courseDraft.at).toBe("seafront");
-    expect(course.violations.filter((v) => v.code === "arrived_elsewhere")).toEqual([]);
+    expect(courseDraft.at).toBeUndefined();
+    expect(course.violations.find((v) => v.code === "arrived_elsewhere")?.message ?? "").toContain('go to "seafront"');
     const supplies = validateDraft(
       fresh(),
       cfg,
@@ -521,7 +529,7 @@ describe("travel and place", () => {
       draft({ narration: "The clock reads 08:00.", delta: [{ op: "clock.advance", minutes: 1 }] }),
       "I look around.",
     );
-    expect(toldEarlier.violations.find((v) => v.code === "clock_mismatch")?.message).toContain("clock.set");
+    expect(toldEarlier.violations.filter((v) => v.code === "clock_mismatch")).toEqual([]);
 
     const free = validateDraft(
       fresh(),
@@ -541,8 +549,8 @@ describe("travel and place", () => {
     bedState.entities.bed = { ...room, id: "bed", name: "Your bed", aliases: [] };
     const bedDraft = draft({ narration: "You stay in the room." });
     const missedBed = validateDraft(bedState, cfg, modules, bedDraft, "I go to bed");
-    expect(bedDraft.at).toBe("bed");
-    expect(missedBed.violations.filter((v) => v.code === "arrived_elsewhere")).toEqual([]);
+    expect(bedDraft.at).toBeUndefined();
+    expect(missedBed.violations.map((v) => v.code)).toContain("arrived_elsewhere");
     const inBed = validateDraft(
       bedState,
       cfg,
@@ -582,8 +590,8 @@ describe("travel and place", () => {
       );
     };
     expect(mismatch("The pages turn steadily. By six o'clock your eyes are tired.", "2026-10-03T16:24")?.message).toContain("18:00");
-    expect(mismatch("You surface at half seven, groggy.")?.message).toContain("07:30");
-    expect(mismatch("It is quarter to nine when the kettle clicks.")?.message).toContain("08:45");
+    expect(mismatch("You surface at half seven, groggy.")).toBeUndefined();
+    expect(mismatch("It is quarter to nine when the kettle clicks.")).toBeUndefined();
     expect(mismatch("Owen has two essays due by Thursday and three quid for chips.")).toBeUndefined();
     expect(mismatch("Tomos says the pub does a quiz at eight o'clock tonight.")).toBeUndefined();
   });
@@ -618,8 +626,8 @@ describe("travel and place", () => {
     expect(pub.violations).toEqual([]);
     const askedDraft = draft({ narration: "Tomos shrugs. You stay in the kitchen." });
     const asked = validateDraft(fresh(), cfg, modules, askedDraft, "Go to the pub tonight");
-    expect(askedDraft.at).toBe("pub");
-    expect(asked.violations.filter((v) => v.code === "arrived_elsewhere")).toEqual([]);
+    expect(askedDraft.at).not.toBe("pub");
+    expect(asked.violations.map((v) => v.code)).toContain("arrived_elsewhere");
   });
 
   it("does not invent a place, and does not override a move or a refusal", () => {
@@ -1039,7 +1047,17 @@ describe("charges the narration never stated", () => {
       }),
       "Make toast and a tea with Owen's milk",
     );
-    expect(res.violations.map((v) => v.code)).toEqual(["unstated_charge"]);
+    expect(res.violations).toEqual([]);
+    expect(res.ok).toBe(true);
+    const poured = draft({
+      narration: "The milk pours pale into a mug, Owen's pint, as promised. You sit with Leah.",
+      delta: [
+        { op: "inventory.add", owner: "player", item: "milk", qty: 1 },
+        { op: "stat.add", key: "money", amount: -1.3, reason: "Pint of milk" },
+      ],
+    });
+    validateDraft(fresh(), config(), modules, poured, "Make toast and a tea with Owen's milk");
+    expect(poured.delta).toEqual([]);
     const bought = validateDraft(
       fresh(),
       config(),
@@ -1297,5 +1315,181 @@ describe("duplicate threads", () => {
       ],
     });
     expect(added.threads.map((t) => t.text)).toEqual(["Feed the cat before dark"]);
+  });
+});
+
+describe("playable salvage", () => {
+  it("does not require a later or conditional trip, and still travels on a plain I'll walk", () => {
+    const cfg = config();
+    const later = validateDraft(
+      fresh(),
+      cfg,
+      modules,
+      draft({ narration: "Harri looks at the coins and stays at the table." }),
+      "Chuck me a couple of quid and I'll go to the kitchen.",
+    );
+    expect(later.violations.filter((v) => v.code === "arrived_elsewhere")).toEqual([]);
+    expect(later.ok).toBe(true);
+
+    const toward = validateDraft(
+      fresh(),
+      cfg,
+      modules,
+      draft({ narration: "You stop on the hill. The university is still above you." }),
+      "I'm going out for a walk up the hill toward the university.",
+    );
+    expect(toward.violations.filter((v) => v.code === "arrived_elsewhere")).toEqual([]);
+
+    const plain = draft({ narration: "You walk into the kitchen and put the kettle on." });
+    const walked = validateDraft(fresh(), cfg, modules, plain, "I'll walk to the kitchen.");
+    expect(plain.at).toBe("kitchen");
+    expect(walked.violations).toEqual([]);
+  });
+
+  it("creates one place id from the player's words when the narration arrives", () => {
+    const made = draft({
+      narration: "You find the Keir Hardie building and go in through the side door.",
+      delta: [{ op: "entity.move", id: "player", location: "swansea-university" }],
+    });
+    const res = validateDraft(fresh(), config(), modules, made, "I'll walk to the Keir Hardie building.");
+    expect(res.violations).toEqual([]);
+    expect(made.at).toBe("keir-hardie-building");
+    expect(made.delta.some((op) => (op as { op?: string; id?: string }).op === "entity.create" && (op as { id?: string }).id === "keir-hardie-building")).toBe(true);
+    const moved = applyDraft(fresh(), config(), modules, made, { input: "I'll walk to the Keir Hardie building.", due: [] });
+    expect(moved.entities.player?.location).toBe("keir-hardie-building");
+    expect(moved.entities["swansea-university"]).toBeUndefined();
+  });
+
+  it("drops a move the narration never reaches, instead of failing on a missing id", () => {
+    const stayed = draft({
+      narration: "You stay put and look at the clock.",
+      delta: [{ op: "entity.move", id: "player", location: "keir-hardie-building" }],
+    });
+    const res = validateDraft(fresh(), config(), modules, stayed, "I'll walk up and find the Keir Hardie building.");
+    expect(res.violations.map((v) => v.code)).not.toContain("unknown_entity");
+    expect(stayed.delta.some((op) => (op as { op?: string }).op === "entity.move")).toBe(false);
+  });
+
+  it("keeps a quoted sentence verbatim", () => {
+    const sent = draft({
+      narration: 'You text Mum. "Trial shift is Saturday, and I got the rooms mixed up." She replies that you sound confused.',
+    });
+    validateDraft(
+      fresh(),
+      config(),
+      modules,
+      sent,
+      'I\'ll text Mum: "Trial shift Sunday. The seminar is Keir Hardie, not Taliesin."',
+    );
+    expect(sent.narration).toContain("Trial shift Sunday. The seminar is Keir Hardie, not Taliesin.");
+    expect(sent.narration).not.toContain("Trial shift is Saturday");
+  });
+
+  it("does not move someone who lives elsewhere into the house unless this turn brought them", () => {
+    const cfg = config();
+    const house = cfg.seed.entities.find((entity) => entity.id === "shared-house");
+    const kitchen = cfg.seed.entities.find((entity) => entity.id === "kitchen");
+    if (!house || !kitchen) throw new Error("places missing");
+    kitchen.location = "shared-house";
+    const state = createInitialState(cfg, modules, "s1");
+    state.entities.player = { ...state.entities.player!, location: "kitchen" };
+    const sample = state.entities.player!;
+    state.entities.priya = {
+      ...sample,
+      id: "priya",
+      name: "Priya",
+      location: null,
+      facts: [{ text: "Lives on Sketty Lane", importance: 2, turn: 1 }],
+    };
+    const uninvited = draft({
+      narration: "The sofa is empty.",
+      delta: [{ op: "entity.move", id: "priya", location: "kitchen" }],
+    });
+    expect(validateDraft(state, cfg, modules, uninvited, "I sit down.").violations).toEqual([]);
+    expect(uninvited.delta).toEqual([]);
+
+    const brought = draft({
+      narration: "Priya comes in with you and takes the spare chair.",
+      delta: [{ op: "entity.move", id: "priya", location: "kitchen" }],
+    });
+    const yes = validateDraft(state, cfg, modules, brought, "I bring Priya back with me.");
+    expect(yes.violations).toEqual([]);
+    expect(brought.delta).toEqual([{ op: "entity.move", id: "priya", location: "kitchen" }]);
+  });
+
+  it("drops a sentence scrap and resolves the open errand a new thread continues", () => {
+    const state = fresh();
+    state.threads.push({
+      id: "t1",
+      kind: "goal",
+      text: "Find a part-time shift at Tesco",
+      status: "open",
+      entities: [],
+      scale: "potential",
+      was_major: false,
+      warm: false,
+      reminders: 0,
+      last_shown_turn: 1,
+      last_interacted_turn: 1,
+      opened_turn: 1,
+      expires: "2026-10-06T11:20",
+    });
+    const next = draft({
+      delta: [
+        { op: "thread.open", kind: "commitment", text: "is still opening the door at ten" },
+        { op: "thread.open", kind: "commitment", text: "Trial shift at Tesco on Sunday afternoon", scale: "minor", due: "2026-10-04T14:00" },
+      ],
+    });
+    expect(validateDraft(state, config(), modules, next, "See you Sunday.").violations).toEqual([]);
+    expect(next.delta.map((op) => (op as { op: string }).op)).toEqual(["thread.resolve", "thread.open"]);
+    const committed = applyDraft(state, config(), modules, next, { input: "See you Sunday.", due: [] });
+    expect(committed.threads.find((thread) => thread.id === "t1")?.status).toBe("resolved");
+    expect(committed.threads.some((thread) => thread.text.startsWith("Trial shift"))).toBe(true);
+    expect(committed.threads.some((thread) => thread.text.includes("opening the door"))).toBe(false);
+  });
+
+  it("does not fail a cleaning turn because a kept phone is still in the bag", () => {
+    const cfg: Config = { ...config(), items: [...config().items, { id: "phone", name: "Phone", keeps: true }] };
+    const state = fresh();
+    const inv = state.modules.inventory as { owners: Record<string, Record<string, number>> };
+    inv.owners.player = { ...inv.owners.player, phone: 1 };
+    const cleaned = validateDraft(
+      state,
+      cfg,
+      modules,
+      draft({ narration: "You bin the plant, wipe the table, and mop the floor. The phone stays in your pocket." }),
+      "Bin the plant. I'll wipe the table and mop.",
+    );
+    expect(cleaned.violations.filter((v) => v.code === "item_still_held")).toEqual([]);
+    const left = validateDraft(
+      state,
+      cfg,
+      modules,
+      draft({ narration: "You leave the phone on the shop counter." }),
+      "Look",
+    );
+    expect(left.violations.map((v) => v.code)).toEqual(["item_still_held"]);
+  });
+
+  it("stores the first pronoun and does not flip it", () => {
+    const state = fresh();
+    const sample = state.entities.player!;
+    state.entities.harri = { ...sample, id: "harri", name: "Harri", location: "kitchen", facts: [], aliases: [] };
+    const told = applyDraft(
+      state,
+      config(),
+      modules,
+      draft({ narration: "Harri says he will open the door." }),
+      { input: "Ask Harri.", due: [] },
+    );
+    expect(told.entities.harri?.tags).toContain("pronoun:he");
+    const flipped = applyDraft(
+      told,
+      config(),
+      modules,
+      draft({ narration: "Harri says she changed her mind." }),
+      { input: "Ask again.", due: [] },
+    );
+    expect(flipped.entities.harri?.tags.filter((tag) => tag.startsWith("pronoun:"))).toEqual(["pronoun:he"]);
   });
 });

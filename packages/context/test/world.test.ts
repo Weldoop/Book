@@ -27,4 +27,42 @@ describe("world sheet", () => {
     const present = text.split("\n").find((line) => line.startsWith("Present:")) ?? "";
     expect(present).not.toContain("Glenys");
   });
+
+  it("keeps catalog prices and a visited place ahead of an unvisited one", () => {
+    const config = makeConfig({
+      items: [{ id: "loaf", name: "Loaf", price: 0.59 }],
+      stats: [{ key: "money", type: "currency", start: 10, display: "£" }],
+    });
+    const state = makeState();
+    state.entities.lidl = {
+      ...state.entities.cafe!,
+      id: "lidl",
+      name: "Lidl",
+      tags: [],
+      last_touched: 4,
+      facts: [],
+    };
+    state.entities.hospital = {
+      ...state.entities.cafe!,
+      id: "hospital",
+      name: "Hospital",
+      tags: ["unvisited"],
+      last_touched: 0,
+      facts: [{ text: "Mentioned once", importance: 1, turn: 0 }],
+    };
+    const text =
+      buildTurnContext({
+        config,
+        state,
+        modules: [],
+        input: "back to the shops",
+        kind: "act",
+        due: [],
+        budget: { world_sheet: 55 },
+      }).messages[0]?.content ?? "";
+    const sheet = text.split("## FOCUS ENTITIES")[0] ?? text;
+    expect(sheet).toContain("- loaf: Loaf, good, £0.59");
+    expect(sheet).toContain("lidl: Lidl");
+    expect(sheet).not.toContain("hospital: Hospital");
+  });
 });
