@@ -66,15 +66,21 @@ function occurrenceAffirmed(sentence: string, index: number, length: number): bo
   return true;
 }
 
+/** "4 p.m." and "4pm" are the same clock as "4 pm". */
+function normalizeClockWords(text: string): string {
+  return text.replace(/\b(\d{1,2})\s*([ap])\.?\s*m\.?\b/gi, (_match, hour: string, ap: string) => `${hour} ${ap.toLowerCase()}m`);
+}
+
 /** A probe passes when some sentence affirms a keyword as a whole word. A denial of that word does not. */
 export function scoreProbe(answer: string, expectAny: string[]): boolean {
-  const parts = answer
+  const normalizedAnswer = normalizeClockWords(answer);
+  const parts = normalizedAnswer
     .split(/[.!?\n]+/)
     .map((sentence) => sentence.trim())
     .filter((sentence) => sentence.length > 0);
-  const sentences = parts.length > 0 ? parts : [answer];
+  const sentences = parts.length > 0 ? parts : [normalizedAnswer];
   return expectAny.some((keyword) => {
-    const pattern = termPattern(keyword);
+    const pattern = termPattern(normalizeClockWords(keyword));
     if (!pattern) return false;
     return sentences.some((sentence) => {
       pattern.lastIndex = 0;

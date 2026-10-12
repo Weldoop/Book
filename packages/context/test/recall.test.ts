@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Fact } from "@book/schema";
 import { buildTurnContext } from "../src/index.ts";
-import { entityPlaces, recallHaystack, selectRecalledFacts } from "../src/recall.ts";
+import { answerFromSave, entityPlaces, recallHaystack, recallLines, selectRecalledFacts } from "../src/recall.ts";
 import { makeConfig, makeEntity, makeState, makeThread, statsModule } from "./fixtures.ts";
 
 function fact(text: string, importance: 1 | 2 | 3, turn: number): Fact {
@@ -80,5 +80,45 @@ describe("recall before the reply", () => {
     facts[0]!.expires = "2026-10-01T09:00";
     expect(selectRecalledFacts(facts, "2026-10-03T09:20", "bins", ["flat"], 6)).toEqual([]);
     expect(selectRecalledFacts([fact("Keeps the spare key", 2, 1)], "2026-10-03T09:20", "key", [], 0)).toEqual([]);
+  });
+});
+
+describe("an out-of-character answer from the save", () => {
+  const config = makeConfig();
+  const state = makeState({
+    entities: {
+      ...makeState().entities,
+      player: makeEntity({
+        id: "player",
+        name: "Nathan",
+        aliases: ["weldo"],
+        location: "flat",
+        facts: [{ text: "Goes by weldo with housemates", importance: 2, turn: 1 }],
+      }),
+    },
+    modules: {
+      stats: { values: { money: 10 }, ledger: [{ clock: "2026-10-03T10:56", key: "money", amount: -4.2, reason: "Sausage and egg cob" }] },
+      inventory: { owners: { player: { "salt-pork": 1 } } },
+    },
+    threads: [makeThread({ id: "t1", text: "Eighty doubloons owed to Crowe", status: "failed", due: "1717-05-10T12:00" })],
+  });
+
+  it("keeps player facts, the ledger and failed threads", () => {
+    const lines = recallLines(state, config);
+    expect(lines.some((line) => line.includes("weldo"))).toBe(true);
+    expect(lines.some((line) => line.includes("Sausage and egg cob"))).toBe(true);
+    expect(lines.some((line) => line.includes("salt-pork"))).toBe(true);
+    expect(lines.some((line) => line.includes("Eighty doubloons"))).toBe(true);
+  });
+
+  it("answers a nickname, a purchase and a debt from the save, and stays quiet otherwise", () => {
+    expect(answerFromSave(state, config, "What nickname do my housemates use?")).toContain("weldo");
+    expect(answerFromSave(state, config, "What did I order at the cafe?")).toContain("Sausage and egg cob");
+    expect(answerFromSave(state, config, "How many doubloons do I owe Captain Crowe?")).toMatch(/Eighty|eighty/);
+    expect(answerFromSave(state, config, "What time is it?")).toBeNull();
+  });
+
+  it("reads a fact that is not on the player", () => {
+    expect(answerFromSave(state, config, "When does Glenys want the mower back?")).toContain("4pm");
   });
 });
