@@ -64,10 +64,10 @@ describe("createProvider", () => {
     expect(createProvider("anthropic", { ANTHROPIC_API_KEY: "k" }).name).toBe("anthropic");
   });
   it("tells the user to set the grok key", () => {
-    expect(() => createProvider("grok", {})).toThrow(/XAI_API_KEY/);
+    expect(() => createProvider("xai", {})).toThrow(/XAI_API_KEY/);
   });
-  it("creates grok with a key", () => {
-    expect(createProvider("grok", { XAI_API_KEY: "k" }).name).toBe("grok");
+  it("creates xai with a key", () => {
+    expect(createProvider("xai", { XAI_API_KEY: "k" }).name).toBe("xai");
   });
   it("rejects unknown names", () => {
     expect(() => createProvider("x" as never, {})).toThrow(/Unknown provider/);

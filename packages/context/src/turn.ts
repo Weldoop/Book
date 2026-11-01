@@ -32,6 +32,8 @@ export interface BuildContextInput {
   fate?: number;
   budget?: Partial<ContextBudget>;
   outputOrder?: OutputOrder;
+  /** Romance may be written explicitly. Set only for a provider whose terms allow adult scenes. */
+  explicitRomance?: boolean;
 }
 
 export interface TurnAssembly {
@@ -46,7 +48,7 @@ export interface TurnAssembly {
 export function assembleTurn(i: BuildContextInput): TurnAssembly {
   const budget = resolveBudget(i.budget);
   const order = i.outputOrder ?? "narration_first";
-  const stat = buildStaticBlocks(i.config, i.modules, order, budget.module_fragments);
+  const stat = buildStaticBlocks(i.config, i.modules, order, budget.module_fragments, i.explicitRomance === true);
 
   const focusIds = mapAttention({
     config: i.config,

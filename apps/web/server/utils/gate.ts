@@ -3,6 +3,7 @@ import { createProvider } from "@book/llm";
 import type { LLMProvider } from "@book/schema";
 import type { H3Event } from "h3";
 import { SupabasePlayDb } from "../lib/supabase-db.ts";
+import { storyModelById } from "../../shared/play.ts";
 import type { PlayView } from "../../shared/play.ts";
 import type { PlayOutcome } from "../lib/session.ts";
 
@@ -42,14 +43,27 @@ export async function requireUserId(event: H3Event): Promise<string> {
   return data.user.id;
 }
 
-export function storyModel(): LLMProvider {
-  if (process.env.XAI_API_KEY?.trim()) return createProvider("grok", process.env);
-  if (process.env.ANTHROPIC_API_KEY?.trim()) return createProvider("anthropic", process.env);
-  throw createError({
-    statusCode: 500,
-    statusMessage: "No model key",
-    data: { error: "XAI_API_KEY is not set on the server." },
-  });
+export function storyModel(requested?: unknown): LLMProvider {
+  const choice = storyModelById(requested);
+  const env = { ...process.env, BOOK_MODEL_STRONG: choice.id, BOOK_MODEL_CHEAP: choice.cheap };
+  if (choice.provider === "xai") {
+    if (!process.env.XAI_API_KEY) {
+      throw createError({
+        statusCode: 500,
+        statusMessage: "No model key",
+        data: { error: "XAI_API_KEY is not set on the server." },
+      });
+    }
+    return createProvider("xai", env);
+  }
+  if (!process.env.ANTHROPIC_API_KEY) {
+    throw createError({
+      statusCode: 500,
+      statusMessage: "No model key",
+      data: { error: "ANTHROPIC_API_KEY is not set on the server." },
+    });
+  }
+  return createProvider("anthropic", env);
 }
 
 export function sendPlay(outcome: PlayOutcome): PlayView {

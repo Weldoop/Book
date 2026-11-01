@@ -588,10 +588,10 @@ The profile only changes the renderer. State and rules are identical, so a world
 
 ### 9.5 Content rating
 
-Config field: `clean | romance | mature`. The rating selects a prompt fragment and the allowed providers.
+Config field: `clean | romance | mature`. The rating selects a prompt fragment.
 
-- Hosted and trial play must follow the provider's usage policy: romance is allowed, explicit scenes fade to black.
-- Explicit content is a later, separate surface (BYO key or a provider whose terms allow it, age assurance, separate payment processor). Verify current Stripe, provider and Ofcom rules and take legal advice before building it.
+- Hosted play follows the provider's usage policy. On Claude, romance is allowed and explicit scenes fade to black. On Grok, romance may be explicit between adults. The play app's menu chooses the model (ADR 0030).
+- Age assurance, a payment processor that will take adult content, and Ofcom rules still need a check, and legal advice, before this is offered as a public adult product.
 - Sexual content involving minors is hard-blocked everywhere.
 
 ---
