@@ -43,14 +43,13 @@ export async function requireUserId(event: H3Event): Promise<string> {
 }
 
 export function storyModel(): LLMProvider {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw createError({
-      statusCode: 500,
-      statusMessage: "No model key",
-      data: { error: "ANTHROPIC_API_KEY is not set on the server." },
-    });
-  }
-  return createProvider("anthropic", process.env);
+  if (process.env.XAI_API_KEY?.trim()) return createProvider("grok", process.env);
+  if (process.env.ANTHROPIC_API_KEY?.trim()) return createProvider("anthropic", process.env);
+  throw createError({
+    statusCode: 500,
+    statusMessage: "No model key",
+    data: { error: "XAI_API_KEY is not set on the server." },
+  });
 }
 
 export function sendPlay(outcome: PlayOutcome): PlayView {

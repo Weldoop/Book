@@ -27,6 +27,10 @@ function num(raw: string | undefined, fallback: number): number {
 
 /** Published list prices by model family, so a tier pointed at another model is costed at that model's rate. */
 const MODEL_PRICES: [RegExp, Price][] = [
+  [/grok-4\.5/, { in: 2, out: 6, cached_in: 0.3 }],
+  [/grok-4\.3|grok-4\.20/, { in: 1.25, out: 2.5, cached_in: 0.2 }],
+  [/grok-build/, { in: 1, out: 2, cached_in: 0.2 }],
+  [/grok/, { in: 2, out: 6, cached_in: 0.5 }],
   [/haiku-4/, { in: 1, out: 5, cached_in: 0.1 }],
   [/haiku/, { in: 0.8, out: 4, cached_in: 0.08 }],
   [/opus/, { in: 15, out: 75, cached_in: 1.5 }],

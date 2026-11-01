@@ -1,14 +1,17 @@
 import type { LLMProvider } from "@book/schema";
 import { AnthropicProvider } from "./anthropic.ts";
 import type { AnthropicProviderOptions } from "./anthropic.ts";
+import { GrokProvider } from "./grok.ts";
+import type { GrokProviderOptions } from "./grok.ts";
 import { MockProvider } from "./mock.ts";
 import type { MockProviderOptions } from "./mock.ts";
 
-export type ProviderName = "mock" | "anthropic";
+export type ProviderName = "mock" | "anthropic" | "grok";
 
 export interface CreateProviderOptions {
   mock?: MockProviderOptions;
   anthropic?: AnthropicProviderOptions;
+  grok?: GrokProviderOptions;
 }
 
 export function createProvider(
@@ -23,5 +26,11 @@ export function createProvider(
     }
     return new AnthropicProvider({ ...opts.anthropic, env });
   }
-  throw new Error(`Unknown provider "${String(name)}". Use "mock" or "anthropic".`);
+  if (name === "grok") {
+    if (!env.XAI_API_KEY && !opts.grok?.apiKey) {
+      throw new Error("The grok provider needs an API key. Set the XAI_API_KEY environment variable.");
+    }
+    return new GrokProvider({ ...opts.grok, env });
+  }
+  throw new Error(`Unknown provider "${String(name)}". Use "mock", "anthropic", or "grok".`);
 }
