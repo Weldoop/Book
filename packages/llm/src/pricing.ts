@@ -31,6 +31,12 @@ const MODEL_PRICES: [RegExp, Price][] = [
   [/haiku/, { in: 0.8, out: 4, cached_in: 0.08 }],
   [/opus/, { in: 15, out: 75, cached_in: 1.5 }],
   [/sonnet/, { in: 3, out: 15, cached_in: 0.3 }],
+  // xAI list prices below the long-context threshold. This engine stays well under that.
+  [/grok-4\.[67]/, { in: 2, out: 6, cached_in: 0.5 }],
+  [/grok-4\.5/, { in: 2, out: 6, cached_in: 0.3 }],
+  [/grok-4\.(3|20)/, { in: 1.25, out: 2.5, cached_in: 0.2 }],
+  [/grok-build/, { in: 1, out: 2, cached_in: 0.2 }],
+  [/grok/, { in: 2, out: 6, cached_in: 0.5 }],
 ];
 
 export function priceForModel(model: string): Price | undefined {

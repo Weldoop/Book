@@ -63,6 +63,9 @@ describe("createProvider", () => {
   it("creates anthropic with a key", () => {
     expect(createProvider("anthropic", { ANTHROPIC_API_KEY: "k" }).name).toBe("anthropic");
   });
+  it("creates xai with a key", () => {
+    expect(createProvider("xai", { XAI_API_KEY: "k" }).name).toBe("xai");
+  });
   it("rejects unknown names", () => {
     expect(() => createProvider("x" as never, {})).toThrow(/Unknown provider/);
   });

@@ -3,7 +3,7 @@ import { MockProvider } from "@book/llm";
 import type { LLMProvider, LLMRequest } from "@book/schema";
 import { MemoryPlayDb } from "../server/lib/memory-db.ts";
 import { library, openGame, readHistory, readSave, redoTurn, takeTurn } from "../server/lib/session.ts";
-import { capMessage, cleanAccount, debugFromRecord, faultMessage, PAGE_MESSAGES, PERSON_CAP_USD, richText, tailWindow } from "../shared/play.ts";
+import { capMessage, cleanAccount, debugFromRecord, faultMessage, modelChoices, PAGE_MESSAGES, PERSON_CAP_USD, richText, storyModelById, tailWindow } from "../shared/play.ts";
 
 function scripted(): MockProvider {
   return new MockProvider({
@@ -101,8 +101,10 @@ describe("a played save", () => {
     expect(noLine.ok).toBe(false);
     if (!noLine.ok) expect(noLine.error).toMatch(/no line to edit/);
 
-    const books = await library(fresh, "ada");
+    const books = await library(fresh, "ada", {});
     expect(books.games.map((game) => game.id)).toEqual(["uk-life", "pirate"]);
+    expect(books.models.map((model) => model.label)).toEqual(["Claude Sonnet", "Claude Haiku", "Grok"]);
+    expect(books.models.every((model) => model.available === false)).toBe(true);
   });
 
   it("keeps the last line when a redo fails", async () => {
@@ -137,6 +139,18 @@ describe("a played save", () => {
     const result = await openGame(new MemoryPlayDb(), "ada", "nope", scripted());
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.status).toBe(400);
+  });
+});
+
+describe("models", () => {
+  it("offers Grok beside Claude, and only when that provider's key is set", () => {
+    expect(storyModelById("nope").id).toBe("claude-sonnet-4-6");
+    expect(storyModelById("grok-4.7").provider).toBe("xai");
+    expect(storyModelById("grok-4.7").cheap).toBe("grok-4.7");
+    const choices = modelChoices({ ANTHROPIC_API_KEY: "k", XAI_API_KEY: " " });
+    expect(choices.find((model) => model.id === "claude-sonnet-4-6")?.available).toBe(true);
+    expect(choices.find((model) => model.id === "grok-4.7")?.available).toBe(false);
+    expect(modelChoices({ XAI_API_KEY: "xai-key" }).find((model) => model.label === "Grok")?.available).toBe(true);
   });
 });
 

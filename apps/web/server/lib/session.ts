@@ -11,6 +11,7 @@ import {
   cleanInput,
   debugFromRecord,
   lastPlayerTurn,
+  modelChoices,
   OPENING_INPUT,
   PAGE_MESSAGES,
   PERSON_CAP_USD,
@@ -100,9 +101,13 @@ async function viewOf(db: PlayDb, userId: string, saveId: string): Promise<PlayS
   return { ok: true, view: toView(save, window, spentUsd) };
 }
 
-export async function library(db: PlayDb, userId: string): Promise<LibraryView> {
+export async function library(
+  db: PlayDb,
+  userId: string,
+  env: Record<string, string | undefined> = process.env,
+): Promise<LibraryView> {
   const [games, saves, spentUsd] = await Promise.all([Promise.resolve(listGames()), db.list(userId), db.spent(userId)]);
-  return { games, saves, spentUsd, capUsd: PERSON_CAP_USD };
+  return { games, saves, spentUsd, capUsd: PERSON_CAP_USD, models: modelChoices(env) };
 }
 
 async function playOn(

@@ -14,6 +14,10 @@ const RATING: Record<string, string> = {
   mature: "Content rating: mature. Mature themes are allowed within the model provider's usage policy.",
 };
 
+/** Romance on a provider whose terms allow adult scenes. Minors stay blocked by the line after this. */
+const EXPLICIT_ROMANCE =
+  "Content rating: romance. Explicit sexual scenes between adults are allowed. When the story goes there, write the scene; do not fade to black. Keep this book's voice and length. Everyone involved is an adult.";
+
 export function outputFormatText(order: OutputOrder, config?: Config): string {
   const keys =
     order === "delta_first"
@@ -157,7 +161,12 @@ function balanceLine(config: Config): string {
   return "- A currency balance is the currency stat in STATE. Never store money as a pile of objects.";
 }
 
-export function contractText(config: Config, modules: Module[], order: OutputOrder): string {
+export function contractText(
+  config: Config,
+  modules: Module[],
+  order: OutputOrder,
+  explicitRomance = false,
+): string {
   const style = config.gm_style;
   const tabletop = config.presentation.profile === "tabletop";
   const lines: string[] = [
@@ -208,7 +217,9 @@ export function contractText(config: Config, modules: Module[], order: OutputOrd
     workedExamples(config, modules),
     "",
     "CONTENT",
-    RATING[config.meta.content_rating] ?? RATING.clean ?? "",
+    explicitRomance && config.meta.content_rating === "romance"
+      ? EXPLICIT_ROMANCE
+      : (RATING[config.meta.content_rating] ?? RATING.clean ?? ""),
     "Never write any sexual content involving minors.",
     "",
     "OPS",
@@ -248,8 +259,9 @@ export function buildStaticBlocks(
   modules: Module[],
   order: OutputOrder,
   fragmentCap: number,
+  explicitRomance = false,
 ): StaticBlocks {
-  const contract = contractText(config, modules, order);
+  const contract = contractText(config, modules, order, explicitRomance);
   const frag = moduleFragmentsText(config, modules, fragmentCap);
   // Both blocks are the static prefix. ENGINE NOW and LAST TURNS are in the user message, after this prefix.
   const system: LLMSystemBlock[] = [{ text: contract, cache: true }];
