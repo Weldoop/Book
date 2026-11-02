@@ -90,6 +90,31 @@ describe("buildTurnContext structure", () => {
     const m = buildTurnContext({ config: mature, state: makeState(), modules, input: "x", kind: "act", due: [] });
     expect(m.system[0]?.text).toContain("usage policy");
     expect(m.system[0]?.text).toContain("involving minors");
+    const romance = makeConfig({ meta: { title: "T", tone: "t", content_rating: "romance" } });
+    const faded = buildTurnContext({ config: romance, state: makeState(), modules, input: "x", kind: "act", due: [] });
+    expect(faded.system[0]?.text).toContain("fades to black");
+    const explicit = buildTurnContext({
+      config: romance,
+      state: makeState(),
+      modules,
+      input: "x",
+      kind: "act",
+      due: [],
+      explicitRomance: true,
+    });
+    expect(explicit.system[0]?.text).toContain("Explicit sexual scenes between adults are allowed");
+    expect(explicit.system[0]?.text).not.toContain("fades to black");
+    expect(explicit.system[0]?.text).toContain("involving minors");
+    const cleanExplicit = buildTurnContext({
+      config: clean,
+      state: makeState(),
+      modules,
+      input: "x",
+      kind: "act",
+      due: [],
+      explicitRomance: true,
+    });
+    expect(cleanExplicit.system[0]?.text).toContain("No sexual content");
   });
 
   it("orders message sections and puts the player input last; omits empty sections", () => {

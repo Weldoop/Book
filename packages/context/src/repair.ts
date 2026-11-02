@@ -23,6 +23,8 @@ export interface RepairInput {
   due?: DueItem[];
   fate?: number;
   outputOrder?: OutputOrder;
+  /** Passed through so a rewrite keeps the same romance line as the draft it replaces. */
+  explicitRomance?: boolean;
 }
 
 export const REWRITE_RULE =
@@ -185,6 +187,7 @@ function buildRewriteRepair(i: RepairInput): BuiltContext {
     due: i.due ?? [],
     ...(i.fate !== undefined ? { fate: i.fate } : {}),
     ...(i.outputOrder ? { outputOrder: i.outputOrder } : {}),
+    ...(i.explicitRomance ? { explicitRomance: true } : {}),
   });
   const draft = capText(i.draftText, REJECTED_DRAFT_CAP);
   const extra = [

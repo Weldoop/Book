@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import type { HistoryPage, LibraryView, PlayView, TranscriptItem } from "~/shared/play";
-import { capMessage, cleanAccount, faultMessage, richText } from "~/shared/play";
+import { capMessage, cleanAccount, DEFAULT_STORY_MODEL, faultMessage, richText } from "~/shared/play";
 
 interface LogLine {
   key: string;
@@ -31,6 +31,8 @@ const logEl = ref<HTMLElement | null>(null);
 const composerEl = ref<HTMLTextAreaElement | null>(null);
 const textSize = ref("19px");
 const themeName = ref<"light" | "dark">("light");
+const MODEL_KEY = "book-model";
+const storyModel = ref(DEFAULT_STORY_MODEL);
 const transcript = ref<LogLine[]>([]);
 const earlier = ref<string | null>(null);
 const loadingEarlier = ref(false);
@@ -149,7 +151,7 @@ async function newGame(configId: string): Promise<void> {
   editing.value = false;
   busy.value = true;
   try {
-    applyView(await api<PlayView>("/api/saves", { configId }));
+    applyView(await api<PlayView>("/api/saves", { configId, model: storyModel.value }));
     draft.value = "";
     await loadLibrary();
     if (narrowScreen()) leftOpen.value = false;
@@ -167,7 +169,7 @@ async function send(): Promise<void> {
   fault.value = "";
   busy.value = true;
   try {
-    applyView(await api<PlayView>(path, { input: draft.value }));
+    applyView(await api<PlayView>(path, { input: draft.value, model: storyModel.value }));
     draft.value = "";
     editing.value = false;
     await loadLibrary();
@@ -291,6 +293,11 @@ function closePanels(): void {
   closeMenu();
 }
 
+function pickModel(id: string): void {
+  storyModel.value = id;
+  localStorage.setItem(MODEL_KEY, id);
+}
+
 function cycleSize(): void {
   const next = sizes[(sizes.indexOf(textSize.value) + 1) % sizes.length] ?? "19px";
   textSize.value = next;
@@ -314,6 +321,8 @@ watch(draft, async () => {
 onMounted(async () => {
   const storedSize = localStorage.getItem("book-text-size");
   if (storedSize && sizes.includes(storedSize)) textSize.value = storedSize;
+  const storedModel = localStorage.getItem(MODEL_KEY);
+  if (storedModel) storyModel.value = storedModel;
   themeName.value = localStorage.getItem("book-theme") === "dark" ? "dark" : "light";
   if (window.matchMedia("(min-width: 960px)").matches) leftOpen.value = true;
   if (!supabase) {
@@ -326,6 +335,14 @@ onMounted(async () => {
     session.value = next;
   });
   ready.value = true;
+});
+
+watch(library, (next) => {
+  if (!next) return;
+  const current = next.models.find((model) => model.id === storyModel.value);
+  if (current?.available) return;
+  const fallback = next.models.find((model) => model.available);
+  if (fallback) pickModel(fallback.id);
 });
 
 watch(session, (next, prev) => {
@@ -471,7 +488,23 @@ watch(session, (next, prev) => {
             {{ debugOpen ? "Back" : "Close" }}
           </button>
         </div>
-        <nav v-if="!debugOpen" class="menu-list" aria-label="Menu">
+        <template v-if="!debugOpen">
+        <div class="side-head"><h2>Model</h2></div>
+        <nav class="menu-list" aria-label="Model">
+          <button
+            v-for="model in library?.models ?? []"
+            :key="model.id"
+            type="button"
+            :class="{ active: storyModel === model.id }"
+            :disabled="!model.available"
+            @click="pickModel(model.id)"
+          >
+            <span>{{ model.label }}</span>
+            <small>{{ storyModel === model.id ? "On" : model.available ? "" : "No key" }}</small>
+          </button>
+        </nav>
+        <p class="model-note">Grok can write explicit romance. Claude fades those scenes out.</p>
+        <nav class="menu-list" aria-label="Menu">
           <button type="button" @click="cycleSize">
             <span>Text size</span>
             <small>{{ textSize }}</small>
@@ -488,6 +521,7 @@ watch(session, (next, prev) => {
             <span>Sign out</span>
           </button>
         </nav>
+        </template>
         <div v-else-if="view" class="debug">
           <p>${{ view.debug.spentUsd.toFixed(2) }} of ${{ view.debug.capUsd.toFixed(0) }} on this account</p>
           <p v-if="view.debug.turn === null">No turn yet.</p>

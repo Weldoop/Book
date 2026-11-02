@@ -6,7 +6,7 @@ Nuxt chat for testers. Email sign-in, one Supabase save list per account, a $5 c
 
 Copy `.env.example` to `.env` in this directory, or export the same names in the shell that runs Nuxt.
 
-`SUPABASE_SECRET_KEY` and `ANTHROPIC_API_KEY` stay on the server. The publishable key is the one the browser uses to sign in.
+`SUPABASE_SECRET_KEY`, `XAI_API_KEY`, and `ANTHROPIC_API_KEY` stay on the server. The publishable key is the one the browser uses to sign in. The play menu offers Claude when `ANTHROPIC_API_KEY` is set and Grok when `XAI_API_KEY` is set.
 
 ```bash
 pnpm --filter @book/web dev
@@ -33,7 +33,8 @@ Set these before the first build. Nuxt copies them into the server config at bui
 - `SUPABASE_URL` — `https://ddosgjvegwvhxfkwzlfb.supabase.co`
 - `SUPABASE_PUBLISHABLE_KEY` — the publishable key
 - `SUPABASE_SECRET_KEY` — the secret key
-- `ANTHROPIC_API_KEY`
+- `XAI_API_KEY` — enables Grok in the play menu
+- `ANTHROPIC_API_KEY` — enables Claude in the play menu
 
 When the deployment has a host, set the Supabase site URL to `https://<host>` and add `https://<host>/auth/callback` to the redirect allow list.
 

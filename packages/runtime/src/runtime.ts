@@ -107,6 +107,11 @@ function holdCompaction(state: State): State {
   };
 }
 
+/** Grok's terms allow adult fictional scenes. Other providers keep romance faded. */
+export function allowsExplicitRomance(llm: LLMProvider): boolean {
+  return llm.name === "xai";
+}
+
 export function createRuntime(opts: {
   config: Config;
   store: Store;
@@ -269,6 +274,7 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
 
   const fate = rollFate(state, config);
   const due = [...carryOn, ...collectDue(state, config, modules)];
+  const explicitRomance = allowsExplicitRomance(rt.llm);
   const ctx = buildTurnContext({
     config,
     state,
@@ -278,6 +284,7 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
     due,
     ...(fate !== undefined ? { fate } : {}),
     outputOrder: rt.outputOrder,
+    ...(explicitRomance ? { explicitRomance } : {}),
   });
 
   const usages: LLMUsage[] = [];
@@ -339,6 +346,7 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
         draftText: JSON.stringify(current.draft.delta),
         violations: current.violations,
         narration: current.draft.narration,
+        ...(explicitRomance ? { explicitRomance } : {}),
       });
       const askRepair = (hint?: string) =>
         call({
@@ -399,6 +407,7 @@ export async function playTurn(rt: Runtime, saveId: string, rawInput: string, ho
         ...(fate !== undefined ? { fate } : {}),
         due,
         outputOrder: rt.outputOrder,
+        ...(explicitRomance ? { explicitRomance } : {}),
       });
       const res = await call({
         tier: "strong",

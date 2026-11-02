@@ -1,3 +1,4 @@
+import { requestedModel } from "../../../../shared/play.ts";
 import { redoTurn } from "../../../lib/session.ts";
 
 export default defineEventHandler(async (event) => {
@@ -5,5 +6,5 @@ export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, "id") ?? "";
   const body = await readBody(event);
   const input = body && typeof body === "object" ? (body as { input?: unknown }).input : undefined;
-  return sendPlay(await redoTurn(playDatabase(event), userId, id, input, storyModel()));
+  return sendPlay(await redoTurn(playDatabase(event), userId, id, input, storyModel(requestedModel(body))));
 });

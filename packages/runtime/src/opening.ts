@@ -3,7 +3,7 @@ import { buildRepairContext, buildTurnContext } from "@book/context";
 import { renderView } from "@book/modules";
 import type { Attempt, Config, Module, State, TurnDraft, TurnRecord, Violation } from "@book/schema";
 import { parseDraftText } from "./parse.ts";
-import type { Runtime, TurnResult } from "./runtime.ts";
+import { allowsExplicitRomance, type Runtime, type TurnResult } from "./runtime.ts";
 
 const OPENING_MAX_TOKENS = 1000;
 const OPENING_INPUT = "The book opens.";
@@ -19,6 +19,7 @@ export async function openBook(rt: Runtime, saveId: string): Promise<TurnResult 
 
   const frame = prepareCast(saved, rt.config);
   const instruction = openingInstruction(rt.config, frame);
+  const explicitRomance = allowsExplicitRomance(rt.llm);
   const ctx = buildTurnContext({
     config: rt.config,
     state: frame,
@@ -26,6 +27,7 @@ export async function openBook(rt: Runtime, saveId: string): Promise<TurnResult 
     input: instruction,
     kind: "act",
     due: [],
+    ...(explicitRomance ? { explicitRomance } : {}),
   });
 
   const usages = [];
@@ -60,6 +62,7 @@ export async function openBook(rt: Runtime, saveId: string): Promise<TurnResult 
       violations: current.violations.length > 0 ? current.violations : unmetViolation(current.draft),
       ...(current.draft ? { narration: current.draft.narration } : {}),
       due: [],
+      ...(explicitRomance ? { explicitRomance } : {}),
     });
     const res = await rt.llm.complete({
       tier: "strong",

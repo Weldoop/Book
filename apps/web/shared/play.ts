@@ -72,11 +72,53 @@ export interface PlayView {
   capUsd: number;
 }
 
+export interface StoryModelChoice {
+  id: string;
+  label: string;
+  provider: "anthropic" | "xai";
+  /** Model used for compaction and cheap repairs while this one writes the story. */
+  cheap: string;
+}
+
+/** Models the play app can switch to. The first is the default. */
+export const STORY_MODELS: readonly StoryModelChoice[] = [
+  { id: "claude-sonnet-4-6", label: "Claude Sonnet", provider: "anthropic", cheap: "claude-haiku-4-5-20251001" },
+  { id: "claude-haiku-4-5-20251001", label: "Claude Haiku", provider: "anthropic", cheap: "claude-haiku-4-5-20251001" },
+  { id: "grok-4.7", label: "Grok", provider: "xai", cheap: "grok-4.7" },
+];
+
+export const DEFAULT_STORY_MODEL = STORY_MODELS[0]?.id ?? "claude-sonnet-4-6";
+
+export interface ModelChoice {
+  id: string;
+  label: string;
+  available: boolean;
+}
+
+export function storyModelById(id: unknown): StoryModelChoice {
+  const found = typeof id === "string" ? STORY_MODELS.find((model) => model.id === id) : undefined;
+  return found ?? STORY_MODELS[0]!;
+}
+
+export function modelChoices(env: Record<string, string | undefined>): ModelChoice[] {
+  return STORY_MODELS.map((model) => ({
+    id: model.id,
+    label: model.label,
+    available: Boolean(env[model.provider === "xai" ? "XAI_API_KEY" : "ANTHROPIC_API_KEY"]?.trim()),
+  }));
+}
+
+export function requestedModel(body: unknown): unknown {
+  if (!body || typeof body !== "object") return undefined;
+  return (body as { model?: unknown }).model;
+}
+
 export interface LibraryView {
   games: GameCard[];
   saves: SaveSummary[];
   spentUsd: number;
   capUsd: number;
+  models: ModelChoice[];
 }
 
 /** Lines brought back when the reader scrolls above the page already shown. */

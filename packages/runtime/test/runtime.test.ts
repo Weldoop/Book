@@ -4,7 +4,7 @@ import { getActiveModules, statsOf } from "@book/modules";
 import { ConfigSchema, type Config, type LLMProvider, type LLMRequest } from "@book/schema";
 import { MemoryStore } from "@book/store";
 import { describe, expect, it } from "vitest";
-import { createRuntime, newGame, openBook, playTurn } from "../src/index.ts";
+import { allowsExplicitRomance, createRuntime, newGame, openBook, playTurn } from "../src/index.ts";
 
 const config: Config = ConfigSchema.parse(JSON.parse(readFileSync(new URL("../../../configs/uk-life/config.json", import.meta.url), "utf8")));
 
@@ -37,6 +37,22 @@ function scripted(responses: Record<string, string[]>): LLMProvider & { calls: L
 const draft = (delta: unknown[], narration = "Rain taps the window.") => JSON.stringify({ narration, delta, beat: "Something happened." });
 
 describe("playTurn", () => {
+  it("lets Grok write explicit romance and keeps Claude faded", async () => {
+    expect(allowsExplicitRomance({ name: "xai", complete: () => Promise.reject(new Error("unused")) })).toBe(true);
+    const grok = scripted({ turn: [draft([])] });
+    grok.name = "xai";
+    const claude = scripted({ turn: [draft([])] });
+    claude.name = "anthropic";
+    await playTurn((await setup(grok)).rt, "s1", "Look around");
+    await playTurn((await setup(claude)).rt, "s1", "Look around");
+    const grokContract = grok.calls[0]?.system.map((b) => b.text).join("\n") ?? "";
+    const claudeContract = claude.calls[0]?.system.map((b) => b.text).join("\n") ?? "";
+    expect(grokContract).toContain("Explicit sexual scenes between adults are allowed");
+    expect(grokContract).toContain("involving minors");
+    expect(claudeContract).toContain("fades to black");
+    expect(claudeContract).not.toContain("Explicit sexual scenes");
+  });
+
   it("commits a valid turn and renders the status line in code", async () => {
     const { rt, store } = await setup(new MockProvider());
     const res = await playTurn(rt, "s1", "Look around");
