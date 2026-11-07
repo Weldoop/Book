@@ -210,6 +210,11 @@ export class SupabasePlayDb implements PlayDb {
     await expectOk(error, "update save");
   }
 
+  async removeSave(userId: string, saveId: string): Promise<void> {
+    const { error } = await this.client.from("saves").delete().eq("user_id", userId).eq("id", saveId);
+    await expectOk(error, "delete save");
+  }
+
   async appendTurn(turn: StoredTurn): Promise<void> {
     const { error } = await this.client.from("turns").insert({
       id: turn.id,

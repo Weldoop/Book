@@ -93,6 +93,18 @@ export class MemoryPlayDb implements PlayDb {
     this.saves.set(save.id, structuredClone(save));
   }
 
+  async removeSave(userId: string, saveId: string): Promise<void> {
+    const existing = this.saves.get(saveId);
+    if (!existing || existing.userId !== userId) return;
+    this.saves.delete(saveId);
+    for (let i = this.turns.length - 1; i >= 0; i -= 1) {
+      const turn = this.turns[i];
+      if (!turn || turn.saveId !== saveId || turn.userId !== userId) continue;
+      this.missingState.delete(turn.id);
+      this.turns.splice(i, 1);
+    }
+  }
+
   async appendTurn(turn: StoredTurn): Promise<void> {
     this.turns.push(structuredClone(turn));
   }

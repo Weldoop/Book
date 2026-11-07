@@ -201,6 +201,15 @@ export async function readSave(db: PlayDb, userId: string, saveId: string): Prom
   return viewOf(db, userId, saveId);
 }
 
+export async function removeSave(db: PlayDb, userId: string, saveId: string): Promise<{ ok: true } | PlayFailure> {
+  const id = saveId.trim();
+  if (!id) return fail(400, "Say which save to remove.");
+  const save = await db.loadSave(userId, id);
+  if (!save) return fail(404, "That save is not on this account.");
+  await db.removeSave(userId, id);
+  return { ok: true };
+}
+
 export async function readHistory(
   db: PlayDb,
   userId: string,

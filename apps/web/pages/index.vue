@@ -120,9 +120,9 @@ function onLogScroll(): void {
   void loadEarlier();
 }
 
-async function api<T>(path: string, body?: unknown): Promise<T> {
+async function api<T>(path: string, body?: unknown, method?: "DELETE"): Promise<T> {
   return await $fetch<T>(path, {
-    method: body === undefined ? "GET" : "POST",
+    method: method ?? (body === undefined ? "GET" : "POST"),
     body,
     headers: token() ? { authorization: `Bearer ${token()}` } : {},
   });
@@ -140,6 +140,35 @@ async function openSave(id: string): Promise<void> {
     applyView(await api<PlayView>(`/api/saves/${id}`));
     draft.value = "";
     if (narrowScreen()) leftOpen.value = false;
+  } catch (err) {
+    fault.value = faultMessage(err);
+  } finally {
+    busy.value = false;
+  }
+}
+
+function clearPlay(): void {
+  viewGen += 1;
+  view.value = null;
+  transcript.value = [];
+  earlier.value = null;
+  editing.value = false;
+  draft.value = "";
+}
+
+async function discardSave(save: { id: string; title: string }): Promise<void> {
+  if (busy.value) return;
+  const confirmed = window.confirm(`Remove "${save.title}"? This save is gone for good.`);
+  if (!confirmed) return;
+  fault.value = "";
+  busy.value = true;
+  try {
+    await api(`/api/saves/${encodeURIComponent(save.id)}`, undefined, "DELETE");
+    if (view.value?.id === save.id) clearPlay();
+    if (library.value) {
+      library.value = { ...library.value, saves: library.value.saves.filter((item) => item.id !== save.id) };
+    }
+    await loadLibrary();
   } catch (err) {
     fault.value = faultMessage(err);
   } finally {
@@ -441,36 +470,49 @@ watch(session, (next, prev) => {
     <div class="stage">
       <button v-if="leftOpen || rightOpen" class="scrim" type="button" aria-label="Close panels" @click="closePanels" />
       <aside class="panel left" :class="{ open: leftOpen }">
-        <div class="side-head">
-          <h2>New game</h2>
-          <button class="icon" type="button" @click="leftOpen = false">Close</button>
+        <div class="side-scroll">
+          <div class="side-head">
+            <h2>New game</h2>
+            <button class="icon" type="button" @click="leftOpen = false">Close</button>
+          </div>
+          <div class="games">
+            <button
+              v-for="game in library?.games ?? []"
+              :key="game.id"
+              type="button"
+              :disabled="busy || !!capped"
+              @click="newGame(game.id)"
+            >
+              {{ game.title }}
+            </button>
+          </div>
+          <div class="side-head"><h2>Your saves</h2></div>
+          <div class="saves">
+            <div v-for="save in library?.saves ?? []" :key="save.id" class="save" :class="{ active: view?.id === save.id }">
+              <button type="button" class="save-open" :disabled="busy" @click="openSave(save.id)">
+                {{ save.title }}
+                <small>Turn {{ save.turn }}{{ save.ended ? " · ended" : "" }}</small>
+              </button>
+              <button
+                class="save-remove"
+                type="button"
+                :aria-label="`Remove ${save.title}`"
+                :disabled="busy"
+                @click="discardSave(save)"
+              >
+                <span aria-hidden="true">×</span>
+              </button>
+            </div>
+            <p v-if="library && library.saves.length === 0" class="empty">No saves yet.</p>
+          </div>
         </div>
-        <div class="games">
-          <button
-            v-for="game in library?.games ?? []"
-            :key="game.id"
-            type="button"
-            :disabled="busy || !!capped"
-            @click="newGame(game.id)"
-          >
-            {{ game.title }}
-          </button>
-        </div>
-        <div class="side-head"><h2>Your saves</h2></div>
-        <div class="saves">
-          <button
-            v-for="save in library?.saves ?? []"
-            :key="save.id"
-            type="button"
-            :class="{ active: view?.id === save.id }"
-            :disabled="busy"
-            @click="openSave(save.id)"
-          >
-            {{ save.title }}
-            <small>Turn {{ save.turn }}{{ save.ended ? " · ended" : "" }}</small>
-          </button>
-          <p v-if="library && library.saves.length === 0" class="empty">No saves yet.</p>
-        </div>
+        <footer class="account-foot">
+          <p class="who">
+            <span>Signed in</span>
+            {{ session?.user.email || "Account" }}
+          </p>
+          <button type="button" @click="signOut">Log out</button>
+        </footer>
       </aside>
       <section class="story">
         <div ref="logEl" class="log" @scroll="onLogScroll">

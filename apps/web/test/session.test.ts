@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { MockProvider } from "@book/llm";
 import type { LLMProvider, LLMRequest } from "@book/schema";
 import { MemoryPlayDb } from "../server/lib/memory-db.ts";
-import { library, openGame, readHistory, readSave, redoTurn, takeTurn } from "../server/lib/session.ts";
+import { library, openGame, readHistory, readSave, redoTurn, removeSave, takeTurn } from "../server/lib/session.ts";
 import { capMessage, cleanAccount, debugFromRecord, faultMessage, modelChoices, PAGE_MESSAGES, PERSON_CAP_USD, richText, storyModelById, tailWindow } from "../shared/play.ts";
 
 function scripted(): MockProvider {
@@ -139,6 +139,35 @@ describe("a played save", () => {
     const result = await openGame(new MemoryPlayDb(), "ada", "nope", scripted());
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.status).toBe(400);
+  });
+
+  it("removes one save, keeps the money spent, and leaves other accounts alone", async () => {
+    const db = new MemoryPlayDb();
+    const opened = await openGame(db, "ada", "uk-life", scripted());
+    if (!opened.ok) throw new Error(opened.error);
+    const played = await takeTurn(db, "ada", opened.view.id, "hello there", scripted());
+    if (!played.ok) throw new Error(played.error);
+    const other = await openGame(db, "bea", "pirate", scripted());
+    if (!other.ok) throw new Error(other.error);
+    await db.charge("ada", opened.view.id, 1.25);
+    const spent = await db.spent("ada");
+
+    const removed = await removeSave(db, "ada", opened.view.id);
+    expect(removed).toEqual({ ok: true });
+    expect(await db.list("ada")).toEqual([]);
+    expect(await db.spent("ada")).toBe(spent);
+    expect(await db.windowTurns("ada", opened.view.id, null, 20)).toEqual({ turns: [], before: null });
+    const gone = await readSave(db, "ada", opened.view.id);
+    expect(gone.ok).toBe(false);
+    if (!gone.ok) expect(gone.status).toBe(404);
+
+    const stranger = await removeSave(db, "ada", other.view.id);
+    expect(stranger.ok).toBe(false);
+    if (!stranger.ok) expect(stranger.status).toBe(404);
+    expect((await db.list("bea")).map((save) => save.id)).toEqual([other.view.id]);
+    const blank = await removeSave(db, "ada", "  ");
+    expect(blank.ok).toBe(false);
+    if (!blank.ok) expect(blank.status).toBe(400);
   });
 });
 
