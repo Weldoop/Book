@@ -34,6 +34,7 @@ const themeName = ref<"light" | "dark">("light");
 const MODEL_KEY = "book-model";
 const storyModel = ref(DEFAULT_STORY_MODEL);
 const transcript = ref<LogLine[]>([]);
+const pendingKey = ref<string | null>(null);
 const earlier = ref<string | null>(null);
 const loadingEarlier = ref(false);
 const pinning = ref(false);
@@ -165,19 +166,60 @@ async function newGame(configId: string): Promise<void> {
 async function send(): Promise<void> {
   if (!view.value || busy.value || capped.value) return;
   if (view.value.ended && !editing.value) return;
-  const path = editing.value ? `/api/saves/${view.value.id}/redo` : `/api/saves/${view.value.id}/turn`;
+  const input = draft.value;
+  const wasEditing = editing.value;
+  const path = wasEditing ? `/api/saves/${view.value.id}/redo` : `/api/saves/${view.value.id}/turn`;
   fault.value = "";
   busy.value = true;
+  const undo = holdOutgoing(input, wasEditing);
+  draft.value = "";
+  editing.value = false;
+  await nextTick();
+  fitComposer();
+  await pinToEnd();
+  let committed = false;
   try {
-    applyView(await api<PlayView>(path, { input: draft.value, model: storyModel.value }));
-    draft.value = "";
-    editing.value = false;
+    applyView(await api<PlayView>(path, { input, model: storyModel.value }));
+    committed = true;
+    pendingKey.value = null;
     await loadLibrary();
   } catch (err) {
+    if (!committed) {
+      undo();
+      draft.value = input;
+      editing.value = wasEditing;
+      await nextTick();
+      fitComposer();
+    }
     fault.value = faultMessage(err);
   } finally {
     busy.value = false;
   }
+}
+
+/** Show the line on the right while the page turns, and put it back if the turn fails. */
+function holdOutgoing(input: string, wasEditing: boolean): () => void {
+  if (wasEditing) {
+    const index = lastPlayerIndex.value;
+    const previous = index >= 0 ? transcript.value[index] : undefined;
+    if (!previous) return () => {};
+    pendingKey.value = previous.key;
+    transcript.value.splice(index, 1, { ...previous, text: input });
+    return () => {
+      pendingKey.value = null;
+      const current = transcript.value[index];
+      if (current?.key === previous.key) transcript.value.splice(index, 1, previous);
+    };
+  }
+  if (!input.trim()) return () => {};
+  lineKey += 1;
+  const key = `line-${lineKey}`;
+  pendingKey.value = key;
+  transcript.value = [...transcript.value, { key, kind: "player", text: input }];
+  return () => {
+    pendingKey.value = null;
+    transcript.value = transcript.value.filter((line) => line.key !== key);
+  };
 }
 
 function fitComposer(): void {
@@ -439,17 +481,20 @@ watch(session, (next, prev) => {
           <p
             v-for="(line, index) in transcript"
             :key="line.key"
-            :class="[line.kind, { 'being-edited': editing && index === lastPlayerIndex }]"
+            :class="[line.kind, { 'being-edited': editing && index === lastPlayerIndex, 'just-sent': line.key === pendingKey }]"
           >
             <template v-for="(part, partIndex) in richText(line.text)" :key="partIndex">
               <strong v-if="part.bold">{{ part.text }}</strong>
               <template v-else>{{ part.text }}</template>
             </template>
           </p>
+          <p v-if="busy" class="turning" role="status" aria-live="polite">
+            <span class="quire" aria-hidden="true"><span class="leaf"></span><span class="leaf under"></span></span>
+            The page is turning…
+          </p>
         </div>
         <form class="dock" :aria-busy="busy" @submit.prevent="send">
-          <p v-if="busy" class="turning" role="status" aria-live="polite">The page is turning…</p>
-          <template v-else>
+          <template v-if="!busy">
             <div v-if="view && !editing && view.suggestions.length" class="offers">
               <button v-for="offer in view.suggestions" :key="offer" type="button" @click="useSuggestion(offer)">
                 {{ offer }}
