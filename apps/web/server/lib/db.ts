@@ -61,6 +61,8 @@ export interface PlayDb {
   lastEditable(userId: string, saveId: string): Promise<EditableTurn | null>;
   insertSave(save: StoredSave): Promise<void>;
   updateSave(save: StoredSave): Promise<void>;
+  /** Removes one save and its turns. Charges stay on the account. */
+  removeSave(userId: string, saveId: string): Promise<void>;
   appendTurn(turn: StoredTurn): Promise<void>;
   deleteTurn(userId: string, saveId: string, turnId: string): Promise<void>;
   /** Money already spent at the provider, including a call that did not commit. */
